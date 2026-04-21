@@ -69,3 +69,35 @@ Melhorar a percepção visual do app antes do Lovable, concentrando a primeira e
 2. melhorar a tela de campanhas
 3. revisão final de responsividade
 4. polimento visual final antes do Lovable
+
+## 2026-04-21 — Etapa 4 iniciada
+
+### Objetivo do bloco
+
+Transformar a tela de campanhas em uma biblioteca de playbooks mais clara para avaliação, sem mexer no fluxo já validado da Edge Function.
+
+### Alterações implementadas
+
+- `src/App.tsx`
+  - resumo executivo de campanhas no topo
+  - biblioteca de playbooks com cards e status
+  - formulário de campanha com mais hierarquia visual
+  - hints curtos para nome, gatilho, contexto e prompt
+
+- `src/styles.css`
+  - grid específico para o workspace de campanhas
+  - chips de status para campanhas ativas/inativas e com/sem gatilho
+  - cards de playbook e ajustes responsivos
+
+### Validações executadas
+
+- `npm run lint`
+- `npm run test`
+- `npm run build`
+- `npm run test:smoke:crm`
+- checagem visual local da tela de campanhas
+
+### Observações
+
+- alguns registros antigos de depuração no banco continuam com texto legado e acentuação ruim; isso é dado histórico, não regressão do componente novo
+- o próximo alvo com maior ganho visual continua sendo a tela de leads

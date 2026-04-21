@@ -608,6 +608,117 @@ h3 {
   gap: 18px;
 }
 
+.campaign-summary-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.campaign-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 0.95fr) minmax(320px, 1.05fr);
+}
+
+.campaign-form,
+.campaign-library {
+  align-content: start;
+}
+
+.campaign-form-heading {
+  display: grid;
+  gap: 6px;
+}
+
+.campaign-form-heading p,
+.campaign-card-header p,
+.campaign-card-section p,
+.field-hint {
+  color: #61706d;
+  line-height: 1.5;
+}
+
+.field-hint {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.campaign-card-list {
+  display: grid;
+  gap: 12px;
+}
+
+.campaign-card-playbook {
+  background: #f8fbfa;
+  border: 1px solid #e1e9e6;
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.campaign-card-selected {
+  border-color: rgba(29, 95, 99, 0.28);
+  box-shadow: 0 0 0 1px rgba(29, 95, 99, 0.12);
+}
+
+.campaign-card-header {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.campaign-card-header > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.campaign-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.campaign-chip {
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 6px 10px;
+}
+
+.campaign-chip-active {
+  background: #e3f5eb;
+  color: #236642;
+}
+
+.campaign-chip-inactive {
+  background: #eef2f1;
+  color: #50605d;
+}
+
+.campaign-chip-trigger {
+  background: #eef1fb;
+  color: #314d8b;
+}
+
+.campaign-chip-idle {
+  background: #fff3de;
+  color: #8d5c08;
+}
+
+.campaign-card-section {
+  display: grid;
+  gap: 6px;
+}
+
+.campaign-card-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .message-toolbar {
   align-items: end;
   display: grid;
@@ -975,6 +1086,8 @@ h3 {
   .auth-links,
   .dashboard-hero,
   .dashboard-grid,
+  .campaign-summary-grid,
+  .campaign-grid,
   .message-overview-grid,
   .chat-summary-grid,
   .chat-modal-footer {
@@ -1005,7 +1118,8 @@ h3 {
   }
 
   .message-toolbar,
-  .message-card-footer {
+  .message-card-footer,
+  .campaign-card-header {
     grid-template-columns: 1fr;
   }
 
@@ -1094,6 +1208,11 @@ h3 {
   .message-card-footer,
   .chat-modal-footer {
     grid-template-columns: 1fr;
+  }
+
+  .campaign-chip-row,
+  .campaign-card-actions {
+    justify-content: flex-start;
   }
 
   .activity-item time {

@@ -12,6 +12,7 @@ import {
   RefreshCcw,
   ShieldAlert,
   Users,
+  Workflow,
 } from 'lucide-react';
 import { DashboardScreen } from './components/dashboard-screen';
 import { MessagesScreen } from './components/messages-screen';
@@ -1066,42 +1067,113 @@ function CampaignsView({
   setNotice: (message: string | null) => void;
 }) {
   const [editing, setEditing] = useState<Campaign | null>(null);
+  const activeCampaigns = data.campaigns.filter((campaign) => campaign.is_active).length;
+  const campaignsWithTrigger = data.campaigns.filter((campaign) => campaign.trigger_stage_id).length;
+  const stageNameById = new Map(data.stages.map((stage) => [stage.id, stage.name]));
+  const summarize = (text: string, limit = 150) => (text.length > limit ? `${text.slice(0, limit).trim()}...` : text);
+
   return (
     <section className="stack">
-      <Header title="Campanhas" subtitle="Contexto e prompt usados pela Edge Function de IA." />
-      <CampaignForm
-        data={data}
-        user={user}
-        campaign={editing}
-        onCancel={() => setEditing(null)}
-        onSaved={() => {
-          setEditing(null);
-          setNotice('Campanha salva.');
-          void onReload();
-        }}
-        setError={setError}
-      />
-      <section className="panel">
-        <h2>Campanhas cadastradas</h2>
-        {data.campaigns.length === 0 ? (
-          <p className="empty">Nenhuma campanha criada.</p>
-        ) : (
-          <div className="campaign-list">
-            {data.campaigns.map((campaign) => (
-              <article key={campaign.id}>
-                <div>
-                  <strong>{campaign.name}</strong>
-                  <span>{campaign.is_active ? 'Ativa' : 'Inativa'}</span>
-                </div>
-                <p>{campaign.context_text}</p>
-                <button type="button" className="ghost compact" onClick={() => setEditing(campaign)}>
-                  Editar
-                </button>
-              </article>
-            ))}
+      <Header title="Campanhas" subtitle="Playbooks de abordagem, contexto e gatilhos usados pela Edge Function de IA." />
+
+      <div className="campaign-summary-grid">
+        <article className="overview-card">
+          <div className="overview-card-topline">
+            <span className="section-kicker">Playbooks cadastrados</span>
+            <Megaphone aria-hidden />
           </div>
-        )}
-      </section>
+          <strong>{data.campaigns.length}</strong>
+          <p>Campanhas disponíveis para orientar a abordagem comercial do avaliador.</p>
+        </article>
+        <article className="overview-card">
+          <div className="overview-card-topline">
+            <span className="section-kicker">Campanhas ativas</span>
+            <CheckCircle2 aria-hidden />
+          </div>
+          <strong>{activeCampaigns}</strong>
+          <p>Playbooks já prontos para geração imediata de mensagens pela IA.</p>
+        </article>
+        <article className="overview-card overview-card-accent">
+          <div className="overview-card-topline">
+            <span className="section-kicker">Gatilhos automáticos</span>
+            <Workflow aria-hidden />
+          </div>
+          <strong>{campaignsWithTrigger}</strong>
+          <p>Campanhas ligadas a etapas do funil, úteis para demonstrar automação orientada a processo.</p>
+        </article>
+      </div>
+
+      <div className="campaign-grid">
+        <CampaignForm
+          data={data}
+          user={user}
+          campaign={editing}
+          onCancel={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            setNotice('Campanha salva.');
+            void onReload();
+          }}
+          setError={setError}
+        />
+
+        <section className="panel campaign-library">
+          <div className="panel-heading">
+            <div>
+              <span className="section-kicker">Biblioteca de playbooks</span>
+              <h2>Campanhas cadastradas</h2>
+            </div>
+            <span className="panel-meta">Selecione uma campanha para editar contexto, prompt e etapa gatilho.</span>
+          </div>
+
+          {data.campaigns.length === 0 ? (
+            <p className="empty">Nenhuma campanha criada.</p>
+          ) : (
+            <div className="campaign-card-list">
+              {data.campaigns.map((campaign) => {
+                const triggerStageName = campaign.trigger_stage_id ? stageNameById.get(campaign.trigger_stage_id) ?? 'Etapa removida' : null;
+                return (
+                  <article
+                    key={campaign.id}
+                    className={`campaign-card-playbook ${editing?.id === campaign.id ? 'campaign-card-selected' : ''}`}
+                  >
+                    <div className="campaign-card-header">
+                      <div>
+                        <strong>{campaign.name}</strong>
+                        <p>{triggerStageName ? `Gatilho em ${triggerStageName}` : 'Sem gatilho automático configurado.'}</p>
+                      </div>
+                      <div className="campaign-chip-row">
+                        <span className={`campaign-chip ${campaign.is_active ? 'campaign-chip-active' : 'campaign-chip-inactive'}`}>
+                          {campaign.is_active ? 'Ativa' : 'Inativa'}
+                        </span>
+                        <span className={`campaign-chip ${triggerStageName ? 'campaign-chip-trigger' : 'campaign-chip-idle'}`}>
+                          {triggerStageName ? 'Com gatilho' : 'Sem gatilho'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="campaign-card-section">
+                      <span className="section-kicker">Contexto</span>
+                      <p>{summarize(campaign.context_text)}</p>
+                    </div>
+
+                    <div className="campaign-card-section">
+                      <span className="section-kicker">Prompt de geração</span>
+                      <p>{summarize(campaign.generation_prompt)}</p>
+                    </div>
+
+                    <div className="campaign-card-actions">
+                      <button type="button" className="ghost compact" onClick={() => setEditing(campaign)}>
+                        Editar playbook
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
     </section>
   );
 }
@@ -1151,9 +1223,13 @@ function CampaignForm({
   }
 
   return (
-    <form className="panel form-grid" onSubmit={submit}>
+    <form className="panel form-grid campaign-form" onSubmit={submit}>
       <div className="form-heading">
-        <h2>{campaign ? 'Editar campanha' : 'Nova campanha'}</h2>
+        <div className="campaign-form-heading">
+          <span className="section-kicker">{campaign ? 'Refinando playbook' : 'Novo playbook'}</span>
+          <h2>{campaign ? 'Editar campanha' : 'Nova campanha'}</h2>
+          <p>Configure o contexto comercial que alimenta a Edge Function e deixa a demonstração da IA mais convincente.</p>
+        </div>
         {campaign && (
           <button type="button" className="ghost compact" onClick={onCancel}>
             Cancelar edição
@@ -1163,6 +1239,7 @@ function CampaignForm({
       <label>
         Nome
         <input name="campaignName" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+        <span className="field-hint">Use um nome que deixe claro o objetivo da abordagem.</span>
       </label>
       <label>
         Etapa gatilho
@@ -1178,6 +1255,7 @@ function CampaignForm({
             </option>
           ))}
         </select>
+        <span className="field-hint">Opcional. Quando definido, a campanha passa a representar um gatilho do funil.</span>
       </label>
       <label className="check inline-check">
         <input
@@ -1191,6 +1269,7 @@ function CampaignForm({
       <label className="wide">
         Contexto
         <textarea name="campaignContext" value={form.context_text} onChange={(event) => setForm({ ...form, context_text: event.target.value })} required />
+        <span className="field-hint">Descreva rapidamente o cenário, produto e dor comercial que a IA deve considerar.</span>
       </label>
       <label className="wide">
         Prompt de geração
@@ -1200,6 +1279,7 @@ function CampaignForm({
           onChange={(event) => setForm({ ...form, generation_prompt: event.target.value })}
           required
         />
+        <span className="field-hint">Explique o tom, a intenção e o tipo de CTA que a mensagem deve produzir.</span>
       </label>
       <div className="wide">
         <button type="submit">Salvar campanha</button>
