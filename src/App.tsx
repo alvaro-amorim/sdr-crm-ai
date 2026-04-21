@@ -187,7 +187,7 @@ export default function App() {
     try {
       const workspace = await createWorkspaceWithDefaults(supabase, session.user, name);
       setData(await loadCrmData(supabase, workspace));
-      setNotice('Workspace criado com funil padrao.');
+      setNotice('Workspace criado com funil padrão.');
     } catch (workspaceError) {
       setError(getSafeMessage(workspaceError));
     } finally {
@@ -196,11 +196,11 @@ export default function App() {
   }
 
   if (envError || !supabase) {
-    return <SetupError message={envError ?? 'Supabase nao configurado.'} />;
+    return <SetupError message={envError ?? 'Supabase não configurado.'} />;
   }
 
   if (loading) {
-    return <FullPageState title="Carregando sessao" />;
+    return <FullPageState title="Carregando sessão" />;
   }
 
   if (!session) {
@@ -266,9 +266,9 @@ function SetupError({ message }: { message: string }) {
     <main className="setup-screen">
       <section className="setup-panel">
         <ShieldAlert aria-hidden />
-        <h1>Ambiente nao configurado</h1>
+        <h1>Ambiente não configurado</h1>
         <p>{message}</p>
-        <p>Crie um arquivo .env.local com as variaveis de .env.example e reinicie o servidor.</p>
+        <p>Crie um arquivo .env.local com as variáveis de .env.example e reinicie o servidor.</p>
       </section>
     </main>
   );
@@ -323,7 +323,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
         if (result.error) throw result.error;
         setSuccess(
           result.data.session
-            ? 'Cadastro criado. Voce ja esta autenticado.'
+            ? 'Cadastro criado. Você já está autenticado.'
             : 'Cadastro criado. Verifique seu e-mail para confirmar a conta antes de entrar.',
         );
       } else {
@@ -371,7 +371,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
               ? 'Acesse seu workspace.'
               : mode === 'signup'
                 ? 'Crie uma conta para iniciar o CRM.'
-                : 'Informe seu e-mail para receber o link de redefinicao.'}
+                : 'Informe seu e-mail para receber o link de redefinição.'}
           </p>
         </div>
         {mode === 'signup' && (
@@ -388,7 +388,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
           </label>
         )}
         <label htmlFor="email">
-          Email
+          E-mail
           <input
             id="email"
             name="email"
@@ -458,7 +458,7 @@ function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
     }
 
     if (password !== confirmPassword) {
-      setError('As senhas nao conferem.');
+      setError('As senhas não conferem.');
       return;
     }
 
@@ -602,7 +602,7 @@ function WorkspaceOnboarding({
       {error && <p className="error">{error}</p>}
       <button type="button" onClick={() => onCreate(name)} disabled={busy || name.trim().length < 2}>
         <Plus aria-hidden />
-        Criar workspace e funil padrao
+        Criar workspace e funil padrão
       </button>
     </section>
   );
@@ -685,7 +685,7 @@ function LeadsView({
     });
 
     if (missing.length > 0) {
-      setError(`Movimento bloqueado. Campos obrigatorios ausentes: ${missing.join(', ')}.`);
+      setError(`Movimento bloqueado. Campos obrigatórios ausentes: ${missing.join(', ')}.`);
       return;
     }
 
@@ -700,7 +700,7 @@ function LeadsView({
 
   return (
     <section className="stack">
-      <Header title="Leads e funil" subtitle="Cadastro, edicao e movimentacao por etapa." />
+      <Header title="Leads e funil" subtitle="Cadastro, edição e movimentação por etapa." />
       <LeadForm
         data={data}
         user={user}
@@ -767,7 +767,7 @@ function LeadForm({
     setError(null);
 
     if (!form.name.trim() || !form.current_stage_id) {
-      setError('Nome e etapa sao obrigatorios.');
+      setError('Nome e etapa são obrigatórios.');
       return;
     }
 
@@ -785,7 +785,7 @@ function LeadForm({
         <h2>{lead ? 'Editar lead' : 'Novo lead'}</h2>
         {lead && (
           <button type="button" className="ghost compact" onClick={onCancel}>
-            Cancelar edicao
+            Cancelar edição
           </button>
         )}
       </div>
@@ -794,7 +794,7 @@ function LeadForm({
         <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
       </label>
       <label>
-        Email
+        E-mail
         <input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
       </label>
       <label>
@@ -824,17 +824,17 @@ function LeadForm({
         </select>
       </label>
       <label>
-        Responsavel
+        Responsável
         <select
           value={form.assigned_user_id ?? ''}
           onChange={(event) => setForm({ ...form, assigned_user_id: event.target.value || null })}
         >
-          <option value="">Sem responsavel</option>
+          <option value="">Sem responsável</option>
           <option value={user.id}>Eu</option>
         </select>
       </label>
       <label className="wide">
-        Observacoes
+        Observações
         <textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
       </label>
       {data.customFields.map((field) => (
@@ -882,7 +882,7 @@ function Kanban({
             {leads.map((lead) => (
               <article className="lead-card" key={lead.id}>
                 <strong>{lead.name}</strong>
-                <span>{lead.company || 'Empresa nao informada'}</span>
+                <span>{lead.company || 'Empresa não informada'}</span>
                 <small>{lead.email || lead.phone || 'Contato pendente'}</small>
                 <div className="card-actions">
                   <button type="button" className="ghost compact" onClick={() => onEdit(lead)}>
@@ -930,7 +930,7 @@ function FieldsView({
     if (!supabase) return;
     const fieldKey = createFieldKey(name);
     if (!fieldKey) {
-      setError('Nome de campo invalido.');
+      setError('Nome de campo inválido.');
       return;
     }
     try {
@@ -962,7 +962,7 @@ function FieldsView({
           Tipo
           <select value={type} onChange={(event) => setType(event.target.value as 'text' | 'number')}>
             <option value="text">Texto</option>
-            <option value="number">Numero</option>
+            <option value="number">Número</option>
           </select>
         </label>
         <button type="submit">Criar campo</button>
@@ -1027,7 +1027,7 @@ function RequiredFieldsPanel({
 
   return (
     <form className="panel" onSubmit={submit}>
-      <h2>Campos obrigatorios por etapa</h2>
+      <h2>Campos obrigatórios por etapa</h2>
       <label>
         Etapa
         <select value={stageId} onChange={(event) => setStageId(event.target.value)}>
@@ -1152,7 +1152,7 @@ function CampaignForm({
     event.preventDefault();
     if (!supabase) return;
     if (!form.name.trim() || !form.context_text.trim() || !form.generation_prompt.trim()) {
-      setError('Nome, contexto e prompt sao obrigatorios.');
+      setError('Nome, contexto e prompt são obrigatórios.');
       return;
     }
     try {
@@ -1169,7 +1169,7 @@ function CampaignForm({
         <h2>{campaign ? 'Editar campanha' : 'Nova campanha'}</h2>
         {campaign && (
           <button type="button" className="ghost compact" onClick={onCancel}>
-            Cancelar edicao
+            Cancelar edição
           </button>
         )}
       </div>
@@ -1204,7 +1204,7 @@ function CampaignForm({
         <textarea value={form.context_text} onChange={(event) => setForm({ ...form, context_text: event.target.value })} required />
       </label>
       <label className="wide">
-        Prompt de geracao
+        Prompt de geração
         <textarea
           value={form.generation_prompt}
           onChange={(event) => setForm({ ...form, generation_prompt: event.target.value })}
@@ -1262,7 +1262,7 @@ function MessagesView({
     if (!supabase) return;
     const targetStage = data.stages.find((stage) => stage.name.toLowerCase() === 'tentando contato');
     if (!targetStage) {
-      setError('Etapa Tentando Contato nao encontrada.');
+      setError('Etapa Tentando Contato não encontrada.');
       return;
     }
 
@@ -1295,7 +1295,7 @@ function MessagesView({
 
   return (
     <section className="stack">
-      <Header title="Mensagens IA" subtitle="Geracao por lead e campanha com envio simulado." />
+      <Header title="Mensagens IA" subtitle="Geração por lead e campanha com envio simulado." />
       <section className="panel inline-form">
         <label>
           Lead
@@ -1330,7 +1330,7 @@ function MessagesView({
         ) : (
           leadMessages.map((message) => (
             <article className="message-card" key={message.id}>
-              <span>Variacao {message.variation_index}</span>
+              <span>Variação {message.variation_index}</span>
               <p>{message.message_text}</p>
               <button type="button" onClick={() => void simulateSend(message)} disabled={message.generation_status === 'sent'}>
                 <Send aria-hidden />

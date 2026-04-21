@@ -11,21 +11,21 @@ export const DEFAULT_PIPELINE_STAGES = [
   'Base',
   'Lead Mapeado',
   'Tentando Contato',
-  'Conexao Iniciada',
+  'Conexão Iniciada',
   'Desqualificado',
   'Qualificado',
-  'Reuniao Agendada',
+  'Reunião Agendada',
 ] as const;
 
 export const STANDARD_LEAD_FIELDS: Array<{ key: StandardLeadField; label: string }> = [
   { key: 'name', label: 'Nome' },
-  { key: 'email', label: 'Email' },
+  { key: 'email', label: 'E-mail' },
   { key: 'phone', label: 'Telefone' },
   { key: 'company', label: 'Empresa' },
   { key: 'job_title', label: 'Cargo' },
   { key: 'lead_source', label: 'Origem' },
-  { key: 'notes', label: 'Observacoes' },
-  { key: 'assigned_user_id', label: 'Responsavel' },
+  { key: 'notes', label: 'Observações' },
+  { key: 'assigned_user_id', label: 'Responsável' },
 ];
 
 const standardFieldLabels = new Map(STANDARD_LEAD_FIELDS.map((field) => [field.key, field.label]));

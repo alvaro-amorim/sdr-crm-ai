@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 const envSchema = z.object({
-  VITE_SUPABASE_URL: z.string().url('VITE_SUPABASE_URL deve ser uma URL valida.'),
-  VITE_SUPABASE_ANON_KEY: z.string().min(20, 'VITE_SUPABASE_ANON_KEY esta ausente ou curta demais.'),
+  VITE_SUPABASE_URL: z.string().url('VITE_SUPABASE_URL deve ser uma URL válida.'),
+  VITE_SUPABASE_ANON_KEY: z.string().min(20, 'VITE_SUPABASE_ANON_KEY está ausente ou curta demais.'),
 });
 
 export type ClientEnv = z.infer<typeof envSchema>;

@@ -37,12 +37,12 @@ export type CampaignInput = {
 
 function assertData<T>(data: T | null, error: { message: string } | null): T {
   if (error) throw new Error(error.message);
-  if (!data) throw new Error('Operacao sem retorno do banco.');
+  if (!data) throw new Error('Operação sem retorno do banco.');
   return data;
 }
 
 export async function createWorkspaceWithDefaults(client: SupabaseClient, user: User, name: string): Promise<Workspace> {
-  if (!user.id) throw new Error('Sessao invalida.');
+  if (!user.id) throw new Error('Sessão inválida.');
 
   const { data, error } = await client.rpc('create_workspace_with_defaults', {
     workspace_name: name,

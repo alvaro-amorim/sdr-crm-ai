@@ -47,6 +47,7 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 - `supabase/migrations/20260421150000_initial_schema.sql`
 - `supabase/migrations/20260421162000_workspace_bootstrap_and_integrity.sql`
 - `supabase/migrations/20260421170000_authenticated_table_grants.sql`
+- `supabase/migrations/20260421171500_fix_portuguese_stage_accents.sql`
 
 Para novas migrations, use o CLI local instalado no projeto:
 

@@ -29,7 +29,7 @@ const lead: Lead = {
 };
 
 describe('pipeline rules', () => {
-  it('bloqueia campo padrao obrigatorio ausente', () => {
+  it('bloqueia campo padrão obrigatório ausente', () => {
     const requiredFields: StageRequiredField[] = [
       {
         id: 'rule-1',
@@ -49,10 +49,10 @@ describe('pipeline rules', () => {
         customFields: [],
         customValues: [],
       }),
-    ).toEqual(['Email']);
+    ).toEqual(['E-mail']);
   });
 
-  it('bloqueia campo personalizado obrigatorio ausente', () => {
+  it('bloqueia campo personalizado obrigatório ausente', () => {
     const customFields: WorkspaceCustomField[] = [
       {
         id: 'field-1',
@@ -106,7 +106,7 @@ describe('pipeline rules', () => {
     ).toEqual([]);
   });
 
-  it('gera field_key estavel e seguro', () => {
+  it('gera field_key estável e seguro', () => {
     expect(createFieldKey('Tamanho da Equipe!')).toBe('tamanho_da_equipe');
   });
 });
