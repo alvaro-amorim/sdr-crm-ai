@@ -1,0 +1,135 @@
+# SDR Expert CRM
+
+Mini CRM para equipes SDR com autenticação Supabase, isolamento por workspace, kanban de leads, campanhas e geração de mensagens com IA via Edge Function.
+
+## Stack
+
+- React + TypeScript + Vite
+- Supabase Auth, Postgres, RLS e Edge Functions
+- OpenAI para geração de mensagens
+- Zod para validação de ambiente e payload da Edge Function
+- Vitest para regras críticas isoladas
+
+## Funcionalidades implementadas
+
+- Cadastro, login e logout com Supabase Auth
+- Login com Google OAuth via Supabase
+- Recuperacao de senha com link por e-mail
+- Criação de workspace inicial com funil padrão
+- RLS e filtros por `workspace_id`
+- CRUD de leads com campos padrão e responsável opcional
+- Campos personalizados por workspace
+- Regras de campos obrigatórios por etapa
+- Kanban por etapa com bloqueio de movimentação quando faltam campos
+- CRUD básico de campanhas
+- Edge Function `generate-lead-messages`
+- Persistência de mensagens geradas
+- Envio simulado com mudança automática para `Tentando Contato`
+- Dashboard com total de leads, mensagens e campanhas ativas
+
+## Setup local
+
+1. Instale dependências:
+
+```bash
+npm install
+```
+
+2. Crie `.env.local` a partir de `.env.example`:
+
+```bash
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+3. Aplique as migrations em ordem:
+
+- `supabase/migrations/20260421150000_initial_schema.sql`
+- `supabase/migrations/20260421162000_workspace_bootstrap_and_integrity.sql`
+
+Para novas migrations, use o CLI local instalado no projeto:
+
+```bash
+npx supabase login
+npx supabase link --project-ref your-project-ref
+npx supabase migration repair 20260421150000 20260421162000 --status applied
+npx supabase db push
+```
+
+4. Configure Auth no Supabase:
+
+- habilite confirmacao de e-mail para cadastro tradicional
+- configure os templates de e-mail usando `docs/supabase-auth-email-templates.md`
+- adicione `http://127.0.0.1:5173` e `http://localhost:5173` nas Redirect URLs
+- habilite Google OAuth em `Authentication > Providers > Google`
+
+5. Configure secrets da Edge Function no Supabase:
+
+```bash
+SUPABASE_SERVICE_ROLE_KEY=...
+OPENAI_API_KEY=...
+```
+
+6. Publique a Edge Function:
+
+```bash
+supabase functions deploy generate-lead-messages
+```
+
+7. Rode localmente:
+
+```bash
+npm run dev
+```
+
+## Segurança e multi-tenancy
+
+- A chave `SUPABASE_SERVICE_ROLE_KEY` não é usada no frontend.
+- Toda tabela funcional possui `workspace_id`.
+- RLS valida membership com `is_workspace_member`.
+- A criação inicial do workspace usa RPC segura para criar workspace, membership e funil padrão de forma atômica.
+- Triggers de integridade bloqueiam referências cruzadas entre workspace, lead, etapa, campanha e campos personalizados.
+- A Edge Function valida autenticação, membership, lead e campanha no mesmo workspace antes de chamar o LLM.
+- O frontend também filtra todas as consultas pelo workspace atual.
+
+## Geração com IA
+
+O frontend chama apenas a Edge Function `generate-lead-messages` com `workspace_id`, `lead_id` e `campaign_id`. A função busca lead, campanha e campos personalizados no backend, monta o prompt de forma controlada, chama a OpenAI e salva 2 ou 3 variações em `generated_messages`.
+
+## Testes
+
+```bash
+npm run test
+npm run lint
+npm run build
+```
+
+Cobertura atual:
+
+- validação segura de variáveis públicas
+- geração de `field_key`
+- bloqueio de transição por campo padrão ausente
+- bloqueio de transição por campo personalizado ausente
+- permissão de transição quando todos os campos estão preenchidos
+
+## Limitações conhecidas
+
+- Convites e múltiplos papéis avançados ficaram fora do MVP.
+- O kanban usa seletor de etapa em vez de drag and drop para reduzir risco.
+- Exclusão/arquivamento de leads não foi priorizado.
+- O link de deploy e o link do vídeo devem ser preenchidos após publicação.
+
+## Checklist de entrega
+
+- [x] Auth
+- [x] Workspace
+- [x] Pipeline padrão
+- [x] Leads
+- [x] Campos personalizados
+- [x] Validação por etapa
+- [x] Campanhas
+- [x] IA via Edge Function
+- [x] Envio simulado
+- [x] Dashboard
+- [ ] Deploy
+- [ ] Vídeo demonstrativo
