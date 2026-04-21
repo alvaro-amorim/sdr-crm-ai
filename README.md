@@ -46,6 +46,7 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
 - `supabase/migrations/20260421150000_initial_schema.sql`
 - `supabase/migrations/20260421162000_workspace_bootstrap_and_integrity.sql`
+- `supabase/migrations/20260421170000_authenticated_table_grants.sql`
 
 Para novas migrations, use o CLI local instalado no projeto:
 
@@ -60,7 +61,8 @@ npx supabase db push
 
 - habilite confirmacao de e-mail para cadastro tradicional
 - configure os templates de e-mail usando `docs/supabase-auth-email-templates.md`
-- adicione `http://127.0.0.1:5173` e `http://localhost:5173` nas Redirect URLs
+- use `https://sdr-crm-ai-wine.vercel.app` como `Site URL` para producao
+- adicione `https://sdr-crm-ai-wine.vercel.app`, `http://127.0.0.1:5173` e `http://localhost:5173` nas Redirect URLs
 - habilite Google OAuth em `Authentication > Providers > Google`
 
 5. Configure secrets da Edge Function no Supabase:
@@ -85,6 +87,8 @@ npm run dev
 ## Segurança e multi-tenancy
 
 - A chave `SUPABASE_SERVICE_ROLE_KEY` não é usada no frontend.
+- Variaveis publicas do frontend devem usar apenas o prefixo `VITE_` quando forem seguras para exposicao no navegador.
+- `OPENAI_API_KEY` e `SUPABASE_SERVICE_ROLE_KEY` devem ficar apenas no ambiente da Supabase Edge Function.
 - Toda tabela funcional possui `workspace_id`.
 - RLS valida membership com `is_workspace_member`.
 - A criação inicial do workspace usa RPC segura para criar workspace, membership e funil padrão de forma atômica.
