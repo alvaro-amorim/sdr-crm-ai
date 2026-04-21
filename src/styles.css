@@ -719,6 +719,158 @@ h3 {
   justify-content: flex-start;
 }
 
+.leads-summary-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.leads-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 0.92fr) minmax(340px, 1.08fr);
+}
+
+.lead-form,
+.lead-spotlight,
+.lead-board-panel {
+  align-content: start;
+}
+
+.lead-form-heading {
+  display: grid;
+  gap: 6px;
+}
+
+.lead-form-heading p,
+.lead-card-subtitle,
+.lead-card-warning,
+.lead-detail-list div span,
+.lead-tag {
+  color: #61706d;
+  line-height: 1.5;
+}
+
+.lead-spotlight-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.lead-pill {
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 7px 12px;
+}
+
+.lead-pill-warning {
+  background: #fff3de;
+  color: #8d5c08;
+}
+
+.lead-pill-ready {
+  background: #e3f5eb;
+  color: #236642;
+}
+
+.kanban-column-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.kanban-column-heading h3 {
+  margin: 0;
+}
+
+.kanban-column-heading small {
+  color: #61706d;
+}
+
+.lead-card-rich {
+  cursor: pointer;
+  gap: 12px;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.lead-card-rich:hover {
+  border-color: rgba(29, 95, 99, 0.22);
+  transform: translateY(-1px);
+}
+
+.lead-card-rich:focus-visible {
+  outline: 2px solid rgba(29, 95, 99, 0.28);
+  outline-offset: 2px;
+}
+
+.lead-card-selected {
+  border-color: rgba(29, 95, 99, 0.3);
+  box-shadow: 0 0 0 1px rgba(29, 95, 99, 0.12);
+}
+
+.lead-card-topline {
+  align-items: start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.lead-card-topline strong {
+  color: #18201f;
+  font-size: 1rem;
+}
+
+.lead-detail-list {
+  display: grid;
+  gap: 8px;
+}
+
+.lead-detail-list div {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.lead-detail-list svg {
+  color: #1d5f63;
+  flex: 0 0 auto;
+  height: 15px;
+  width: 15px;
+}
+
+.lead-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lead-tag {
+  background: #eef2f1;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 6px 10px;
+}
+
+.lead-card-warning {
+  color: #8d5c08;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.lead-card-actions {
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.lead-stage-select {
+  width: 100%;
+}
+
 .message-toolbar {
   align-items: end;
   display: grid;
@@ -1086,10 +1238,13 @@ h3 {
   .auth-links,
   .dashboard-hero,
   .dashboard-grid,
+  .leads-summary-grid,
+  .leads-grid,
   .campaign-summary-grid,
   .campaign-grid,
   .message-overview-grid,
   .chat-summary-grid,
+  .lead-spotlight-grid,
   .chat-modal-footer {
     grid-template-columns: 1fr;
   }
@@ -1119,7 +1274,8 @@ h3 {
 
   .message-toolbar,
   .message-card-footer,
-  .campaign-card-header {
+  .campaign-card-header,
+  .lead-card-actions {
     grid-template-columns: 1fr;
   }
 
@@ -1198,6 +1354,11 @@ h3 {
     grid-template-columns: 1fr;
   }
 
+  .lead-card-topline {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .stage-bar,
   .table-list > div {
     grid-template-columns: 1fr;
@@ -1213,6 +1374,10 @@ h3 {
   .campaign-chip-row,
   .campaign-card-actions {
     justify-content: flex-start;
+  }
+
+  .lead-tag-row {
+    align-items: flex-start;
   }
 
   .activity-item time {

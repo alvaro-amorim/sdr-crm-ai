@@ -101,3 +101,44 @@ Transformar a tela de campanhas em uma biblioteca de playbooks mais clara para a
 
 - alguns registros antigos de depuração no banco continuam com texto legado e acentuação ruim; isso é dado histórico, não regressão do componente novo
 - o próximo alvo com maior ganho visual continua sendo a tela de leads
+
+## 2026-04-21 — Etapa 3 executada
+
+### Objetivo do bloco
+
+Dar cara de operação comercial à tela de leads, reduzindo a sensação de CRUD cru e tornando a leitura do funil mais útil para avaliação.
+
+### Alterações implementadas
+
+- `src/App.tsx`
+  - resumo superior com métricas de operação do funil
+  - formulário de lead com hierarquia visual mais clara
+  - painel `Lead em foco` com contexto, contato e checklist da etapa
+  - kanban com cards mais ricos, destacando empresa, contato, origem, responsável e pendências
+  - seleção visual do lead em foco sem quebrar o fluxo de edição e movimentação
+
+- `src/styles.css`
+  - grids específicos para o workspace de leads
+  - pills de status para prontidão e pendências
+  - cards mais ricos para o kanban
+  - ajuste responsivo para spotlight, métricas e ações do card
+
+### Validações executadas
+
+- `npm run lint`
+- `npm run test`
+- `npm run build`
+- `npm run test:smoke:crm`
+- revisão manual desktop da tela de leads
+- revisão manual mobile da tela de leads
+- conferência de console sem erros ou warnings
+
+### Observações
+
+- o preview antigo em `127.0.0.1:4173` estava servindo uma versão local desatualizada; a validação visual final foi feita em um preview limpo da build atual em `127.0.0.1:4174`
+- registros legados `[DEBUG]` continuam aparecendo por causa de dados históricos no banco, não por regressão da UI nova
+
+### Próximo bloco
+
+1. revisão transversal de responsividade e consistência entre dashboard, campanhas, leads e mensagens
+2. polimento final de microcopy, estados vazios e feedbacks antes da etapa Lovable

@@ -2,12 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import {
   Bot,
+  Building2,
+  CircleAlert,
   CheckCircle2,
   KeyRound,
   LayoutDashboard,
   LogOut,
+  Mail,
   MailCheck,
   Megaphone,
+  Phone,
   Plus,
   RefreshCcw,
   ShieldAlert,
@@ -34,6 +38,7 @@ import type {
   Lead,
   PipelineStage,
 } from './types/domain';
+import { getLeadMetaLine } from './utils/crm-ui';
 import { createFieldKey, findMissingRequiredFields, STANDARD_LEAD_FIELDS } from './utils/pipeline';
 
 type Tab = 'dashboard' | 'leads' | 'fields' | 'campaigns' | 'messages';
@@ -656,6 +661,48 @@ function LeadsView({
   setNotice: (message: string | null) => void;
 }) {
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [selectedLeadId, setSelectedLeadId] = useState(data.leads[0]?.id ?? '');
+  const stageById = useMemo(() => new Map(data.stages.map((stage) => [stage.id, stage])), [data.stages]);
+  const selectedLead = data.leads.find((lead) => lead.id === selectedLeadId) ?? null;
+  const selectedLeadStage = selectedLead ? stageById.get(selectedLead.current_stage_id) ?? null : null;
+  const selectedLeadMissing = selectedLead && selectedLeadStage
+    ? findMissingRequiredFields({
+        lead: selectedLead,
+        targetStage: selectedLeadStage,
+        requiredFields: data.requiredFields,
+        customFields: data.customFields,
+        customValues: data.customValues,
+      })
+    : [];
+  const leadsWithContact = data.leads.filter((lead) => Boolean(lead.email || lead.phone)).length;
+  const leadsWithPendingFields = data.leads.filter((lead) => {
+    const currentStage = stageById.get(lead.current_stage_id);
+    if (!currentStage) return false;
+    return (
+      findMissingRequiredFields({
+        lead,
+        targetStage: currentStage,
+        requiredFields: data.requiredFields,
+        customFields: data.customFields,
+        customValues: data.customValues,
+      }).length > 0
+    );
+  }).length;
+  const leadsInContact = data.leads.filter((lead) => stageById.get(lead.current_stage_id)?.name === 'Tentando Contato').length;
+
+  useEffect(() => {
+    if (!data.leads.length) {
+      setSelectedLeadId('');
+      setEditingLead(null);
+      return;
+    }
+
+    if (selectedLeadId && data.leads.some((lead) => lead.id === selectedLeadId)) {
+      return;
+    }
+
+    setSelectedLeadId(data.leads[0]?.id ?? '');
+  }, [data.leads, selectedLeadId]);
 
   async function handleMove(lead: Lead, targetStage: PipelineStage) {
     if (!supabase) return;
@@ -684,19 +731,118 @@ function LeadsView({
   return (
     <section className="stack">
       <Header title="Leads e funil" subtitle="Cadastro, edição e movimentação por etapa." />
-      <LeadForm
-        data={data}
-        user={user}
-        lead={editingLead}
-        onCancel={() => setEditingLead(null)}
-        onSaved={() => {
-          setEditingLead(null);
-          setNotice('Lead salvo.');
-          void onReload();
-        }}
-        setError={setError}
-      />
-      <Kanban data={data} onEdit={setEditingLead} onMove={handleMove} />
+
+      <div className="leads-summary-grid">
+        <article className="overview-card">
+          <div className="overview-card-topline">
+            <span className="section-kicker">Leads no funil</span>
+            <Users aria-hidden />
+          </div>
+          <strong>{data.leads.length}</strong>
+          <p>Volume total de oportunidades acompanhadas neste workspace.</p>
+        </article>
+        <article className="overview-card">
+          <div className="overview-card-topline">
+            <span className="section-kicker">Com contato válido</span>
+            <Mail aria-hidden />
+          </div>
+          <strong>{leadsWithContact}</strong>
+          <p>Leads com e-mail ou telefone já prontos para abordagem.</p>
+        </article>
+        <article className="overview-card overview-card-accent">
+          <div className="overview-card-topline">
+            <span className="section-kicker">Precisam de revisão</span>
+            <CircleAlert aria-hidden />
+          </div>
+          <strong>{leadsWithPendingFields}</strong>
+          <p>Leads com campos obrigatórios faltando na etapa atual.</p>
+        </article>
+        <article className="overview-card">
+          <div className="overview-card-topline">
+            <span className="section-kicker">Em contato</span>
+            <CheckCircle2 aria-hidden />
+          </div>
+          <strong>{leadsInContact}</strong>
+          <p>Leads já movidos para a etapa Tentando Contato.</p>
+        </article>
+      </div>
+
+      <div className="leads-grid">
+        <LeadForm
+          data={data}
+          user={user}
+          lead={editingLead}
+          onCancel={() => setEditingLead(null)}
+          onSaved={() => {
+            setEditingLead(null);
+            setNotice('Lead salvo.');
+            void onReload();
+          }}
+          setError={setError}
+        />
+
+        <div className="stack">
+          <section className="panel lead-spotlight">
+            <div className="panel-heading">
+              <div>
+                <span className="section-kicker">Lead em foco</span>
+                <h2>{selectedLead ? selectedLead.name : 'Nenhum lead selecionado'}</h2>
+              </div>
+              {selectedLead && (
+                <span className={`lead-pill ${selectedLeadMissing.length > 0 ? 'lead-pill-warning' : 'lead-pill-ready'}`}>
+                  {selectedLeadMissing.length > 0 ? `${selectedLeadMissing.length} pendência(s)` : 'Pronto para avançar'}
+                </span>
+              )}
+            </div>
+
+            {!selectedLead ? (
+              <p className="empty">Crie o primeiro lead para começar a operar o funil.</p>
+            ) : (
+              <div className="lead-spotlight-grid">
+                <article className="chat-summary-card">
+                  <strong>Contexto comercial</strong>
+                  <p>{getLeadMetaLine(selectedLead)}</p>
+                  <span>Etapa atual: {selectedLeadStage?.name ?? 'Sem etapa'}</span>
+                </article>
+                <article className="chat-summary-card">
+                  <strong>Contato principal</strong>
+                  <p>{selectedLead.email ?? selectedLead.phone ?? 'Contato não informado'}</p>
+                  <span>Origem: {selectedLead.lead_source || 'Não informada'}</span>
+                </article>
+                <article className="chat-summary-card">
+                  <strong>Checklist da etapa</strong>
+                  <p>
+                    {selectedLeadMissing.length > 0
+                      ? `Faltam ${selectedLeadMissing.length} campo(s) obrigatório(s) para movimentar com segurança.`
+                      : 'O lead já atende os requisitos da etapa atual.'}
+                  </p>
+                  <span>{selectedLeadMissing.length > 0 ? selectedLeadMissing.join(', ') : 'Sem bloqueios ativos'}</span>
+                </article>
+              </div>
+            )}
+          </section>
+
+          <section className="panel lead-board-panel">
+            <div className="panel-heading">
+              <div>
+                <span className="section-kicker">Funil operacional</span>
+                <h2>Leads por etapa</h2>
+              </div>
+              <span className="panel-meta">Clique em um card para destacar o lead e use o seletor para mover de etapa.</span>
+            </div>
+            <Kanban
+              data={data}
+              selectedLeadId={selectedLeadId}
+              onSelect={setSelectedLeadId}
+              onEdit={(lead) => {
+                setSelectedLeadId(lead.id);
+                setEditingLead(lead);
+              }}
+              onMove={handleMove}
+            />
+          </section>
+        </div>
+      </div>
     </section>
   );
 }
@@ -763,9 +909,13 @@ function LeadForm({
   }
 
   return (
-    <form className="panel form-grid" onSubmit={submit}>
+    <form className="panel form-grid lead-form" onSubmit={submit}>
       <div className="form-heading">
-        <h2>{lead ? 'Editar lead' : 'Novo lead'}</h2>
+        <div className="lead-form-heading">
+          <span className="section-kicker">{lead ? 'Atualizando oportunidade' : 'Novo lead'}</span>
+          <h2>{lead ? 'Editar lead' : 'Novo lead'}</h2>
+          <p>Cadastre contexto suficiente para mover o lead pelo funil sem travas de campos obrigatórios.</p>
+        </div>
         {lead && (
           <button type="button" className="ghost compact" onClick={onCancel}>
             Cancelar edição
@@ -846,10 +996,14 @@ function LeadForm({
 
 function Kanban({
   data,
+  selectedLeadId,
+  onSelect,
   onEdit,
   onMove,
 }: {
   data: CrmData;
+  selectedLeadId: string | null;
+  onSelect: (leadId: string) => void;
   onEdit: (lead: Lead) => void;
   onMove: (lead: Lead, stage: PipelineStage) => void;
 }) {
@@ -860,40 +1014,122 @@ function Kanban({
         return (
           <div className="kanban-column" key={stage.id}>
             <header>
-              <h3>{stage.name}</h3>
+              <div className="kanban-column-heading">
+                <h3>{stage.name}</h3>
+                <small>{leads.length > 0 ? `${leads.length} lead(s) nesta etapa` : 'Sem leads nesta etapa'}</small>
+              </div>
               <span>{leads.length}</span>
             </header>
             {leads.length === 0 && <p className="empty">Sem leads nesta etapa.</p>}
             {leads.map((lead) => (
-              <article className="lead-card" key={lead.id}>
-                <strong>{lead.name}</strong>
-                <span>{lead.company || 'Empresa não informada'}</span>
-                <small>{lead.email || lead.phone || 'Contato pendente'}</small>
-                <div className="card-actions">
-                  <button type="button" className="ghost compact" onClick={() => onEdit(lead)}>
-                    Editar
-                  </button>
-                  <select
-                    name={`lead-stage-${lead.id}`}
-                    value={lead.current_stage_id}
-                    onChange={(event) => {
-                      const target = data.stages.find((item) => item.id === event.target.value);
-                      if (target) void onMove(lead, target);
-                    }}
-                  >
-                    {data.stages.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </article>
+              <LeadCard
+                key={lead.id}
+                lead={lead}
+                data={data}
+                selected={selectedLeadId === lead.id}
+                onSelect={() => onSelect(lead.id)}
+                onEdit={() => onEdit(lead)}
+                onMove={onMove}
+              />
             ))}
           </div>
         );
       })}
     </section>
+  );
+}
+
+function LeadCard({
+  lead,
+  data,
+  selected,
+  onSelect,
+  onEdit,
+  onMove,
+}: {
+  lead: Lead;
+  data: CrmData;
+  selected: boolean;
+  onSelect: () => void;
+  onEdit: () => void;
+  onMove: (lead: Lead, stage: PipelineStage) => void;
+}) {
+  const currentStage = data.stages.find((stage) => stage.id === lead.current_stage_id) ?? null;
+  const missing = currentStage
+    ? findMissingRequiredFields({
+        lead,
+        targetStage: currentStage,
+        requiredFields: data.requiredFields,
+        customFields: data.customFields,
+        customValues: data.customValues,
+      })
+    : [];
+
+  return (
+    <article
+      className={`lead-card lead-card-rich ${selected ? 'lead-card-selected' : ''}`}
+      onClick={onSelect}
+    >
+      <div className="lead-card-topline">
+        <strong>{lead.name}</strong>
+        <span className={`lead-pill ${missing.length > 0 ? 'lead-pill-warning' : 'lead-pill-ready'}`}>
+          {missing.length > 0 ? `${missing.length} pendência(s)` : 'Pronto'}
+        </span>
+      </div>
+
+      <p className="lead-card-subtitle">{getLeadMetaLine(lead)}</p>
+
+      <div className="lead-detail-list">
+        <div>
+          <Building2 aria-hidden />
+          <span>{lead.company || 'Empresa não informada'}</span>
+        </div>
+        <div>
+          <Mail aria-hidden />
+          <span>{lead.email || 'Sem e-mail'}</span>
+        </div>
+        <div>
+          <Phone aria-hidden />
+          <span>{lead.phone || 'Sem telefone'}</span>
+        </div>
+      </div>
+
+      <div className="lead-tag-row">
+        <span className="lead-tag">{lead.lead_source || 'Origem não informada'}</span>
+        {lead.assigned_user_id ? <span className="lead-tag">Responsável definido</span> : <span className="lead-tag">Sem responsável</span>}
+      </div>
+
+      {missing.length > 0 && <p className="lead-card-warning">Campos faltando: {missing.join(', ')}.</p>}
+
+      <div className="card-actions lead-card-actions">
+        <button
+          type="button"
+          className="ghost compact"
+          onClick={(event) => {
+            event.stopPropagation();
+            onEdit();
+          }}
+        >
+          Editar
+        </button>
+        <select
+          className="lead-stage-select"
+          name={`lead-stage-${lead.id}`}
+          value={lead.current_stage_id}
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) => {
+            const target = data.stages.find((item) => item.id === event.target.value);
+            if (target) void onMove(lead, target);
+          }}
+        >
+          {data.stages.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+      </div>
+    </article>
   );
 }
 
