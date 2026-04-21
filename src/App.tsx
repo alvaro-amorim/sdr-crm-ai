@@ -633,9 +633,16 @@ function WorkspaceOnboarding({
 
 function StatusBar({ notice, error, onClear }: { notice: string | null; error: string | null; onClear: () => void }) {
   if (!notice && !error) return null;
+  const isError = Boolean(error);
   return (
-    <div className={error ? 'status error-box' : 'status success-box'}>
-      <span>{error ?? notice}</span>
+    <div className={isError ? 'status error-box' : 'status success-box'}>
+      <div className="status-copy">
+        {isError ? <ShieldAlert aria-hidden /> : <CheckCircle2 aria-hidden />}
+        <div>
+          <strong className="status-title">{isError ? 'Atenção na operação' : 'Ação concluída'}</strong>
+          <span>{error ?? notice}</span>
+        </div>
+      </div>
       <button type="button" className="ghost compact" onClick={onClear}>
         Fechar
       </button>
@@ -1146,6 +1153,9 @@ function FieldsView({
 }) {
   const [name, setName] = useState('');
   const [type, setType] = useState<'text' | 'number'>('text');
+  const stagesWithRules = new Set(data.requiredFields.map((rule) => rule.stage_id)).size;
+  const standardRules = data.requiredFields.filter((rule) => rule.field_key).length;
+  const customRules = data.requiredFields.filter((rule) => rule.custom_field_id).length;
 
   async function createCustomField(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1175,37 +1185,101 @@ function FieldsView({
   return (
     <section className="stack">
       <Header title="Campos e regras" subtitle="Campos personalizados e obrigatoriedade por etapa." />
-      <form className="panel inline-form" onSubmit={createCustomField}>
-        <label>
-          Nome do campo
-          <input name="customFieldName" value={name} onChange={(event) => setName(event.target.value)} required />
-        </label>
-        <label>
-          Tipo
-          <select name="customFieldType" value={type} onChange={(event) => setType(event.target.value as 'text' | 'number')}>
-            <option value="text">Texto</option>
-            <option value="number">Número</option>
-          </select>
-        </label>
-        <button type="submit">Criar campo</button>
-      </form>
-      <section className="panel">
-        <h2>Campos personalizados</h2>
-        {data.customFields.length === 0 ? (
-          <p className="empty">Nenhum campo personalizado criado.</p>
-        ) : (
-          <div className="table-list">
-            {data.customFields.map((field) => (
-              <div key={field.id}>
-                <strong>{field.name}</strong>
-                <span>{field.field_key}</span>
-                <span>{field.field_type}</span>
-              </div>
-            ))}
+
+      <div className="fields-summary-grid">
+        <article className="overview-card">
+          <div className="overview-card-topline">
+            <span className="section-kicker">Campos personalizados</span>
+            <Plus aria-hidden />
           </div>
-        )}
-      </section>
-      <RequiredFieldsPanel data={data} onReload={onReload} setError={setError} setNotice={setNotice} />
+          <strong>{data.customFields.length}</strong>
+          <p>Campos extras que enriquecem o contexto do lead sem mudar a estrutura base do CRM.</p>
+        </article>
+        <article className="overview-card">
+          <div className="overview-card-topline">
+            <span className="section-kicker">Etapas com regra</span>
+            <Workflow aria-hidden />
+          </div>
+          <strong>{stagesWithRules}</strong>
+          <p>Etapas do funil que já têm bloqueios explícitos para manter integridade operacional.</p>
+        </article>
+        <article className="overview-card overview-card-accent">
+          <div className="overview-card-topline">
+            <span className="section-kicker">Cobertura de validação</span>
+            <CircleAlert aria-hidden />
+          </div>
+          <strong>{data.requiredFields.length}</strong>
+          <p>{standardRules} regra(s) padrão e {customRules} regra(s) baseadas em campos personalizados.</p>
+        </article>
+      </div>
+
+      <div className="fields-grid">
+        <div className="stack">
+          <form className="panel form-grid field-create-form" onSubmit={createCustomField}>
+            <div className="form-heading">
+              <div className="lead-form-heading">
+                <span className="section-kicker">Novo campo</span>
+                <h2>Criar campo personalizado</h2>
+                <p>Use campos extras para registrar sinais comerciais do lead sem perder a leitura do funil.</p>
+              </div>
+            </div>
+            <label>
+              Nome do campo
+              <input name="customFieldName" value={name} onChange={(event) => setName(event.target.value)} required />
+              <span className="field-hint">Exemplo: segmento, ICP, ticket médio, número de vendedores.</span>
+            </label>
+            <label>
+              Tipo
+              <select name="customFieldType" value={type} onChange={(event) => setType(event.target.value as 'text' | 'number')}>
+                <option value="text">Texto</option>
+                <option value="number">Número</option>
+              </select>
+              <span className="field-hint">Escolha número apenas quando o valor precisar ser estritamente quantitativo.</span>
+            </label>
+            <div className="wide field-form-actions">
+              <button type="submit">
+                <Plus aria-hidden />
+                Criar campo
+              </button>
+            </div>
+          </form>
+
+          <section className="panel field-library">
+            <div className="panel-heading">
+              <div>
+                <span className="section-kicker">Biblioteca de campos</span>
+                <h2>Campos personalizados</h2>
+              </div>
+              <span className="panel-meta">Use esta área para revisar rapidamente a estrutura adicional do workspace.</span>
+            </div>
+            {data.customFields.length === 0 ? (
+              <div className="empty-panel">
+                <CircleAlert aria-hidden />
+                <div>
+                  <h2>Nenhum campo extra criado</h2>
+                  <p className="empty">Comece pelos dados que fazem diferença na qualificação, não por cadastro excessivo.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="field-card-list">
+                {data.customFields.map((field) => (
+                  <article key={field.id} className="field-card">
+                    <div className="field-card-header">
+                      <strong>{field.name}</strong>
+                      <span className={`campaign-chip ${field.field_type === 'number' ? 'campaign-chip-trigger' : 'campaign-chip-idle'}`}>
+                        {field.field_type === 'number' ? 'Número' : 'Texto'}
+                      </span>
+                    </div>
+                    <p>{field.field_key}</p>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+
+        <RequiredFieldsPanel data={data} onReload={onReload} setError={setError} setNotice={setNotice} />
+      </div>
     </section>
   );
 }
@@ -1248,8 +1322,14 @@ function RequiredFieldsPanel({
   }
 
   return (
-    <form className="panel" onSubmit={submit}>
-      <h2>Campos obrigatórios por etapa</h2>
+    <form className="panel required-fields-panel" onSubmit={submit}>
+      <div className="panel-heading">
+        <div>
+          <span className="section-kicker">Regras do funil</span>
+          <h2>Campos obrigatórios por etapa</h2>
+        </div>
+        <span className="panel-meta">{currentRules.length} regra(s) ativa(s) nesta etapa</span>
+      </div>
       <label>
         Etapa
         <select name="requiredFieldStage" value={stageId} onChange={(event) => setStageId(event.target.value)}>
@@ -1260,30 +1340,71 @@ function RequiredFieldsPanel({
           ))}
         </select>
       </label>
-      <div className="checkbox-grid">
-        {STANDARD_LEAD_FIELDS.map((field) => (
-          <label key={field.key} className="check">
-            <input
-              name={`required-standard-${field.key}`}
-              type="checkbox"
-              checked={standardKeys.includes(field.key)}
-              onChange={() => toggle(standardKeys, setStandardKeys, field.key)}
-            />
-            {field.label}
-          </label>
-        ))}
-        {data.customFields.map((field) => (
-          <label key={field.id} className="check">
-            <input
-              name={`required-custom-${field.id}`}
-              type="checkbox"
-              checked={customIds.includes(field.id)}
-              onChange={() => toggle(customIds, setCustomIds, field.id)}
-            />
-            {field.name}
-          </label>
-        ))}
+
+      <div className="required-stage-summary">
+        <article className="chat-summary-card">
+          <strong>Leitura da etapa</strong>
+          <p>Defina só o que é realmente bloqueante para manter o lead avançando com dados consistentes.</p>
+          <span>{standardKeys.length + customIds.length} item(ns) marcados</span>
+        </article>
+        <article className="chat-summary-card">
+          <strong>Campos padrão</strong>
+          <p>Nome, contato, origem, cargo e demais dados base do lead.</p>
+          <span>{standardKeys.length} regra(s) padrão ativas</span>
+        </article>
+        <article className="chat-summary-card">
+          <strong>Campos extras</strong>
+          <p>Campos personalizados do workspace que reforçam segmentação e qualificação.</p>
+          <span>{customIds.length} regra(s) personalizada(s)</span>
+        </article>
       </div>
+
+      <div className="required-fields-sections">
+        <section className="required-fields-section">
+          <div className="required-fields-section-heading">
+            <h3>Campos padrão</h3>
+            <p>Regras universais do lead antes de mover a etapa.</p>
+          </div>
+          <div className="checkbox-grid">
+            {STANDARD_LEAD_FIELDS.map((field) => (
+              <label key={field.key} className="check">
+                <input
+                  name={`required-standard-${field.key}`}
+                  type="checkbox"
+                  checked={standardKeys.includes(field.key)}
+                  onChange={() => toggle(standardKeys, setStandardKeys, field.key)}
+                />
+                {field.label}
+              </label>
+            ))}
+          </div>
+        </section>
+
+        <section className="required-fields-section">
+          <div className="required-fields-section-heading">
+            <h3>Campos personalizados</h3>
+            <p>Complementos do workspace para tornar a abordagem e a qualificação mais precisas.</p>
+          </div>
+          {data.customFields.length === 0 ? (
+            <p className="empty">Nenhum campo personalizado disponível nesta etapa.</p>
+          ) : (
+            <div className="checkbox-grid">
+              {data.customFields.map((field) => (
+                <label key={field.id} className="check">
+                  <input
+                    name={`required-custom-${field.id}`}
+                    type="checkbox"
+                    checked={customIds.includes(field.id)}
+                    onChange={() => toggle(customIds, setCustomIds, field.id)}
+                  />
+                  {field.name}
+                </label>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
       <button type="submit">Salvar regras</button>
     </form>
   );

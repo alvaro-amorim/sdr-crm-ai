@@ -140,6 +140,22 @@ export function MessagesScreen({
           </button>
         </div>
 
+        <div className={`message-readiness-strip ${selectedLead && selectedCampaign ? 'message-readiness-ready' : ''}`}>
+          <div>
+            <span className="section-kicker">Leitura do fluxo</span>
+            <strong>
+              {selectedLead && selectedCampaign
+                ? `A geração vai usar ${selectedCampaign.name} para abordar ${selectedLead.name}.`
+                : 'Selecione um lead e uma campanha ativa para preparar a demonstração.'}
+            </strong>
+          </div>
+          <span className="message-readiness-meta">
+            {selectedLead ? `Canal: ${getLeadChannel(selectedLead)}` : 'Sem lead selecionado'}
+            {' · '}
+            {targetStage ? `Próxima etapa: ${targetStage.name}` : 'Etapa de destino indisponível'}
+          </span>
+        </div>
+
         <div className="message-overview-grid">
           <article className="overview-card">
             <div className="overview-card-topline">

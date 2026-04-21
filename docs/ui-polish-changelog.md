@@ -142,3 +142,43 @@ Dar cara de operação comercial à tela de leads, reduzindo a sensação de CRU
 
 1. revisão transversal de responsividade e consistência entre dashboard, campanhas, leads e mensagens
 2. polimento final de microcopy, estados vazios e feedbacks antes da etapa Lovable
+
+## 2026-04-21 — Etapa 5 executada
+
+### Objetivo do bloco
+
+Fechar o polimento transversal antes do Lovable, reforçando leitura operacional, feedbacks de sucesso/erro e a clareza das telas de `Campos` e `Mensagens IA`.
+
+### Alterações implementadas
+
+- `src/App.tsx`
+  - `StatusBar` passou a destacar melhor sucesso e erro com hierarquia visual clara
+  - tela de `Campos` ganhou resumo executivo, biblioteca de campos e leitura orientada a operação
+  - painel de regras por etapa ficou mais legível, com divisão entre campos padrão e personalizados
+
+- `src/components/messages-screen.tsx`
+  - faixa de leitura do fluxo antes da geração, deixando explícito qual campanha está abordando qual lead
+  - reforço do contexto operacional antes da demonstração do chat
+
+- `src/styles.css`
+  - novos padrões visuais para feedbacks, painéis de `Campos` e faixa contextual de `Mensagens IA`
+  - ajustes responsivos finais para desktop e mobile
+
+### Validações executadas
+
+- `npm run lint`
+- `npm run test`
+- `npm run build`
+- `npm run test:smoke:crm`
+- checagem visual desktop e mobile no preview limpo em `127.0.0.1:4174`
+- conferência de console sem erros
+
+### Observações
+
+- o fluxo principal continua íntegro: login, workspace, lead, campanha, geração de mensagens e envio simulado
+- registros históricos `[DEBUG]` ainda aparecem em alguns dados antigos do banco, mas não são regressão da interface atual
+
+### Situação da fase
+
+- blocos planejados para o polimento pré-Lovable foram concluídos
+- o próximo passo deixa de ser refino local de UI e passa a ser validação final em produção e migração guiada para Lovable
