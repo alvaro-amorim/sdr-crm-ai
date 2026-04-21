@@ -40,7 +40,7 @@ function json(status: number, body: Record<string, unknown>) {
 function sanitizeMessages(payload: GeneratedPayload): string[] {
   const rawMessages = payload.messages ?? [];
   return rawMessages
-    .map((item) => (typeof item === 'string' ? item : item.text ?? ''))
+    .map((item) => (typeof item === "string" ? item : item.text ?? ''))
     .map((text) => text.trim())
     .filter((text) => text.length > 0)
     .slice(0, 3);
@@ -114,10 +114,10 @@ serve(async (request) => {
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const publishableKey = Deno.env.get('SUPABASE_ANON_KEY');
   const openAiKey = Deno.env.get('OPENAI_API_KEY');
 
-  if (!supabaseUrl || !serviceRoleKey || !openAiKey) {
+  if (!supabaseUrl || !publishableKey || !openAiKey) {
     return json(500, { success: false, error: 'Serviço de geração não configurado.' });
   }
 
@@ -131,27 +131,29 @@ serve(async (request) => {
     return json(400, { success: false, error: 'Payload inválido.' });
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+  const token = authorization.replace('Bearer ', '');
+  const userClient = createClient(supabaseUrl, publishableKey, {
     global: { headers: { Authorization: authorization } },
-    auth: { persistSession: false },
+    auth: { persistSession: false, autoRefreshToken: false },
   });
 
   const {
-    data: { user },
+    data: userData,
     error: userError,
-  } = await supabase.auth.getUser(authorization.replace('Bearer ', ''));
+  } = await userClient.auth.getUser(token);
 
-  if (userError || !user) {
+  const userId = userData?.user?.id;
+  if (userError || !userId) {
     return json(401, { success: false, error: 'Sessão inválida.' });
   }
 
   const { workspace_id, lead_id, campaign_id } = parsed.data;
 
-  const { data: membership } = await supabase
+  const { data: membership } = await userClient
     .from('workspace_members')
     .select('id')
     .eq('workspace_id', workspace_id)
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .single();
 
   if (!membership) {
@@ -159,9 +161,9 @@ serve(async (request) => {
   }
 
   const [{ data: lead }, { data: campaign }, { data: customValues }] = await Promise.all([
-    supabase.from('leads').select('*').eq('workspace_id', workspace_id).eq('id', lead_id).single(),
-    supabase.from('campaigns').select('*').eq('workspace_id', workspace_id).eq('id', campaign_id).eq('is_active', true).single(),
-    supabase
+    userClient.from('leads').select('*').eq('workspace_id', workspace_id).eq('id', lead_id).single(),
+    userClient.from('campaigns').select('*').eq('workspace_id', workspace_id).eq('id', campaign_id).eq('is_active', true).single(),
+    userClient
       .from('lead_custom_field_values')
       .select('value_text, workspace_custom_fields(name, field_key)')
       .eq('workspace_id', workspace_id)
@@ -202,10 +204,10 @@ serve(async (request) => {
       variation_index: index + 1,
       message_text: messageText,
       generation_status: 'generated',
-      generated_by_user_id: user.id,
+      generated_by_user_id: userId,
     }));
 
-    const { data: savedMessages, error: insertError } = await supabase.from('generated_messages').insert(rows).select();
+    const { data: savedMessages, error: insertError } = await userClient.from('generated_messages').insert(rows).select();
     if (insertError) {
       return json(500, { success: false, error: 'Falha ao salvar mensagens geradas.' });
     }

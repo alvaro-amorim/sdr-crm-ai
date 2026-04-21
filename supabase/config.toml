@@ -1,0 +1,2 @@
+[functions.generate-lead-messages]
+verify_jwt = false
