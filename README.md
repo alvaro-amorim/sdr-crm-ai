@@ -117,6 +117,14 @@ npm run lint
 npm run build
 ```
 
+Smoke test automatizado do fluxo principal:
+
+```bash
+TEST_USER_EMAIL=seu-usuario-teste@example.com TEST_USER_PASSWORD=sua-senha npm run test:smoke:crm
+```
+
+O script autentica um usuário de teste, garante um workspace, cria lead, cria campanha, invoca a Edge Function, valida as mensagens geradas e simula o envio movendo o lead para `Tentando Contato`.
+
 Cobertura atual:
 
 - validação segura de variáveis públicas

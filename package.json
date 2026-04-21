@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:smoke:crm": "node scripts/smoke-crm-flow.mjs"
   },
   "keywords": [],
   "author": "",
