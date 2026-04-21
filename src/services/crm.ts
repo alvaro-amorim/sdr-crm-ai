@@ -6,6 +6,7 @@ import type {
   Lead,
   LeadCustomFieldValue,
   PipelineStage,
+  SentMessageEvent,
   StageRequiredField,
   Workspace,
   WorkspaceCustomField,
@@ -73,6 +74,7 @@ export async function loadCrmData(client: SupabaseClient, workspace: Workspace):
     customValuesResult,
     campaignsResult,
     generatedMessagesResult,
+    sentMessageEventsResult,
   ] = await Promise.all([
     client.from('pipeline_stages').select('*').eq('workspace_id', workspace.id).order('position', { ascending: true }),
     client.from('stage_required_fields').select('*').eq('workspace_id', workspace.id),
@@ -81,6 +83,7 @@ export async function loadCrmData(client: SupabaseClient, workspace: Workspace):
     client.from('lead_custom_field_values').select('*').eq('workspace_id', workspace.id),
     client.from('campaigns').select('*').eq('workspace_id', workspace.id).order('updated_at', { ascending: false }),
     client.from('generated_messages').select('*').eq('workspace_id', workspace.id).order('created_at', { ascending: false }),
+    client.from('sent_message_events').select('*').eq('workspace_id', workspace.id).order('sent_at', { ascending: false }),
   ]);
 
   for (const result of [
@@ -91,6 +94,7 @@ export async function loadCrmData(client: SupabaseClient, workspace: Workspace):
     customValuesResult,
     campaignsResult,
     generatedMessagesResult,
+    sentMessageEventsResult,
   ]) {
     if (result.error) throw new Error(result.error.message);
   }
@@ -104,6 +108,7 @@ export async function loadCrmData(client: SupabaseClient, workspace: Workspace):
     customValues: (customValuesResult.data ?? []) as LeadCustomFieldValue[],
     campaigns: (campaignsResult.data ?? []) as Campaign[],
     generatedMessages: (generatedMessagesResult.data ?? []) as GeneratedMessage[],
+    sentMessageEvents: (sentMessageEventsResult.data ?? []) as SentMessageEvent[],
   };
 }
 

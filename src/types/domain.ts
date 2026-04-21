@@ -124,4 +124,5 @@ export type CrmData = {
   customValues: LeadCustomFieldValue[];
   campaigns: Campaign[];
   generatedMessages: GeneratedMessage[];
+  sentMessageEvents: SentMessageEvent[];
 };

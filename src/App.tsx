@@ -10,10 +10,11 @@ import {
   Megaphone,
   Plus,
   RefreshCcw,
-  Send,
   ShieldAlert,
   Users,
 } from 'lucide-react';
+import { DashboardScreen } from './components/dashboard-screen';
+import { MessagesScreen } from './components/messages-screen';
 import { envError, supabase } from './lib/supabase';
 import {
   createWorkspaceWithDefaults,
@@ -29,7 +30,6 @@ import {
 import type {
   Campaign,
   CrmData,
-  GeneratedMessage,
   Lead,
   PipelineStage,
 } from './types/domain';
@@ -213,14 +213,21 @@ export default function App() {
 
   if (!data) {
     return (
-      <Shell user={session.user} tab={tab} onTabChange={setTab} onRefresh={reloadData} busy={busy}>
+      <Shell user={session.user} workspaceName={null} tab={tab} onTabChange={setTab} onRefresh={reloadData} busy={busy}>
         <WorkspaceOnboarding user={session.user} busy={busy} onCreate={handleCreateWorkspace} error={error} />
       </Shell>
     );
   }
 
   return (
-    <Shell user={session.user} tab={tab} onTabChange={setTab} onRefresh={reloadData} busy={busy}>
+    <Shell
+      user={session.user}
+      workspaceName={data.workspace.name}
+      tab={tab}
+      onTabChange={setTab}
+      onRefresh={reloadData}
+      busy={busy}
+    >
       <StatusBar notice={notice} error={error} onClear={() => {
         setNotice(null);
         setError(null);
@@ -426,7 +433,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
         )}
         <div className="auth-links">
           <button type="button" className="ghost" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}>
-            {mode === 'login' ? 'Criar conta' : 'Ja tenho conta'}
+            {mode === 'login' ? 'Criar conta' : 'Já tenho conta'}
           </button>
           {mode !== 'signup' && (
             <button type="button" className="ghost" onClick={() => setMode(mode === 'forgot' ? 'login' : 'forgot')}>
@@ -521,6 +528,7 @@ function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
 function Shell({
   children,
   user,
+  workspaceName,
   tab,
   onTabChange,
   onRefresh,
@@ -528,6 +536,7 @@ function Shell({
 }: {
   children: React.ReactNode;
   user: User;
+  workspaceName: string | null;
   tab: Tab;
   onTabChange: (tab: Tab) => void;
   onRefresh: () => void;
@@ -544,11 +553,17 @@ function Shell({
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand">
-          <Bot aria-hidden />
-          <div>
-            <strong>SDR Expert</strong>
-            <span>{user.email}</span>
+        <div className="sidebar-top">
+          <div className="brand">
+            <Bot aria-hidden />
+            <div>
+              <strong>SDR Expert</strong>
+              <span>{user.email}</span>
+            </div>
+          </div>
+          <div className="workspace-badge">
+            <small>Workspace ativo</small>
+            <strong>{workspaceName ?? 'Configuração inicial'}</strong>
           </div>
         </div>
         <nav>
@@ -573,7 +588,9 @@ function Shell({
           </button>
         </div>
       </aside>
-      <main className="content">{children}</main>
+      <main className="content">
+        <div className="content-shell">{children}</div>
+      </main>
     </div>
   );
 }
@@ -597,7 +614,7 @@ function WorkspaceOnboarding({
       <p>O workspace isola funil, leads, campos, campanhas e mensagens.</p>
       <label>
         Nome do workspace
-        <input value={name} onChange={(event) => setName(event.target.value)} />
+        <input name="workspaceName" value={name} onChange={(event) => setName(event.target.value)} />
       </label>
       {error && <p className="error">{error}</p>}
       <button type="button" onClick={() => onCreate(name)} disabled={busy || name.trim().length < 2}>
@@ -621,42 +638,7 @@ function StatusBar({ notice, error, onClear }: { notice: string | null; error: s
 }
 
 function Dashboard({ data }: { data: CrmData }) {
-  const activeCampaigns = data.campaigns.filter((campaign) => campaign.is_active).length;
-  const stageCounts = data.stages.map((stage) => ({
-    stage,
-    count: data.leads.filter((lead) => lead.current_stage_id === stage.id).length,
-  }));
-
-  return (
-    <section className="stack">
-      <Header title="Dashboard" subtitle={data.workspace.name} />
-      <div className="metric-grid">
-        <Metric label="Leads" value={data.leads.length} />
-        <Metric label="Campanhas ativas" value={activeCampaigns} />
-        <Metric label="Mensagens geradas" value={data.generatedMessages.length} />
-      </div>
-      <section className="panel">
-        <h2>Leads por etapa</h2>
-        <div className="stage-bars">
-          {stageCounts.map(({ stage, count }) => (
-            <div key={stage.id} className="stage-bar">
-              <span>{stage.name}</span>
-              <strong>{count}</strong>
-            </div>
-          ))}
-        </div>
-      </section>
-    </section>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <article className="metric">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
-  );
+  return <DashboardScreen data={data} />;
 }
 
 function LeadsView({
@@ -791,31 +773,31 @@ function LeadForm({
       </div>
       <label>
         Nome
-        <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+        <input name="leadName" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
       </label>
       <label>
         E-mail
-        <input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+        <input name="leadEmail" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
       </label>
       <label>
         Telefone
-        <input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
+        <input name="leadPhone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
       </label>
       <label>
         Empresa
-        <input value={form.company} onChange={(event) => setForm({ ...form, company: event.target.value })} />
+        <input name="leadCompany" value={form.company} onChange={(event) => setForm({ ...form, company: event.target.value })} />
       </label>
       <label>
         Cargo
-        <input value={form.job_title} onChange={(event) => setForm({ ...form, job_title: event.target.value })} />
+        <input name="leadJobTitle" value={form.job_title} onChange={(event) => setForm({ ...form, job_title: event.target.value })} />
       </label>
       <label>
         Origem
-        <input value={form.lead_source} onChange={(event) => setForm({ ...form, lead_source: event.target.value })} />
+        <input name="leadSource" value={form.lead_source} onChange={(event) => setForm({ ...form, lead_source: event.target.value })} />
       </label>
       <label>
         Etapa
-        <select value={form.current_stage_id} onChange={(event) => setForm({ ...form, current_stage_id: event.target.value })}>
+        <select name="leadStage" value={form.current_stage_id} onChange={(event) => setForm({ ...form, current_stage_id: event.target.value })}>
           {data.stages.map((stage) => (
             <option key={stage.id} value={stage.id}>
               {stage.name}
@@ -826,6 +808,7 @@ function LeadForm({
       <label>
         Responsável
         <select
+          name="leadAssignee"
           value={form.assigned_user_id ?? ''}
           onChange={(event) => setForm({ ...form, assigned_user_id: event.target.value || null })}
         >
@@ -835,12 +818,13 @@ function LeadForm({
       </label>
       <label className="wide">
         Observações
-        <textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+        <textarea name="leadNotes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
       </label>
       {data.customFields.map((field) => (
         <label key={field.id}>
           {field.name}
           <input
+            name={`customField-${field.id}`}
             type={field.field_type === 'number' ? 'number' : 'text'}
             value={form.customValues[field.id] ?? ''}
             onChange={(event) =>
@@ -889,6 +873,7 @@ function Kanban({
                     Editar
                   </button>
                   <select
+                    name={`lead-stage-${lead.id}`}
                     value={lead.current_stage_id}
                     onChange={(event) => {
                       const target = data.stages.find((item) => item.id === event.target.value);
@@ -956,11 +941,11 @@ function FieldsView({
       <form className="panel inline-form" onSubmit={createCustomField}>
         <label>
           Nome do campo
-          <input value={name} onChange={(event) => setName(event.target.value)} required />
+          <input name="customFieldName" value={name} onChange={(event) => setName(event.target.value)} required />
         </label>
         <label>
           Tipo
-          <select value={type} onChange={(event) => setType(event.target.value as 'text' | 'number')}>
+          <select name="customFieldType" value={type} onChange={(event) => setType(event.target.value as 'text' | 'number')}>
             <option value="text">Texto</option>
             <option value="number">Número</option>
           </select>
@@ -1030,7 +1015,7 @@ function RequiredFieldsPanel({
       <h2>Campos obrigatórios por etapa</h2>
       <label>
         Etapa
-        <select value={stageId} onChange={(event) => setStageId(event.target.value)}>
+        <select name="requiredFieldStage" value={stageId} onChange={(event) => setStageId(event.target.value)}>
           {data.stages.map((stage) => (
             <option key={stage.id} value={stage.id}>
               {stage.name}
@@ -1042,6 +1027,7 @@ function RequiredFieldsPanel({
         {STANDARD_LEAD_FIELDS.map((field) => (
           <label key={field.key} className="check">
             <input
+              name={`required-standard-${field.key}`}
               type="checkbox"
               checked={standardKeys.includes(field.key)}
               onChange={() => toggle(standardKeys, setStandardKeys, field.key)}
@@ -1052,6 +1038,7 @@ function RequiredFieldsPanel({
         {data.customFields.map((field) => (
           <label key={field.id} className="check">
             <input
+              name={`required-custom-${field.id}`}
               type="checkbox"
               checked={customIds.includes(field.id)}
               onChange={() => toggle(customIds, setCustomIds, field.id)}
@@ -1175,11 +1162,12 @@ function CampaignForm({
       </div>
       <label>
         Nome
-        <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+        <input name="campaignName" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
       </label>
       <label>
         Etapa gatilho
         <select
+          name="campaignTriggerStage"
           value={form.trigger_stage_id ?? ''}
           onChange={(event) => setForm({ ...form, trigger_stage_id: event.target.value || null })}
         >
@@ -1193,6 +1181,7 @@ function CampaignForm({
       </label>
       <label className="check inline-check">
         <input
+          name="campaignIsActive"
           type="checkbox"
           checked={form.is_active}
           onChange={(event) => setForm({ ...form, is_active: event.target.checked })}
@@ -1201,11 +1190,12 @@ function CampaignForm({
       </label>
       <label className="wide">
         Contexto
-        <textarea value={form.context_text} onChange={(event) => setForm({ ...form, context_text: event.target.value })} required />
+        <textarea name="campaignContext" value={form.context_text} onChange={(event) => setForm({ ...form, context_text: event.target.value })} required />
       </label>
       <label className="wide">
         Prompt de geração
         <textarea
+          name="campaignPrompt"
           value={form.generation_prompt}
           onChange={(event) => setForm({ ...form, generation_prompt: event.target.value })}
           required
@@ -1231,116 +1221,14 @@ function MessagesView({
   setError: (message: string | null) => void;
   setNotice: (message: string | null) => void;
 }) {
-  const [leadId, setLeadId] = useState(data.leads[0]?.id ?? '');
-  const [campaignId, setCampaignId] = useState(data.campaigns.find((campaign) => campaign.is_active)?.id ?? '');
-  const [busy, setBusy] = useState(false);
-  const leadMessages = data.generatedMessages.filter((message) => message.lead_id === leadId);
-  const activeCampaigns = data.campaigns.filter((campaign) => campaign.is_active);
-
-  async function generateMessages() {
-    if (!supabase || !leadId || !campaignId) {
-      setError('Selecione lead e campanha ativa.');
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const { error: functionError } = await supabase.functions.invoke('generate-lead-messages', {
-        body: { workspace_id: data.workspace.id, lead_id: leadId, campaign_id: campaignId },
-      });
-      if (functionError) throw functionError;
-      setNotice('Mensagens geradas e salvas.');
-      await onReload();
-    } catch (generateError) {
-      setError(getSafeMessage(generateError));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function simulateSend(message: GeneratedMessage) {
-    if (!supabase) return;
-    const targetStage = data.stages.find((stage) => stage.name.toLowerCase() === 'tentando contato');
-    if (!targetStage) {
-      setError('Etapa Tentando Contato não encontrada.');
-      return;
-    }
-
-    try {
-      const { error: eventError } = await supabase.from('sent_message_events').insert({
-        workspace_id: data.workspace.id,
-        lead_id: message.lead_id,
-        campaign_id: message.campaign_id,
-        generated_message_id: message.id,
-        message_text: message.message_text,
-        sent_by_user_id: user.id,
-        is_simulated: true,
-      });
-      if (eventError) throw eventError;
-
-      const { error: messageError } = await supabase
-        .from('generated_messages')
-        .update({ generation_status: 'sent' })
-        .eq('workspace_id', data.workspace.id)
-        .eq('id', message.id);
-      if (messageError) throw messageError;
-
-      await moveLead(supabase, data.workspace.id, message.lead_id, targetStage.id);
-      setNotice('Envio simulado registrado. Lead movido para Tentando Contato.');
-      await onReload();
-    } catch (sendError) {
-      setError(getSafeMessage(sendError));
-    }
-  }
-
   return (
-    <section className="stack">
-      <Header title="Mensagens IA" subtitle="Geração por lead e campanha com envio simulado." />
-      <section className="panel inline-form">
-        <label>
-          Lead
-          <select value={leadId} onChange={(event) => setLeadId(event.target.value)}>
-            {data.leads.map((lead) => (
-              <option key={lead.id} value={lead.id}>
-                {lead.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Campanha ativa
-          <select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}>
-            {activeCampaigns.map((campaign) => (
-              <option key={campaign.id} value={campaign.id}>
-                {campaign.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" onClick={generateMessages} disabled={busy || data.leads.length === 0 || activeCampaigns.length === 0}>
-          <Bot aria-hidden />
-          {busy ? 'Gerando...' : 'Gerar mensagens'}
-        </button>
-      </section>
-      <section className="message-grid">
-        {leadMessages.length === 0 ? (
-          <div className="panel">
-            <p className="empty">Nenhuma mensagem gerada para este lead.</p>
-          </div>
-        ) : (
-          leadMessages.map((message) => (
-            <article className="message-card" key={message.id}>
-              <span>Variação {message.variation_index}</span>
-              <p>{message.message_text}</p>
-              <button type="button" onClick={() => void simulateSend(message)} disabled={message.generation_status === 'sent'}>
-                <Send aria-hidden />
-                {message.generation_status === 'sent' ? 'Enviado simulado' : 'Simular envio'}
-              </button>
-            </article>
-          ))
-        )}
-      </section>
-    </section>
+    <MessagesScreen
+      data={data}
+      user={user}
+      onReload={onReload}
+      setError={setError}
+      setNotice={setNotice}
+    />
   );
 }
 
