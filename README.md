@@ -101,6 +101,14 @@ npm run dev
 
 O frontend chama apenas a Edge Function `generate-lead-messages` com `workspace_id`, `lead_id` e `campaign_id`. A função busca lead, campanha e campos personalizados no backend, monta o prompt de forma controlada, chama a OpenAI e salva 2 ou 3 variações em `generated_messages`.
 
+A geração possui fallback em cadeia dentro da própria OpenAI:
+
+- tenta primeiro `gpt-4o-mini`
+- se houver timeout, indisponibilidade, rate limit, resposta incompleta ou JSON inválido, tenta `gpt-4o`
+- se ainda falhar, tenta `gpt-4.1-mini`
+- erros de autenticação/autorização da API não fazem fallback, pois indicam secret incorreto ou sem permissão
+- nenhuma mensagem é salva no banco se todas as tentativas falharem
+
 ## Testes
 
 ```bash
