@@ -219,7 +219,13 @@ async function withSupabaseRetry(label, operation, attempts = 4) {
   let lastError = null;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    const result = await operation().catch((error) => ({ data: null, error }));
+    let result;
+    try {
+      result = await operation();
+    } catch (error) {
+      result = { data: null, error };
+    }
+
     if (!result.error) return result;
 
     lastError = result.error;
