@@ -12,6 +12,23 @@ const inputSchema = z.object({
   workspace_id: z.string().uuid(),
   wave: z.union([z.literal(1), z.literal(2)]),
   scenario: z.string().min(3).max(120),
+  scenario_profile: z.object({
+    key: z.string().min(3).max(80),
+    label: z.string().min(3).max(120),
+    description: z.string().min(10).max(1200),
+    resultStageName: z.string().min(3).max(120),
+    threadStatus: z.enum(['open', 'positive', 'neutral', 'negative', 'meeting_scheduled', 'closed']),
+    threadSentiment: z.enum(['positive', 'neutral', 'negative', 'mixed']),
+    sequence: z.array(
+      z.object({
+        direction: z.enum(['outbound', 'inbound']),
+        promptPurpose: z.string().nullable().optional(),
+        intentTag: z.string().min(3).max(80),
+        guidance: z.string().min(10).max(800),
+        expectedSentiment: z.enum(['positive', 'neutral', 'negative', 'mixed']).optional(),
+      }),
+    ).min(1).max(6),
+  }),
   lead: z.record(z.unknown()),
   campaign: z.record(z.unknown()),
 });
@@ -43,12 +60,16 @@ function json(status: number, body: Record<string, unknown>) {
   });
 }
 
-function parseConversation(content: string | null | undefined, expectedCount: number): ConversationMessage[] {
+function parseConversation(
+  content: string | null | undefined,
+  scenarioProfile: z.infer<typeof inputSchema>['scenario_profile'],
+): ConversationMessage[] {
   const parsed = JSON.parse(content ?? '{}');
   const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
   const normalized = messages
     .map((message, index) => {
-      const direction = message.direction === 'inbound' || message.direction === 'outbound' ? message.direction : index % 2 === 0 ? 'outbound' : 'inbound';
+      const fallbackDirection = scenarioProfile.sequence[index]?.direction ?? (index % 2 === 0 ? 'outbound' : 'inbound');
+      const direction = message.direction === 'inbound' || message.direction === 'outbound' ? message.direction : fallbackDirection;
       const sentiment = ['positive', 'neutral', 'negative', 'mixed'].includes(message.sentiment_tag) ? message.sentiment_tag : 'neutral';
 
       return {
@@ -60,37 +81,57 @@ function parseConversation(content: string | null | undefined, expectedCount: nu
       };
     })
     .filter((message) => message.message_text.length > 0)
-    .slice(0, expectedCount);
+    .slice(0, scenarioProfile.sequence.length);
 
-  if (normalized.length < expectedCount) {
-    throw new Error('A IA retornou menos mensagens do que o necessário.');
+  if (normalized.length !== scenarioProfile.sequence.length) {
+    throw new Error('A IA retornou quantidade de mensagens diferente do cenário.');
   }
 
-  normalized[0].direction = 'outbound';
-  normalized[0].sender_name = 'SDR Expert';
+  scenarioProfile.sequence.forEach((step, index) => {
+    if (normalized[index]?.direction !== step.direction) {
+      throw new Error('A IA retornou uma sequência inválida para o cenário do smoke.');
+    }
+  });
+
   return normalized;
 }
 
 function buildConversationPrompt(input: z.infer<typeof inputSchema>) {
-  const targetMessages = input.wave === 1 ? 3 : 4;
+  const targetMessages = input.scenario_profile.sequence.length;
+  const sequenceInstructions = input.scenario_profile.sequence
+    .map((step, index) => {
+      const purposePart = step.direction === 'outbound' && step.promptPurpose ? ` / prompt_purpose=${step.promptPurpose}` : '';
+      const sentimentPart = step.expectedSentiment ? ` / sentimento=${step.expectedSentiment}` : '';
+      return `${index + 1}. ${step.direction}${purposePart}${sentimentPart}: ${step.guidance}`;
+    })
+    .join('\n');
 
   return [
     'Você vai gerar uma conversa B2B realista para um CRM SDR brasileiro.',
     'A conversa precisa parecer uma operação real em andamento, não um exemplo genérico.',
     'Retorne somente JSON válido. Não use markdown.',
-    `Gere exatamente ${targetMessages} mensagens alternando SDR e cliente. A primeira mensagem deve ser outbound do SDR.`,
+    `Gere exatamente ${targetMessages} mensagens seguindo a sequência obrigatória de direções abaixo.`,
     'Use português do Brasil com acentuação correta, tom profissional, humano e sem exagero.',
     'Não invente dados sensíveis. Use apenas os dados do lead e campanha fornecidos.',
     'Cada mensagem deve ter no máximo 420 caracteres.',
     'Formato obrigatório: {"messages":[{"direction":"outbound|inbound","sender_name":"...","message_text":"...","sentiment_tag":"positive|neutral|negative|mixed","intent_tag":"..."}]}',
     `Onda: ${input.wave}`,
     `Cenário alvo: ${input.scenario}`,
+    `Descrição operacional: ${input.scenario_profile.description}`,
+    `Resultado esperado: status=${input.scenario_profile.threadStatus}, sentimento=${input.scenario_profile.threadSentiment}, etapa_final=${input.scenario_profile.resultStageName}`,
+    'Sequência obrigatória:',
+    sequenceInstructions,
+    'Não altere a ordem das mensagens nem troque outbound por inbound.',
     `Lead: ${JSON.stringify(input.lead)}`,
     `Campanha: ${JSON.stringify(input.campaign)}`,
   ].join('\n\n');
 }
 
-async function callOpenAiWithFallback(openAiKey: string, prompt: string, expectedCount: number) {
+async function callOpenAiWithFallback(
+  openAiKey: string,
+  prompt: string,
+  scenarioProfile: z.infer<typeof inputSchema>['scenario_profile'],
+) {
   let lastError = 'Falha desconhecida no provedor de IA.';
 
   for (const attempt of aiFallbackChain) {
@@ -128,7 +169,7 @@ async function callOpenAiWithFallback(openAiKey: string, prompt: string, expecte
 
       const completion = await response.json();
       return {
-        messages: parseConversation(completion.choices?.[0]?.message?.content, expectedCount),
+        messages: parseConversation(completion.choices?.[0]?.message?.content, scenarioProfile),
         model: attempt.model,
         usage: completion.usage ?? null,
       };
@@ -193,9 +234,8 @@ serve(async (request) => {
   }
 
   try {
-    const expectedCount = parsed.data.wave === 1 ? 3 : 4;
     const prompt = buildConversationPrompt(parsed.data);
-    const generated = await callOpenAiWithFallback(openAiKey, prompt, expectedCount);
+    const generated = await callOpenAiWithFallback(openAiKey, prompt, parsed.data.scenario_profile);
 
     return json(200, { success: true, data: generated });
   } catch (_error) {

@@ -3,6 +3,13 @@ import path from 'node:path';
 import process from 'node:process';
 import { createHash, randomBytes } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import {
+  buildSmokeAssignments,
+  getSmokeExpectedMetrics,
+  getSmokeScenarioByKey,
+  validateScenarioConversation,
+  validateScenarioThreadSummary,
+} from './smoke-flow-lib.mjs';
 
 const AI_FALLBACK_CHAIN = [
   { model: 'gpt-4o-mini', temperature: 0.65, timeoutMs: 18000 },
@@ -276,13 +283,6 @@ function stageForIndex(index) {
   return 'Desqualificado';
 }
 
-function campaignForStage(stageName) {
-  if (stageName === 'Base' || stageName === 'Lead Mapeado') return 'outbound-icp-operacoes';
-  if (stageName === 'Tentando Contato') return 'reativacao-pipeline-parado';
-  if (stageName === 'Conexão Iniciada') return 'qualificacao-diagnostico';
-  return 'avanco-reuniao';
-}
-
 function leadSourceForIndex(index) {
   const sources = [
     'Lista ICP 2026',
@@ -340,19 +340,31 @@ function leadProfile(index, name, company) {
   };
 }
 
-function buildConversationPrompt({ lead, campaign, scenario, wave }) {
-  const targetMessages = wave === 1 ? 3 : 4;
+function buildConversationPrompt({ lead, campaign, scenarioProfile }) {
+  const targetMessages = scenarioProfile.sequence.length;
+  const sequenceInstructions = scenarioProfile.sequence
+    .map((step, index) => {
+      const purposePart = step.direction === 'outbound' ? ` / prompt_purpose=${step.promptPurpose}` : '';
+      const sentimentPart = step.expectedSentiment ? ` / sentimento=${step.expectedSentiment}` : '';
+      return `${index + 1}. ${step.direction}${purposePart}${sentimentPart}: ${step.guidance}`;
+    })
+    .join('\n');
+
   return [
     'Você vai gerar uma conversa B2B realista para um CRM SDR brasileiro.',
     'A conversa precisa parecer uma operação real em andamento, não um exemplo genérico.',
     'Retorne somente JSON válido. Não use markdown.',
-    `Gere exatamente ${targetMessages} mensagens alternando SDR e cliente. A primeira mensagem deve ser outbound do SDR.`,
+    `Gere exatamente ${targetMessages} mensagens seguindo a sequencia obrigatoria de direcoes abaixo.`,
     'Use português do Brasil com acentuação correta, tom profissional, humano e sem exagero.',
     'Não invente dados sensíveis. Use apenas os dados do lead e campanha fornecidos.',
     'Cada mensagem deve ter no máximo 420 caracteres.',
     'Formato obrigatório: {"messages":[{"direction":"outbound|inbound","sender_name":"...","message_text":"...","sentiment_tag":"positive|neutral|negative|mixed","intent_tag":"..."}]}',
-    `Onda: ${wave}`,
-    `Cenário alvo: ${scenario}`,
+    `Cenário alvo: ${scenarioProfile.label}`,
+    `Descrição operacional: ${scenarioProfile.description}`,
+    `Resultado esperado: status=${scenarioProfile.threadStatus}, sentimento=${scenarioProfile.threadSentiment}, etapa_final=${scenarioProfile.resultStageName}`,
+    'Sequência obrigatória:',
+    sequenceInstructions,
+    'Não altere a ordem das mensagens nem troque outbound por inbound.',
     `Lead: ${JSON.stringify(lead)}`,
     `Campanha: ${JSON.stringify({
       name: campaign.name,
@@ -364,12 +376,13 @@ function buildConversationPrompt({ lead, campaign, scenario, wave }) {
   ].join('\n\n');
 }
 
-function parseConversation(content, expectedCount) {
+function parseConversation(content, scenarioProfile) {
   const parsed = JSON.parse(content ?? '{}');
   const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
   const normalized = messages
     .map((message, index) => {
-      const direction = message.direction === 'inbound' || message.direction === 'outbound' ? message.direction : index % 2 === 0 ? 'outbound' : 'inbound';
+      const fallbackDirection = scenarioProfile.sequence[index]?.direction ?? (index % 2 === 0 ? 'outbound' : 'inbound');
+      const direction = message.direction === 'inbound' || message.direction === 'outbound' ? message.direction : fallbackDirection;
       const sentiment = ['positive', 'neutral', 'negative', 'mixed'].includes(message.sentiment_tag) ? message.sentiment_tag : 'neutral';
       return {
         direction,
@@ -380,18 +393,13 @@ function parseConversation(content, expectedCount) {
       };
     })
     .filter((message) => message.message_text.length > 0)
-    .slice(0, expectedCount);
+    .slice(0, scenarioProfile.sequence.length);
 
-  if (normalized.length < expectedCount) {
-    throw new Error('A IA retornou menos mensagens do que o necessário.');
-  }
-
-  normalized[0].direction = 'outbound';
-  normalized[0].sender_name = 'SDR Expert';
+  validateScenarioConversation(normalized, scenarioProfile.key);
   return normalized;
 }
 
-async function callOpenAiConversation(openAiKey, prompt, expectedCount) {
+async function callOpenAiConversation(openAiKey, prompt, scenarioProfile) {
   let lastError = 'Falha desconhecida no provedor de IA.';
 
   for (const attempt of AI_FALLBACK_CHAIN) {
@@ -430,7 +438,7 @@ async function callOpenAiConversation(openAiKey, prompt, expectedCount) {
       const completion = await response.json();
       const content = completion.choices?.[0]?.message?.content;
       return {
-        messages: parseConversation(content, expectedCount),
+        messages: parseConversation(content, scenarioProfile),
         model: attempt.model,
         usage: completion.usage ?? null,
       };
@@ -444,7 +452,7 @@ async function callOpenAiConversation(openAiKey, prompt, expectedCount) {
   throw new Error(lastError);
 }
 
-async function callEdgeConversation({ supabaseUrl, supabaseAnonKey, authToken, workspaceId, lead, campaign, scenario, wave }, expectedCount) {
+async function callEdgeConversation({ supabaseUrl, supabaseAnonKey, authToken, workspaceId, lead, campaign, scenarioProfile, wave }) {
   let lastError = 'Falha desconhecida na Edge Function de smoke.';
 
   for (let attempt = 1; attempt <= 4; attempt += 1) {
@@ -458,7 +466,8 @@ async function callEdgeConversation({ supabaseUrl, supabaseAnonKey, authToken, w
       body: JSON.stringify({
         workspace_id: workspaceId,
         wave,
-        scenario,
+        scenario: scenarioProfile.label,
+        scenario_profile: scenarioProfile,
         lead,
         campaign: {
           name: campaign.name,
@@ -474,7 +483,7 @@ async function callEdgeConversation({ supabaseUrl, supabaseAnonKey, authToken, w
 
     if (response.ok && data?.success && data?.data) {
       return {
-        messages: parseConversation(JSON.stringify({ messages: data.data.messages }), expectedCount),
+        messages: parseConversation(JSON.stringify({ messages: data.data.messages }), scenarioProfile),
         model: data.data.model ?? 'supabase-edge-openai',
         usage: data.data.usage ?? null,
       };
@@ -488,12 +497,12 @@ async function callEdgeConversation({ supabaseUrl, supabaseAnonKey, authToken, w
   throw new Error(lastError);
 }
 
-async function generateConversation({ supabaseUrl, supabaseAnonKey, authToken, workspaceId, openAiKey, lead, campaign, scenario, wave, expectedCount }) {
+async function generateConversation({ supabaseUrl, supabaseAnonKey, authToken, workspaceId, openAiKey, lead, campaign, scenarioProfile, wave }) {
   if (openAiKey) {
-    return callOpenAiConversation(openAiKey, buildConversationPrompt({ lead, campaign, scenario, wave }), expectedCount);
+    return callOpenAiConversation(openAiKey, buildConversationPrompt({ lead, campaign, scenarioProfile }), scenarioProfile);
   }
 
-  return callEdgeConversation({ supabaseUrl, supabaseAnonKey, authToken, workspaceId, lead, campaign, scenario, wave }, expectedCount);
+  return callEdgeConversation({ supabaseUrl, supabaseAnonKey, authToken, workspaceId, lead, campaign, scenarioProfile, wave });
 }
 
 async function getOrCreateWorkspace(client, workspaceName) {
@@ -651,18 +660,6 @@ async function saveLeadCustomValues(client, workspaceId, leadMap, customFieldMap
   if (error) throw new Error(`Falha ao salvar valores personalizados: ${error.message}`);
 }
 
-function scenarioForIndex(index) {
-  const scenarios = [
-    'cliente positivo pede mais detalhes e aceita próximo passo',
-    'cliente neutro pede material antes de agenda',
-    'cliente negativo diz que não é prioridade agora',
-    'cliente interessado faz objeção de orçamento',
-    'cliente quer envolver outro decisor',
-    'cliente pede comparação com processo atual',
-  ];
-  return scenarios[index % scenarios.length];
-}
-
 async function insertConversation({
   client,
   supabaseUrl,
@@ -675,12 +672,13 @@ async function insertConversation({
   openAiKey,
   wave,
   index,
+  stageMap,
+  scenarioKey,
   publicBaseUrl,
   delayMs,
 }) {
   const { record: lead, profile } = leadBundle;
-  const expectedCount = wave === 1 ? 3 : 4;
-  const scenario = scenarioForIndex(index);
+  const scenarioProfile = getSmokeScenarioByKey(scenarioKey);
   const generated = await generateConversation({
     supabaseUrl,
     supabaseAnonKey,
@@ -689,17 +687,11 @@ async function insertConversation({
     openAiKey,
     lead: profile,
     campaign,
-    scenario,
+    scenarioProfile,
     wave,
-    expectedCount,
   });
+  validateScenarioConversation(generated.messages, scenarioProfile.key);
   const createdAt = isoHoursAgo(80 - index * 0.7);
-  const status = generated.messages.some((message) => message.sentiment_tag === 'negative')
-    ? 'negative'
-    : generated.messages.some((message) => message.sentiment_tag === 'positive')
-      ? 'positive'
-      : 'neutral';
-  const sentiment = status === 'negative' ? 'negative' : status === 'positive' ? 'positive' : 'neutral';
 
   const { data: thread } = await withSupabaseRetry(`Falha ao criar thread para ${lead.name}`, () =>
     client.from('conversation_threads').insert({
@@ -708,8 +700,8 @@ async function insertConversation({
       campaign_id: campaign.id,
       title: `${lead.name} · ${campaign.name}`,
       channel: campaign.channel,
-      status,
-      sentiment_tag: sentiment,
+      status: scenarioProfile.threadStatus,
+      sentiment_tag: scenarioProfile.threadSentiment,
       simulation_enabled: true,
       created_by: userId,
       created_at: createdAt,
@@ -723,6 +715,7 @@ async function insertConversation({
   const conversationRows = [];
   const eventRows = [];
   for (const [messageIndex, message] of generated.messages.entries()) {
+    const sequenceStep = scenarioProfile.sequence[messageIndex];
     const messageAt = isoHoursAgo(78 - index * 0.7 - messageIndex * 0.3);
     let generatedMessageId = null;
 
@@ -750,16 +743,16 @@ async function insertConversation({
       lead_id: lead.id,
       campaign_id: campaign.id,
       direction: message.direction,
-      sender_type: message.direction === 'outbound' ? 'sdr_ai' : 'client',
-      sender_name: message.direction === 'outbound' ? 'SDR Expert' : lead.name.split(' ')[0],
-      message_text: message.message_text,
-      model_name: generated.model,
-      prompt_purpose: wave === 1 ? 'smoke_wave_1' : 'smoke_wave_2',
-      sentiment_tag: message.sentiment_tag,
-      intent_tag: message.intent_tag,
-      generated_by: 'openai',
-      token_usage: generated.usage,
-      created_at: messageAt,
+        sender_type: message.direction === 'outbound' ? 'sdr_ai' : 'client',
+        sender_name: message.direction === 'outbound' ? 'SDR Expert' : lead.name.split(' ')[0],
+        message_text: message.message_text,
+        model_name: generated.model,
+        prompt_purpose: message.direction === 'outbound' ? sequenceStep.promptPurpose : null,
+        sentiment_tag: sequenceStep.expectedSentiment ?? message.sentiment_tag,
+        intent_tag: message.intent_tag || sequenceStep.intentTag,
+        generated_by: 'openai',
+        token_usage: generated.usage,
+        created_at: messageAt,
     });
 
     eventRows.push({
@@ -782,6 +775,30 @@ async function insertConversation({
 
   await withSupabaseRetry(`Falha ao salvar eventos de ${lead.name}`, () => client.from('sent_message_events').insert(eventRows));
 
+  const targetStageId = stageIdByName(stageMap, scenarioProfile.resultStageName);
+  await withSupabaseRetry(`Falha ao atualizar etapa do lead ${lead.name}`, () =>
+    client
+      .from('leads')
+      .update({
+        current_stage_id: targetStageId,
+        updated_at: conversationRows.at(-1)?.created_at ?? new Date().toISOString(),
+      })
+      .eq('workspace_id', workspace.id)
+      .eq('id', lead.id),
+  );
+
+  await withSupabaseRetry(`Falha ao atualizar thread ${thread.id}`, () =>
+    client
+      .from('conversation_threads')
+      .update({
+        status: scenarioProfile.threadStatus,
+        sentiment_tag: scenarioProfile.threadSentiment,
+        updated_at: conversationRows.at(-1)?.created_at ?? new Date().toISOString(),
+      })
+      .eq('workspace_id', workspace.id)
+      .eq('id', thread.id),
+  );
+
   const token = createToken();
   await withSupabaseRetry(`Falha ao criar token do simulador para ${lead.name}`, () =>
     client.from('conversation_simulation_tokens').insert({
@@ -795,9 +812,17 @@ async function insertConversation({
   if (delayMs > 0) await sleep(delayMs);
 
   return {
-    thread,
+    threadId: thread.id,
+    leadId: lead.id,
+    scenarioKey: scenarioProfile.key,
     model: generated.model,
     generatedCount: generated.messages.length,
+    outboundCount: scenarioProfile.sequence.filter((step) => step.direction === 'outbound').length,
+    inboundCount: scenarioProfile.sequence.filter((step) => step.direction === 'inbound').length,
+    leadStageName: scenarioProfile.resultStageName,
+    threadStatus: scenarioProfile.threadStatus,
+    threadSentiment: scenarioProfile.threadSentiment,
+    leadName: lead.name,
     firstOutboundMessageId,
     simulatorUrl: `${publicBaseUrl.replace(/\/$/, '')}/client-simulator?token=${token}`,
   };
@@ -821,7 +846,7 @@ async function main() {
   const publicBaseUrl = env.SMOKE_PUBLIC_BASE_URL?.trim() || 'https://sdr-crm-ai-wine.vercel.app';
   const delayMs = Number(env.SMOKE_AI_DELAY_MS ?? 500);
   const requestedWave = env.SMOKE_WAVE?.trim() || 'all';
-  const threadLimit = Number(env.SMOKE_THREAD_LIMIT ?? 75);
+  const threadLimit = Number(env.SMOKE_THREAD_LIMIT ?? 100);
 
   const client = createClient(supabaseUrl, supabaseAnonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -857,16 +882,22 @@ async function main() {
   const campaignMap = await createCampaigns(client, workspace.id, authData.user.id, stageMap);
 
   const selectedProfiles = profiles.slice(0, Math.min(threadLimit, profiles.length));
-  const waveOneProfiles = requestedWave === '2' ? [] : selectedProfiles.slice(0, Math.min(35, selectedProfiles.length));
-  const waveTwoProfiles = requestedWave === '1' ? [] : selectedProfiles.slice(35);
+  const scenarioAssignments = buildSmokeAssignments(selectedProfiles.length, requestedWave);
+  const expectedMetrics = getSmokeExpectedMetrics(scenarioAssignments);
   const simulatorSamples = [];
   let totalAiMessages = 0;
   const modelUsage = new Map();
+  const threadSummaries = [];
 
-  console.log(`7/11 Onda 1: gerando ${waveOneProfiles.length} conversas iniciais com IA real...`);
-  for (const [index, profile] of waveOneProfiles.entries()) {
+  console.log(`7/11 Semeando ${selectedProfiles.length} conversas operacionais com IA real...`);
+  for (const [index, profile] of selectedProfiles.entries()) {
+    const scenarioKey = scenarioAssignments[index];
+    const scenarioProfile = getSmokeScenarioByKey(scenarioKey);
     const leadBundle = leadMap.get(profile.slug);
-    const campaign = campaignMap.get(campaignForStage(profile.stageName));
+    const campaign = campaignMap.get(scenarioProfile.campaignSlug);
+    if (!leadBundle) throw new Error(`Lead do smoke não encontrado: ${profile.name}`);
+    if (!campaign) throw new Error(`Campanha do smoke não encontrada para o cenário ${scenarioProfile.key}.`);
+
     const result = await insertConversation({
       client,
       supabaseUrl,
@@ -877,45 +908,33 @@ async function main() {
       leadBundle,
       campaign,
       openAiKey,
-      wave: 1,
+      wave: ['opening_no_response', 'secondary_follow_up_no_response'].includes(scenarioKey) ? 1 : 2,
       index,
+      stageMap,
+      scenarioKey,
       publicBaseUrl,
       delayMs,
     });
     totalAiMessages += result.generatedCount;
     modelUsage.set(result.model, (modelUsage.get(result.model) ?? 0) + 1);
-    if (simulatorSamples.length < 3) simulatorSamples.push(result.simulatorUrl);
-    console.log(`   Onda 1 ${index + 1}/${waveOneProfiles.length}: ${profile.name} · ${result.generatedCount} mensagens · ${result.model}`);
+    threadSummaries.push(result);
+    if (simulatorSamples.length < 8) simulatorSamples.push(result.simulatorUrl);
+    console.log(`   ${index + 1}/${selectedProfiles.length}: ${profile.name} · ${scenarioProfile.label} · ${result.generatedCount} mensagens · ${result.model}`);
   }
 
-  console.log(`8/11 Onda 2: aprofundando ${waveTwoProfiles.length} conversas adicionais com IA real...`);
-  for (const [offset, profile] of waveTwoProfiles.entries()) {
-    const index = waveOneProfiles.length + offset;
-    const leadBundle = leadMap.get(profile.slug);
-    const campaign = campaignMap.get(campaignForStage(profile.stageName));
-    const result = await insertConversation({
-      client,
-      supabaseUrl,
-      supabaseAnonKey,
-      authToken: authData.session.access_token,
-      workspace,
-      userId: authData.user.id,
-      leadBundle,
-      campaign,
-      openAiKey,
-      wave: 2,
-      index,
-      publicBaseUrl,
-      delayMs,
-    });
-    totalAiMessages += result.generatedCount;
-    modelUsage.set(result.model, (modelUsage.get(result.model) ?? 0) + 1);
-    if (simulatorSamples.length < 6) simulatorSamples.push(result.simulatorUrl);
-    console.log(`   Onda 2 ${offset + 1}/${waveTwoProfiles.length}: ${profile.name} · ${result.generatedCount} mensagens · ${result.model}`);
-  }
-
-  console.log('9/11 Validando contagens do cenário completo...');
-  const [leadCount, campaignCount, generatedMessageCount, eventCount, threadCount, conversationMessageCount, tokenCount] = await Promise.all([
+  console.log('8/11 Validando contagens e sequências do cenário completo...');
+  const [
+    leadCount,
+    campaignCount,
+    generatedMessageCount,
+    eventCount,
+    threadCount,
+    conversationMessageCount,
+    tokenCount,
+    reloadedLeadsResult,
+    reloadedThreadsResult,
+    reloadedConversationMessagesResult,
+  ] = await Promise.all([
     countTable(client, 'leads', workspace.id),
     countTable(client, 'campaigns', workspace.id),
     countTable(client, 'generated_messages', workspace.id),
@@ -923,15 +942,73 @@ async function main() {
     countTable(client, 'conversation_threads', workspace.id),
     countTable(client, 'conversation_messages', workspace.id),
     countTable(client, 'conversation_simulation_tokens', workspace.id),
+    client.from('leads').select('id,current_stage_id').eq('workspace_id', workspace.id),
+    client.from('conversation_threads').select('id,status,sentiment_tag,lead_id').eq('workspace_id', workspace.id),
+    client
+      .from('conversation_messages')
+      .select('thread_id,direction,prompt_purpose,message_text,created_at')
+      .eq('workspace_id', workspace.id)
+      .order('created_at', { ascending: true }),
   ]);
 
   if (leadCount < 100) throw new Error('O smoke não criou os 100 leads esperados.');
   if (campaignCount < 4) throw new Error('O smoke não criou as 4 campanhas esperadas.');
-  if (threadCount < Math.min(threadLimit, 75)) throw new Error('O smoke não criou conversas suficientes.');
-  if (conversationMessageCount < 220 && requestedWave !== '1') throw new Error('A Onda 2 não gerou volume suficiente de mensagens.');
-  if (tokenCount < threadCount) throw new Error('Nem todas as conversas receberam token de simulador.');
+  if (threadCount !== expectedMetrics.threads) throw new Error(`Threads esperadas: ${expectedMetrics.threads}. Encontradas: ${threadCount}.`);
+  if (generatedMessageCount !== expectedMetrics.generatedMessages) {
+    throw new Error(`Generated messages esperadas: ${expectedMetrics.generatedMessages}. Encontradas: ${generatedMessageCount}.`);
+  }
+  if (eventCount !== expectedMetrics.sentMessageEvents) {
+    throw new Error(`Sent message events esperados: ${expectedMetrics.sentMessageEvents}. Encontrados: ${eventCount}.`);
+  }
+  if (conversationMessageCount !== expectedMetrics.conversationMessages) {
+    throw new Error(`Conversation messages esperadas: ${expectedMetrics.conversationMessages}. Encontradas: ${conversationMessageCount}.`);
+  }
+  if (tokenCount !== expectedMetrics.threads) throw new Error('Nem todas as conversas receberam token de simulador.');
+  if (reloadedLeadsResult.error) throw new Error(`Falha ao recarregar leads: ${reloadedLeadsResult.error.message}`);
+  if (reloadedThreadsResult.error) throw new Error(`Falha ao recarregar threads: ${reloadedThreadsResult.error.message}`);
+  if (reloadedConversationMessagesResult.error) {
+    throw new Error(`Falha ao recarregar mensagens de conversa: ${reloadedConversationMessagesResult.error.message}`);
+  }
 
-  console.log('10/11 Calculando distribuição por etapa...');
+  const leadsById = new Map((reloadedLeadsResult.data ?? []).map((lead) => [lead.id, lead]));
+  const threadsById = new Map((reloadedThreadsResult.data ?? []).map((thread) => [thread.id, thread]));
+  const stageNameById = new Map(stages.map((stage) => [stage.id, stage.name]));
+  const messagesByThread = new Map();
+  for (const message of reloadedConversationMessagesResult.data ?? []) {
+    const current = messagesByThread.get(message.thread_id) ?? [];
+    current.push(message);
+    messagesByThread.set(message.thread_id, current);
+  }
+
+  for (const summary of threadSummaries) {
+    const thread = threadsById.get(summary.threadId);
+    const lead = leadsById.get(summary.leadId);
+    if (!thread || !lead) {
+      throw new Error(`Thread ou lead não recarregado para ${summary.leadName}.`);
+    }
+
+    validateScenarioThreadSummary(
+      {
+        threadId: summary.threadId,
+        threadStatus: thread.status,
+        threadSentiment: thread.sentiment_tag,
+        leadStageName: stageNameById.get(lead.current_stage_id) ?? 'Etapa desconhecida',
+        leadName: summary.leadName,
+      },
+      summary.scenarioKey,
+    );
+
+    validateScenarioConversation(
+      (messagesByThread.get(summary.threadId) ?? []).map((message) => ({
+        direction: message.direction,
+        prompt_purpose: message.prompt_purpose,
+        message_text: message.message_text,
+      })),
+      summary.scenarioKey,
+    );
+  }
+
+  console.log('9/11 Calculando distribuição por etapa...');
   const { data: reloadedLeads, error: reloadError } = await client.from('leads').select('current_stage_id').eq('workspace_id', workspace.id);
   if (reloadError) throw new Error(`Falha ao recarregar leads: ${reloadError.message}`);
   const stageDistribution = stages.map((stage) => ({
@@ -939,7 +1016,7 @@ async function main() {
     count: reloadedLeads.filter((lead) => lead.current_stage_id === stage.id).length,
   }));
 
-  console.log('11/11 Smoke test realista concluído com sucesso.');
+  console.log('10/11 Smoke test realista concluído com sucesso.');
   const summary = {
     workspace_id: workspace.id,
     workspace_name: workspace.name,
@@ -952,6 +1029,8 @@ async function main() {
     simulation_tokens: tokenCount,
     ai_messages_generated_now: totalAiMessages,
     model_usage: Object.fromEntries(modelUsage),
+    expected_metrics: expectedMetrics,
+    scenario_distribution: expectedMetrics.byScenario,
     stage_distribution: stageDistribution,
     simulator_samples: simulatorSamples,
   };
