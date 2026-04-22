@@ -25,6 +25,8 @@ Mini CRM para equipes SDR com autenticação Supabase, isolamento por workspace,
 - Edge Function `generate-lead-messages`
 - Persistência de mensagens geradas
 - Envio simulado com mudança automática para `Tentando Contato`
+- Threads de conversa com histórico persistido
+- Simulador público por token para agir como cliente e testar a próxima resposta da IA
 - Dashboard com total de leads, mensagens e campanhas ativas
 
 ## Setup local
@@ -73,10 +75,12 @@ SUPABASE_SERVICE_ROLE_KEY=...
 OPENAI_API_KEY=...
 ```
 
-6. Publique a Edge Function:
+6. Publique as Edge Functions:
 
 ```bash
 supabase functions deploy generate-lead-messages
+supabase functions deploy create-simulation-link
+supabase functions deploy simulate-client-chat
 ```
 
 7. Rode localmente:
@@ -101,6 +105,11 @@ npm run dev
 
 O frontend chama apenas a Edge Function `generate-lead-messages` com `workspace_id`, `lead_id` e `campaign_id`. A função busca lead, campanha e campos personalizados no backend, monta o prompt de forma controlada, chama a OpenAI e salva 2 ou 3 variações em `generated_messages`.
 
+O simulador de cliente usa duas funções adicionais:
+
+- `create-simulation-link`: função autenticada que valida membership do workspace e cria um link temporário por token.
+- `simulate-client-chat`: função pública limitada pelo token; grava a resposta do cliente e gera a próxima resposta SDR com OpenAI.
+
 A geração possui fallback em cadeia dentro da própria OpenAI:
 
 - tenta primeiro `gpt-4o-mini`
@@ -120,10 +129,10 @@ npm run build
 Smoke test automatizado do fluxo principal:
 
 ```bash
-TEST_USER_EMAIL=seu-usuario-teste@example.com TEST_USER_PASSWORD=sua-senha npm run test:smoke:crm
+TEST_USER_EMAIL=seu-usuario-teste@example.com TEST_USER_PASSWORD=sua-senha OPENAI_API_KEY=sua-chave npm run test:smoke:crm
 ```
 
-O script autentica um usuário de teste, garante um workspace, cria lead, cria campanha, invoca a Edge Function, valida as mensagens geradas e simula o envio movendo o lead para `Tentando Contato`.
+O script autentica um usuário de teste, garante um workspace demo, limpa apenas esse workspace, cria 100 leads, 4 campanhas, 75 conversas, mensagens reais geradas pela OpenAI, eventos de envio e tokens de simulador. A execução segue a estratégia documentada em `docs/smoke-realista-ondas.md`.
 
 Cobertura atual:
 

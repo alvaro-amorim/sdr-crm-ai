@@ -2,7 +2,7 @@
 
 ## Fase atual
 
-Base funcional do MVP criada com frontend React, schema Supabase, RLS, Edge Function de IA e testes de regras puras.
+Base funcional do MVP criada com frontend React, schema Supabase, RLS, Edge Functions de IA, simulador público por token e testes de regras puras.
 
 ## Testes automatizados
 
@@ -18,10 +18,11 @@ Base funcional do MVP criada com frontend React, schema Supabase, RLS, Edge Func
   - cria ou reutiliza o workspace dedicado `Operação SDR Demo`
   - limpa o workspace demo antes de reseedar
   - cria campos personalizados e regras por etapa
-  - cria leads com nomes e empresas realistas em vários estágios do funil
-  - cria campanhas/playbooks com contextos e gatilhos plausíveis
-  - valida a Edge Function de IA gerando mensagens reais para o lead principal
-  - semeia histórico de mensagens com envios simulados e respostas do cliente
+  - cria 100 leads com nomes, empresas, cargos, canais e estágios variados
+  - cria 4 campanhas oficiais da demonstração
+  - executa Onda 1 e Onda 2 com conversas geradas por OpenAI real
+  - semeia `conversation_threads`, `conversation_messages`, `generated_messages`, `sent_message_events` e tokens do simulador
+  - valida volume mínimo de 75 conversas e pelo menos 220 mensagens quando `SMOKE_WAVE=all`
   - deixa a interface pronta para avaliação com múltiplos estados operacionais
 
 ## Testes manuais previstos
@@ -30,10 +31,10 @@ Base funcional do MVP criada com frontend React, schema Supabase, RLS, Edge Func
    - Criar conta com e-mail fictício.
    - Confirmar que o cadastro exige senha e confirmação de senha iguais.
    - Confirmar que os campos de senha permitem revelar/ocultar o valor digitado.
-   - Confirmar que o app exibe orientacao de verificacao de e-mail apos cadastro.
+   - Confirmar que o app exibe orientação de verificação de e-mail após cadastro.
    - Usar `Esqueci a senha` e confirmar envio de link seguro.
-   - Abrir link de recuperacao e definir nova senha.
-   - Entrar com Google OAuth apos configurar provider no Supabase.
+   - Abrir link de recuperação e definir nova senha.
+   - Entrar com Google OAuth após configurar provider no Supabase.
    - Entrar e sair.
    - Confirmar que rota interna não aparece sem sessão.
 
@@ -66,20 +67,30 @@ Base funcional do MVP criada com frontend React, schema Supabase, RLS, Edge Func
 7. Navegação mobile
    - Confirmar que o menu lateral abre via botão `Menu`.
    - Confirmar que o menu fecha ao tocar fora, ao fechar manualmente e ao trocar de aba.
+   - Confirmar que campos de senha mantêm reveal sem quebrar a largura do input.
+
+8. Simulador do cliente
+   - Entrar em `Mensagens IA`.
+   - Abrir o atalho `Abrir janela do cliente`.
+   - Responder como cliente na nova janela.
+   - Confirmar que a próxima resposta da IA aparece no chat.
+   - Voltar ao CRM, atualizar e confirmar que a conversa foi persistida.
 
 ## Convenção do smoke realista
 
 - O smoke usa um workspace dedicado para demonstração.
 - O nome padrão é `Operação SDR Demo`, mas pode ser sobrescrito por `SMOKE_WORKSPACE_NAME`.
 - O script foi desenhado para ser reexecutável no mesmo perfil de teste sem contaminar outros workspaces.
-- As credenciais do usuário de teste devem ficar apenas no `.env.local`:
+- As credenciais do usuário de teste e a chave OpenAI local devem ficar apenas no `.env.local`:
   - `TEST_USER_EMAIL`
   - `TEST_USER_PASSWORD`
+  - `OPENAI_API_KEY`
 
 ## Revisão de segurança
 
 - `.env*` ignorados no Git.
 - `.env.example` não contém segredos reais.
-- Service role restrita a Edge Function.
+- Service role restrita a Edge Functions.
 - RLS adicionada nas tabelas funcionais.
-- Edge Function valida usuário e membership antes de acessar lead/campanha.
+- Edge Functions autenticadas validam usuário e membership antes de acessar dados internos.
+- O simulador público acessa apenas uma conversa específica via token temporário, sem expor o workspace inteiro.

@@ -205,3 +205,39 @@ Transformar o smoke test do CRM em um seed de demonstração realista, útil par
 
 - `docs/qa-checklist.md` e `.env.example`
   - documentação das novas variáveis e do comportamento do smoke realista
+
+## 2026-04-22 — Smoke realista em duas ondas e simulador de cliente
+
+### Objetivo
+
+Preparar o ambiente para avaliação antes da etapa Lovable, com volume operacional e conversas realistas geradas por IA em vez de exemplos fixos.
+
+### Alterações
+
+- `supabase/migrations/20260422093000_conversation_threads_and_simulator_tokens.sql`
+  - adiciona `conversation_threads`, `conversation_messages` e `conversation_simulation_tokens`
+  - adiciona RLS, grants, índices e trigger de integridade para impedir referências cruzadas de workspace
+- `supabase/functions/create-simulation-link`
+  - cria link temporário do simulador após validar usuário e membership
+- `supabase/functions/simulate-client-chat`
+  - permite abrir uma conversa por token
+  - registra resposta do cliente
+  - gera próxima resposta do SDR com OpenAI e fallback
+- `src/components/client-simulator-screen.tsx`
+  - cria a janela pública do cliente para testar respostas
+- `src/components/messages-screen.tsx`
+  - adiciona prévia operacional da conversa
+  - adiciona atalho pequeno para abrir o simulador em nova janela
+- `scripts/smoke-crm-flow.mjs`
+  - passa a criar 100 leads, 4 campanhas e 75 conversas em duas ondas
+  - persiste mensagens reais geradas por IA, eventos simulados e tokens do simulador
+- `docs/smoke-realista-ondas.md`
+  - documenta estratégia, variáveis, validações e execução
+
+### Validação
+
+- `npm run test`
+- `npm run lint`
+- `npm run build`
+
+O smoke completo depende de `OPENAI_API_KEY`, migrations aplicadas e Edge Functions publicadas no Supabase.

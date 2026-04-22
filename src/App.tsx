@@ -683,7 +683,7 @@ function Shell({
           </div>
           <div className="workspace-badge">
             <small>Workspace ativo</small>
-            <strong>{workspaceName ?? 'Configura??o inicial'}</strong>
+            <strong>{workspaceName ?? 'Configuração inicial'}</strong>
           </div>
         </div>
         <nav>
@@ -722,7 +722,7 @@ function Shell({
           </button>
           <div className="mobile-shell-copy">
             <strong>SDR Expert</strong>
-            <span>{workspaceName ?? 'Configura??o inicial'}</span>
+            <span>{workspaceName ?? 'Configuração inicial'}</span>
           </div>
         </div>
         <div className="content-shell">{children}</div>
