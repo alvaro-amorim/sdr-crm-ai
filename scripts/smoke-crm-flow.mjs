@@ -210,6 +210,26 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function retryableSupabaseError(error) {
+  const message = String(error?.message ?? error ?? '').toLowerCase();
+  return message.includes('fetch failed') || message.includes('network') || message.includes('timeout') || message.includes('temporarily');
+}
+
+async function withSupabaseRetry(label, operation, attempts = 4) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const result = await operation().catch((error) => ({ data: null, error }));
+    if (!result.error) return result;
+
+    lastError = result.error;
+    if (!retryableSupabaseError(lastError) || attempt === attempts) break;
+    await sleep(750 * attempt);
+  }
+
+  throw new Error(`${label}: ${lastError?.message ?? lastError ?? 'erro desconhecido'}`);
+}
+
 function stageIdByName(stageMap, name) {
   const stage = stageMap.get(normalizeStageName(name));
   if (!stage) throw new Error(`Etapa não encontrada: ${name}`);
@@ -671,9 +691,8 @@ async function insertConversation({
       : 'neutral';
   const sentiment = status === 'negative' ? 'negative' : status === 'positive' ? 'positive' : 'neutral';
 
-  const { data: thread, error: threadError } = await client
-    .from('conversation_threads')
-    .insert({
+  const { data: thread } = await withSupabaseRetry(`Falha ao criar thread para ${lead.name}`, () =>
+    client.from('conversation_threads').insert({
       workspace_id: workspace.id,
       lead_id: lead.id,
       campaign_id: campaign.id,
@@ -685,11 +704,10 @@ async function insertConversation({
       created_by: userId,
       created_at: createdAt,
       updated_at: new Date().toISOString(),
-    })
-    .select()
-    .single();
+    }).select().single(),
+  );
 
-  if (threadError || !thread) throw new Error(`Falha ao criar thread para ${lead.name}: ${threadError?.message ?? 'sem retorno'}`);
+  if (!thread) throw new Error(`Falha ao criar thread para ${lead.name}: sem retorno`);
 
   let firstOutboundMessageId = null;
   const conversationRows = [];
@@ -699,9 +717,8 @@ async function insertConversation({
     let generatedMessageId = null;
 
     if (message.direction === 'outbound') {
-      const { data: generatedMessage, error: generatedError } = await client
-        .from('generated_messages')
-        .insert({
+      const { data: generatedMessage } = await withSupabaseRetry(`Falha ao persistir mensagem gerada para ${lead.name}`, () =>
+        client.from('generated_messages').insert({
           workspace_id: workspace.id,
           lead_id: lead.id,
           campaign_id: campaign.id,
@@ -710,13 +727,9 @@ async function insertConversation({
           generation_status: 'sent',
           generated_by_user_id: userId,
           created_at: messageAt,
-        })
-        .select()
-        .single();
-
-      if (generatedError || !generatedMessage) {
-        throw new Error(`Falha ao persistir mensagem gerada para ${lead.name}: ${generatedError?.message ?? 'sem retorno'}`);
-      }
+        }).select().single(),
+      );
+      if (!generatedMessage) throw new Error(`Falha ao persistir mensagem gerada para ${lead.name}: sem retorno`);
       generatedMessageId = generatedMessage.id;
       firstOutboundMessageId ??= generatedMessage.id;
     }
@@ -755,20 +768,19 @@ async function insertConversation({
     });
   }
 
-  const { error: messageError } = await client.from('conversation_messages').insert(conversationRows);
-  if (messageError) throw new Error(`Falha ao salvar conversa de ${lead.name}: ${messageError.message}`);
+  await withSupabaseRetry(`Falha ao salvar conversa de ${lead.name}`, () => client.from('conversation_messages').insert(conversationRows));
 
-  const { error: eventError } = await client.from('sent_message_events').insert(eventRows);
-  if (eventError) throw new Error(`Falha ao salvar eventos de ${lead.name}: ${eventError.message}`);
+  await withSupabaseRetry(`Falha ao salvar eventos de ${lead.name}`, () => client.from('sent_message_events').insert(eventRows));
 
   const token = createToken();
-  const { error: tokenError } = await client.from('conversation_simulation_tokens').insert({
-    workspace_id: workspace.id,
-    thread_id: thread.id,
-    token_hash: hashToken(token),
-    created_by: userId,
-  });
-  if (tokenError) throw new Error(`Falha ao criar token do simulador para ${lead.name}: ${tokenError.message}`);
+  await withSupabaseRetry(`Falha ao criar token do simulador para ${lead.name}`, () =>
+    client.from('conversation_simulation_tokens').insert({
+      workspace_id: workspace.id,
+      thread_id: thread.id,
+      token_hash: hashToken(token),
+      created_by: userId,
+    }),
+  );
 
   if (delayMs > 0) await sleep(delayMs);
 
