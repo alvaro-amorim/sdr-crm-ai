@@ -84,10 +84,6 @@ function inferChannelKey(lead: Lead) {
   return 'linkedin';
 }
 
-function formatMessageCount(count: number) {
-  return `${count} ${count === 1 ? 'mensagem' : 'mensagens'}`;
-}
-
 function sortByLabel<T>(items: T[], getLabel: (item: T) => string) {
   return [...items].sort((left, right) => getLabel(left).localeCompare(getLabel(right), 'pt-BR'));
 }
@@ -117,7 +113,6 @@ export function MessagesScreen({
   const [simulationMessage, setSimulationMessage] = useState<GeneratedMessage | null>(null);
   const [simulationBusy, setSimulationBusy] = useState(false);
   const [simulatorLinkBusy, setSimulatorLinkBusy] = useState(false);
-  const [simulatorThreadId, setSimulatorThreadId] = useState('');
   const selectedLead = data.leads.find((lead) => lead.id === leadId) ?? null;
   const selectedCampaign = data.campaigns.find((campaign) => campaign.id === campaignId) ?? null;
   const selectedStage = selectedLead ? data.stages.find((stage) => stage.id === selectedLead.current_stage_id) ?? null : null;
@@ -173,18 +168,12 @@ export function MessagesScreen({
     [leadId, simulatorThreadOptions],
   );
   const activeSimulatorThread =
-    selectedLeadThreadOptions.find((option) => option.thread.id === simulatorThreadId)?.thread ??
-    selectedThread ??
-    selectedLeadThreadOptions[0]?.thread ??
-    null;
+    selectedThread ?? selectedLeadThreadOptions[0]?.thread ?? null;
   const activeSimulatorThreadMessages = activeSimulatorThread
     ? data.conversationMessages
         .filter((message) => message.thread_id === activeSimulatorThread.id)
         .sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime())
     : [];
-  const activeSimulatorOption = activeSimulatorThread
-    ? selectedLeadThreadOptions.find((option) => option.thread.id === activeSimulatorThread.id) ?? null
-    : null;
 
   useEffect(() => {
     if (leadId && data.leads.some((lead) => lead.id === leadId)) return;
@@ -205,16 +194,6 @@ export function MessagesScreen({
     if (campaignId && activeCampaigns.some((campaign) => campaign.id === campaignId)) return;
     setCampaignId(activeCampaigns[0]?.id ?? '');
   }, [activeCampaigns, campaignId]);
-
-  useEffect(() => {
-    setSimulatorThreadId(selectedThread?.id ?? selectedLeadThreadOptions[0]?.thread.id ?? '');
-  }, [campaignId, leadId, selectedThread?.id, selectedLeadThreadOptions]);
-
-  useEffect(() => {
-    if (!simulatorThreadId) return;
-    if (selectedLeadThreadOptions.some((option) => option.thread.id === simulatorThreadId)) return;
-    setSimulatorThreadId(selectedThread?.id ?? selectedLeadThreadOptions[0]?.thread.id ?? '');
-  }, [selectedLeadThreadOptions, selectedThread?.id, simulatorThreadId]);
 
   function handleLeadQueryChange(value: string) {
     setLeadQuery(value);
@@ -474,28 +453,6 @@ export function MessagesScreen({
 
         {activeSimulatorThread ? (
           <>
-            <div className="conversation-selector-row">
-              <label className="conversation-thread-select">
-                Conversa atual do lead
-                <select
-                  name="simulatorThread"
-                  value={activeSimulatorThread.id}
-                  onChange={(event) => setSimulatorThreadId(event.target.value)}
-                >
-                  {selectedLeadThreadOptions.map((option) => (
-                    <option key={option.thread.id} value={option.thread.id}>
-                      {option.lead?.name ?? 'Lead removido'} · {option.campaign?.name ?? 'Campanha removida'} · {formatMessageCount(option.messageCount)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <span className="conversation-selector-meta">
-                {activeSimulatorOption
-                  ? `${formatMessageCount(activeSimulatorOption.messageCount)} no histórico`
-                  : 'Histórico selecionado'}
-              </span>
-            </div>
-
             <ConversationPreview
               thread={activeSimulatorThread}
               messages={activeSimulatorThreadMessages}
