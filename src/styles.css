@@ -1348,6 +1348,39 @@ h3 {
   grid-template-columns: minmax(0, 1.2fr) minmax(240px, 0.8fr) auto;
 }
 
+.autocomplete-field {
+  min-width: 0;
+}
+
+.autocomplete-input-shell {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #d9e3df;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 0 14px;
+}
+
+.autocomplete-input-shell svg {
+  color: #61706d;
+  height: 18px;
+  width: 18px;
+}
+
+.autocomplete-input-shell input {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  min-width: 0;
+  padding: 12px 0;
+}
+
+.autocomplete-input-shell input:focus {
+  outline: none;
+}
+
 .message-readiness-strip {
   align-items: center;
   background: #f8fbfa;
@@ -1780,6 +1813,10 @@ h3 {
 
 .conversation-thread-select select {
   width: 100%;
+}
+
+.conversation-thread-select option {
+  white-space: normal;
 }
 
 .conversation-selector-meta {

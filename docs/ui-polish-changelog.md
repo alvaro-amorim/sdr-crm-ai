@@ -303,3 +303,27 @@ Melhorar a compreensão do fluxo completo do CRM e transformar o dashboard em um
 - checagem visual desktop do dashboard em `127.0.0.1:5173`
 - checagem visual mobile do guia, modal e menu de navegação
 - conferência de console sem erros
+
+## 2026-04-22 — Mensagens IA com busca de lead e conversa sincronizada
+
+### Objetivo
+
+Deixar a operação de geração e simulação mais legível, garantindo que o simulador mostre a conversa do lead selecionado e que os seletores sigam ordem alfabética.
+
+### Alterações
+
+- `src/components/messages-screen.tsx`
+  - ordena leads e campanhas ativas em ordem alfabética
+  - substitui a escolha de lead por campo com digitação livre e sugestão automática
+  - sincroniza a conversa do simulador autenticável com o lead atualmente selecionado na geração
+  - restringe o seletor de conversa às threads do lead em foco, evitando contexto cruzado
+
+- `src/styles.css`
+  - adiciona estilos do novo campo de busca de lead com ícone e sugestão visual consistente
+
+### Validação
+
+- `npm run test`
+- `npm run lint`
+- `npm run build`
+- checagem visual local da tela `Mensagens IA`

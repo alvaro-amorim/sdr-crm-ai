@@ -1,5 +1,5 @@
-import { Activity, Building2, Clock3, ExternalLink, MessageCircleReply, MessageSquareText, Send, Sparkles, Workflow, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Activity, Building2, Clock3, ExternalLink, MessageCircleReply, MessageSquareText, Search, Send, Sparkles, Workflow, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase, supabaseEnv } from '../lib/supabase';
 import { moveLead } from '../services/crm';
@@ -88,6 +88,10 @@ function formatMessageCount(count: number) {
   return `${count} ${count === 1 ? 'mensagem' : 'mensagens'}`;
 }
 
+function sortByLabel<T>(items: T[], getLabel: (item: T) => string) {
+  return [...items].sort((left, right) => getLabel(left).localeCompare(getLabel(right), 'pt-BR'));
+}
+
 export function MessagesScreen({
   data,
   user,
@@ -101,18 +105,31 @@ export function MessagesScreen({
   setError: (message: string | null) => void;
   setNotice: (message: string | null) => void;
 }) {
-  const [leadId, setLeadId] = useState(data.leads[0]?.id ?? '');
-  const [campaignId, setCampaignId] = useState(data.campaigns.find((campaign) => campaign.is_active)?.id ?? '');
+  const sortedLeads = useMemo(() => sortByLabel(data.leads, (lead) => lead.name), [data.leads]);
+  const activeCampaigns = useMemo(
+    () => sortByLabel(data.campaigns.filter((campaign) => campaign.is_active), (campaign) => campaign.name),
+    [data.campaigns],
+  );
+  const [leadId, setLeadId] = useState(sortedLeads[0]?.id ?? '');
+  const [leadQuery, setLeadQuery] = useState('');
+  const [campaignId, setCampaignId] = useState(activeCampaigns[0]?.id ?? '');
   const [busy, setBusy] = useState(false);
   const [simulationMessage, setSimulationMessage] = useState<GeneratedMessage | null>(null);
   const [simulationBusy, setSimulationBusy] = useState(false);
   const [simulatorLinkBusy, setSimulatorLinkBusy] = useState(false);
-  const [simulatorThreadId, setSimulatorThreadId] = useState(data.conversationThreads[0]?.id ?? '');
-  const activeCampaigns = data.campaigns.filter((campaign) => campaign.is_active);
+  const [simulatorThreadId, setSimulatorThreadId] = useState('');
   const selectedLead = data.leads.find((lead) => lead.id === leadId) ?? null;
   const selectedCampaign = data.campaigns.find((campaign) => campaign.id === campaignId) ?? null;
   const selectedStage = selectedLead ? data.stages.find((stage) => stage.id === selectedLead.current_stage_id) ?? null : null;
   const targetStage = findStageByName(data.stages, 'Tentando Contato');
+  const leadOptions = useMemo(
+    () =>
+      sortedLeads.map((lead) => ({
+        id: lead.id,
+        label: lead.company ? `${lead.name} · ${lead.company}` : lead.name,
+      })),
+    [sortedLeads],
+  );
   const leadMessages = data.generatedMessages
     .filter((message) => message.lead_id === leadId && (!campaignId || message.campaign_id === campaignId))
     .sort((left, right) => left.variation_index - right.variation_index);
@@ -122,7 +139,6 @@ export function MessagesScreen({
   const selectedThread =
     data.conversationThreads.find((thread) => thread.lead_id === leadId && (!campaignId || thread.campaign_id === campaignId)) ??
     data.conversationThreads.find((thread) => thread.lead_id === leadId) ??
-    data.conversationThreads[0] ??
     null;
   const conversationMessageStats = data.conversationMessages.reduce<Record<string, { count: number; lastMessageAt: number }>>((stats, message) => {
     const current = stats[message.thread_id] ?? { count: 0, lastMessageAt: 0 };
@@ -133,34 +149,57 @@ export function MessagesScreen({
     };
     return stats;
   }, {});
-  const simulatorThreadOptions = data.conversationThreads
-    .map((thread) => ({
-      thread,
-      lead: data.leads.find((lead) => lead.id === thread.lead_id) ?? null,
-      campaign: data.campaigns.find((campaign) => campaign.id === thread.campaign_id) ?? null,
-      messageCount: conversationMessageStats[thread.id]?.count ?? 0,
-      lastMessageAt: conversationMessageStats[thread.id]?.lastMessageAt ?? 0,
-    }))
-    .sort((left, right) => {
-      const timeDiff = right.lastMessageAt - left.lastMessageAt;
-      if (timeDiff !== 0) return timeDiff;
-      return (left.lead?.name ?? '').localeCompare(right.lead?.name ?? '', 'pt-BR');
-    });
+  const simulatorThreadOptions = useMemo(
+    () =>
+      data.conversationThreads
+        .map((thread) => ({
+          thread,
+          lead: data.leads.find((lead) => lead.id === thread.lead_id) ?? null,
+          campaign: data.campaigns.find((campaign) => campaign.id === thread.campaign_id) ?? null,
+          messageCount: conversationMessageStats[thread.id]?.count ?? 0,
+          lastMessageAt: conversationMessageStats[thread.id]?.lastMessageAt ?? 0,
+        }))
+        .sort((left, right) => {
+          const leadDiff = (left.lead?.name ?? '').localeCompare(right.lead?.name ?? '', 'pt-BR');
+          if (leadDiff !== 0) return leadDiff;
+          const campaignDiff = (left.campaign?.name ?? '').localeCompare(right.campaign?.name ?? '', 'pt-BR');
+          if (campaignDiff !== 0) return campaignDiff;
+          return left.thread.created_at.localeCompare(right.thread.created_at, 'pt-BR');
+        }),
+    [conversationMessageStats, data.campaigns, data.conversationThreads, data.leads],
+  );
+  const selectedLeadThreadOptions = useMemo(
+    () => simulatorThreadOptions.filter((option) => option.thread.lead_id === leadId),
+    [leadId, simulatorThreadOptions],
+  );
   const activeSimulatorThread =
-    data.conversationThreads.find((thread) => thread.id === simulatorThreadId) ?? selectedThread ?? simulatorThreadOptions[0]?.thread ?? null;
+    selectedLeadThreadOptions.find((option) => option.thread.id === simulatorThreadId)?.thread ??
+    selectedThread ??
+    selectedLeadThreadOptions[0]?.thread ??
+    null;
   const activeSimulatorThreadMessages = activeSimulatorThread
     ? data.conversationMessages
         .filter((message) => message.thread_id === activeSimulatorThread.id)
         .sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime())
     : [];
   const activeSimulatorOption = activeSimulatorThread
-    ? simulatorThreadOptions.find((option) => option.thread.id === activeSimulatorThread.id) ?? null
+    ? selectedLeadThreadOptions.find((option) => option.thread.id === activeSimulatorThread.id) ?? null
     : null;
 
   useEffect(() => {
     if (leadId && data.leads.some((lead) => lead.id === leadId)) return;
-    setLeadId(data.leads[0]?.id ?? '');
-  }, [data.leads, leadId]);
+    setLeadId(sortedLeads[0]?.id ?? '');
+  }, [data.leads, leadId, sortedLeads]);
+
+  useEffect(() => {
+    if (!selectedLead) {
+      setLeadQuery('');
+      return;
+    }
+
+    const selectedOption = leadOptions.find((option) => option.id === selectedLead.id);
+    setLeadQuery(selectedOption?.label ?? selectedLead.name);
+  }, [leadOptions, selectedLead]);
 
   useEffect(() => {
     if (campaignId && activeCampaigns.some((campaign) => campaign.id === campaignId)) return;
@@ -168,9 +207,32 @@ export function MessagesScreen({
   }, [activeCampaigns, campaignId]);
 
   useEffect(() => {
-    if (simulatorThreadId && data.conversationThreads.some((thread) => thread.id === simulatorThreadId)) return;
-    setSimulatorThreadId(selectedThread?.id ?? data.conversationThreads[0]?.id ?? '');
-  }, [data.conversationThreads, selectedThread?.id, simulatorThreadId]);
+    setSimulatorThreadId(selectedThread?.id ?? selectedLeadThreadOptions[0]?.thread.id ?? '');
+  }, [campaignId, leadId, selectedThread?.id, selectedLeadThreadOptions]);
+
+  useEffect(() => {
+    if (!simulatorThreadId) return;
+    if (selectedLeadThreadOptions.some((option) => option.thread.id === simulatorThreadId)) return;
+    setSimulatorThreadId(selectedThread?.id ?? selectedLeadThreadOptions[0]?.thread.id ?? '');
+  }, [selectedLeadThreadOptions, selectedThread?.id, simulatorThreadId]);
+
+  function handleLeadQueryChange(value: string) {
+    setLeadQuery(value);
+
+    const exactMatch = leadOptions.find((option) => option.label === value);
+    if (exactMatch) {
+      setLeadId(exactMatch.id);
+      return;
+    }
+
+    const normalizedValue = value.trim().toLocaleLowerCase('pt-BR');
+    if (!normalizedValue) return;
+
+    const includesMatch = leadOptions.find((option) => option.label.toLocaleLowerCase('pt-BR').includes(normalizedValue));
+    if (includesMatch) {
+      setLeadId(includesMatch.id);
+    }
+  }
 
   async function generateMessages() {
     if (!supabase || !leadId || !campaignId) {
@@ -283,15 +345,24 @@ export function MessagesScreen({
 
       <section className="panel message-workbench">
         <div className="message-toolbar">
-          <label>
+          <label className="autocomplete-field">
             Lead
-            <select name="messageLead" value={leadId} onChange={(event) => setLeadId(event.target.value)}>
-              {data.leads.map((lead) => (
-                <option key={lead.id} value={lead.id}>
-                  {lead.name}
-                </option>
+            <div className="autocomplete-input-shell">
+              <Search aria-hidden />
+              <input
+                name="messageLead"
+                list="messageLeadOptions"
+                value={leadQuery}
+                onChange={(event) => handleLeadQueryChange(event.target.value)}
+                placeholder="Digite para buscar um lead"
+                autoComplete="off"
+              />
+            </div>
+            <datalist id="messageLeadOptions">
+              {leadOptions.map((option) => (
+                <option key={option.id} value={option.label} />
               ))}
-            </select>
+            </datalist>
           </label>
 
           <label>
@@ -404,13 +475,13 @@ export function MessagesScreen({
           <>
             <div className="conversation-selector-row">
               <label className="conversation-thread-select">
-                Escolher conversa
+                Conversa atual do lead
                 <select
                   name="simulatorThread"
                   value={activeSimulatorThread.id}
                   onChange={(event) => setSimulatorThreadId(event.target.value)}
                 >
-                  {simulatorThreadOptions.map((option) => (
+                  {selectedLeadThreadOptions.map((option) => (
                     <option key={option.thread.id} value={option.thread.id}>
                       {option.lead?.name ?? 'Lead removido'} · {option.campaign?.name ?? 'Campanha removida'} · {formatMessageCount(option.messageCount)}
                     </option>
