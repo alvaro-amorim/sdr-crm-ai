@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { z } from 'https://deno.land/x/zod@v3.23.8/mod.ts';
-import { getDeterministicConversationOutcome, mergeConversationVerdict } from '../../../src/lib/conversation-verdict.ts';
+import { getDeterministicConversationOutcome, mergeConversationVerdict, resolveNextOutboundPurpose } from '../../../src/lib/conversation-verdict.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -138,11 +138,13 @@ function buildPrompt({
   campaign,
   messages,
   clientMessage,
+  expectedPromptPurpose,
 }: {
   lead: Record<string, unknown>;
   campaign: Record<string, unknown>;
   messages: Array<Record<string, unknown>>;
   clientMessage: string;
+  expectedPromptPurpose: string;
 }) {
   const history = messages
     .map((message) => {
@@ -158,6 +160,7 @@ function buildPrompt({
     'Se houver objecao forte ou recusa, responda com encerramento cordial e sem insistir.',
     'Se houver interesse, avance para diagnostico, envio de material ou agendamento.',
     'Classifique a conversa com base principal na mensagem do cliente e no historico, nao no sentimento da sua propria resposta.',
+    `Tipo esperado da sua proxima mensagem: ${expectedPromptPurpose}.`,
     'Retorne JSON valido sem markdown.',
     `Lead: ${JSON.stringify(lead)}`,
     `Campanha: ${JSON.stringify(campaign)}`,
@@ -214,10 +217,24 @@ serve(async (request) => {
     campaign: thread.campaigns,
     messages,
     clientMessage: parsed.data.message,
+    expectedPromptPurpose: resolveNextOutboundPurpose({
+      history: [
+        ...messages,
+        {
+          direction: 'inbound',
+          sentiment_tag: getDeterministicConversationOutcome(parsed.data.message).sentiment_tag ?? 'neutral',
+        },
+      ],
+      threadStatus: getDeterministicConversationOutcome(parsed.data.message).thread_status ?? thread.status,
+    }),
   });
 
   try {
     const generated = mergeConversationVerdict(parsed.data.message, await callOpenAiWithFallback(openAiKey, prompt));
+    const promptPurpose = resolveNextOutboundPurpose({
+      history: [...messages, { direction: 'inbound', sentiment_tag: generated.sentiment_tag }],
+      threadStatus: generated.thread_status,
+    });
     const { data: saved, error: saveError } = await publicClient.rpc('append_simulation_exchange', {
       target_token_hash: tokenHash,
       client_message: parsed.data.message,
@@ -226,6 +243,7 @@ serve(async (request) => {
       ai_usage: generated.usage,
       ai_sentiment: generated.sentiment_tag,
       ai_intent: generated.intent_tag,
+      ai_prompt_purpose: promptPurpose,
       ai_thread_status: generated.thread_status,
       ai_stage_action: generated.lead_stage_action,
       ai_should_close: generated.should_close,

@@ -1,5 +1,12 @@
 export type ConversationSentiment = 'positive' | 'neutral' | 'negative' | 'mixed';
 export type ConversationThreadStatus = 'open' | 'positive' | 'neutral' | 'negative' | 'meeting_scheduled' | 'closed';
+export type ConversationPromptPurpose =
+  | 'opening'
+  | 'secondary_follow_up'
+  | 'qualification_follow_up'
+  | 'closing_note'
+  | 'meeting_confirmation'
+  | 'simulator_follow_up';
 export type LeadStageAction =
   | 'keep_current'
   | 'desqualificado'
@@ -15,6 +22,13 @@ export type AiConversationVerdict = {
   thread_status: ConversationThreadStatus;
   lead_stage_action: LeadStageAction;
   should_close: boolean;
+};
+
+export type ConversationHistoryMessage = {
+  direction: 'outbound' | 'inbound';
+  sentiment_tag?: ConversationSentiment | null;
+  prompt_purpose?: string | null;
+  intent_tag?: string | null;
 };
 
 const NEGATIVE_PATTERNS = [
@@ -58,6 +72,19 @@ export function normalizeConversationText(value: string): string {
 
 function includesAnyPattern(value: string, patterns: string[]) {
   return patterns.some((pattern) => value.includes(pattern));
+}
+
+function sanitizePromptPurpose(value: string | null | undefined): ConversationPromptPurpose {
+  switch (value) {
+    case 'opening':
+    case 'secondary_follow_up':
+    case 'qualification_follow_up':
+    case 'closing_note':
+    case 'meeting_confirmation':
+      return value;
+    default:
+      return 'simulator_follow_up';
+  }
 }
 
 export function getDeterministicConversationOutcome(clientMessage: string): Partial<AiConversationVerdict> {
@@ -114,6 +141,28 @@ export function sanitizeConversationVerdict(input: Partial<AiConversationVerdict
         : 'keep_current',
     should_close: Boolean(input.should_close),
   };
+}
+
+export function resolveNextOutboundPurpose({
+  history,
+  threadStatus,
+}: {
+  history: ConversationHistoryMessage[];
+  threadStatus?: ConversationThreadStatus | null;
+}): ConversationPromptPurpose {
+  const lastMessage = history.at(-1);
+  if (!lastMessage) return 'opening';
+
+  if (threadStatus === 'meeting_scheduled') return 'meeting_confirmation';
+  if (threadStatus === 'negative' || threadStatus === 'closed') return 'closing_note';
+
+  if (lastMessage.direction === 'outbound') {
+    const lastPurpose = sanitizePromptPurpose(lastMessage.prompt_purpose);
+    return lastPurpose === 'opening' ? 'secondary_follow_up' : 'secondary_follow_up';
+  }
+
+  if (lastMessage.sentiment_tag === 'negative') return 'closing_note';
+  return 'qualification_follow_up';
 }
 
 export function mergeConversationVerdict<T extends Partial<AiConversationVerdict> & { message_text: string }>(

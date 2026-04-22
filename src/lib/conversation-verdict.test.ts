@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { getDeterministicConversationOutcome, mergeConversationVerdict, normalizeConversationText } from './conversation-verdict';
+import {
+  getDeterministicConversationOutcome,
+  mergeConversationVerdict,
+  normalizeConversationText,
+  resolveNextOutboundPurpose,
+} from './conversation-verdict';
 
 describe('conversation verdict', () => {
   it('normaliza texto com acentos', () => {
@@ -47,5 +52,44 @@ describe('conversation verdict', () => {
       should_close: false,
       intent_tag: 'qualification_follow_up',
     });
+  });
+
+  it('usa opening quando ainda nao existe historico', () => {
+    expect(resolveNextOutboundPurpose({ history: [] })).toBe('opening');
+  });
+
+  it('usa abordagem secundaria quando a ultima mensagem foi outbound', () => {
+    expect(
+      resolveNextOutboundPurpose({
+        history: [{ direction: 'outbound', prompt_purpose: 'opening', sentiment_tag: 'neutral' }],
+      }),
+    ).toBe('secondary_follow_up');
+  });
+
+  it('usa follow-up de qualificacao quando o cliente respondeu e a conversa segue aberta', () => {
+    expect(
+      resolveNextOutboundPurpose({
+        history: [{ direction: 'inbound', sentiment_tag: 'positive' }],
+        threadStatus: 'positive',
+      }),
+    ).toBe('qualification_follow_up');
+  });
+
+  it('usa encerramento quando a ultima resposta do cliente foi negativa', () => {
+    expect(
+      resolveNextOutboundPurpose({
+        history: [{ direction: 'inbound', sentiment_tag: 'negative' }],
+        threadStatus: 'negative',
+      }),
+    ).toBe('closing_note');
+  });
+
+  it('usa confirmacao de reuniao quando a thread ja esta agendada', () => {
+    expect(
+      resolveNextOutboundPurpose({
+        history: [{ direction: 'inbound', sentiment_tag: 'positive' }],
+        threadStatus: 'meeting_scheduled',
+      }),
+    ).toBe('meeting_confirmation');
   });
 });

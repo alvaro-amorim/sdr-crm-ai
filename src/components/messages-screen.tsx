@@ -1,6 +1,7 @@
 import { Activity, Building2, Clock3, ExternalLink, MessageCircleReply, MessageSquareText, Search, Send, Sparkles, Workflow, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
+import { resolveNextOutboundPurpose } from '../lib/conversation-verdict';
 import { supabase, supabaseEnv } from '../lib/supabase';
 import { moveLead } from '../services/crm';
 import type {
@@ -86,6 +87,23 @@ function inferChannelKey(lead: Lead) {
 
 function sortByLabel<T>(items: T[], getLabel: (item: T) => string) {
   return [...items].sort((left, right) => getLabel(left).localeCompare(getLabel(right), 'pt-BR'));
+}
+
+function formatPromptPurposeLabel(promptPurpose: string | null | undefined) {
+  switch (promptPurpose) {
+    case 'opening':
+      return 'Abertura';
+    case 'secondary_follow_up':
+      return 'Abordagem secundária';
+    case 'qualification_follow_up':
+      return 'Qualificação';
+    case 'closing_note':
+      return 'Encerramento';
+    case 'meeting_confirmation':
+      return 'Confirmação de reunião';
+    default:
+      return 'Fluxo ativo';
+  }
 }
 
 export function MessagesScreen({
@@ -253,6 +271,51 @@ export function MessagesScreen({
 
     try {
       setSimulationBusy(true);
+      const existingThread =
+        data.conversationThreads.find((thread) => thread.lead_id === message.lead_id && thread.campaign_id === message.campaign_id) ?? null;
+      const threadMessages = existingThread
+        ? data.conversationMessages
+            .filter((conversationMessage) => conversationMessage.thread_id === existingThread.id)
+            .sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime())
+        : [];
+      const promptPurpose = resolveNextOutboundPurpose({
+        history: threadMessages.map((conversationMessage) => ({
+          direction: conversationMessage.direction,
+          sentiment_tag: conversationMessage.sentiment_tag,
+          prompt_purpose: conversationMessage.prompt_purpose,
+          intent_tag: conversationMessage.intent_tag,
+        })),
+        threadStatus: existingThread?.status,
+      });
+      let threadId = existingThread?.id ?? null;
+
+      if (!threadId) {
+        const { data: createdThread, error: threadError } = await supabase
+          .from('conversation_threads')
+          .insert({
+            workspace_id: data.workspace.id,
+            lead_id: message.lead_id,
+            campaign_id: message.campaign_id,
+            title: `${messageLead.name} · ${selectedCampaign?.name ?? 'Campanha ativa'}`,
+            channel: inferChannelKey(messageLead),
+            status: 'open',
+            sentiment_tag: 'neutral',
+            simulation_enabled: true,
+            created_by: user.id,
+          })
+          .select()
+          .single();
+
+        if (threadError || !createdThread) {
+          throw threadError ?? new Error('Falha ao criar a conversa simulada.');
+        }
+
+        threadId = createdThread.id;
+      }
+
+      if (!threadId) {
+        throw new Error('Thread de conversa nao resolvida para o envio simulado.');
+      }
 
       const { error: eventError } = await supabase.from('sent_message_events').insert({
         workspace_id: data.workspace.id,
@@ -277,6 +340,35 @@ export function MessagesScreen({
         .eq('id', message.id);
 
       if (messageError) throw messageError;
+
+      const { error: conversationError } = await supabase.from('conversation_messages').insert({
+        workspace_id: data.workspace.id,
+        thread_id: threadId,
+        lead_id: message.lead_id,
+        campaign_id: message.campaign_id,
+        direction: 'outbound',
+        sender_type: 'sdr_ai',
+        sender_name: 'SDR Expert',
+        message_text: message.message_text,
+        prompt_purpose: promptPurpose,
+        sentiment_tag: 'neutral',
+        intent_tag: promptPurpose,
+        generated_by: 'openai',
+      });
+
+      if (conversationError) throw conversationError;
+
+      const { error: threadUpdateError } = await supabase
+        .from('conversation_threads')
+        .update({
+          channel: inferChannelKey(messageLead),
+          status: 'open',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('workspace_id', data.workspace.id)
+        .eq('id', threadId);
+
+      if (threadUpdateError) throw threadUpdateError;
 
       await moveLead(supabase, data.workspace.id, message.lead_id, targetStage.id);
       setSimulationMessage(null);
@@ -568,7 +660,12 @@ function ConversationPreview({
             className={`conversation-preview-row ${message.direction === 'inbound' ? 'conversation-preview-row-inbound' : ''}`}
           >
             <div className="conversation-preview-bubble">
-              <strong>{message.sender_name}</strong>
+              <div className="conversation-preview-bubble-header">
+                <strong>{message.sender_name}</strong>
+                {message.direction === 'outbound' ? (
+                  <span className="conversation-purpose-chip">{formatPromptPurposeLabel(message.prompt_purpose)}</span>
+                ) : null}
+              </div>
               <p>{message.message_text}</p>
               <time dateTime={message.created_at}>{formatDateTime(message.created_at)}</time>
             </div>

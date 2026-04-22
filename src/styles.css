@@ -1852,10 +1852,28 @@ h3 {
   padding: 12px 14px;
 }
 
+.conversation-preview-bubble-header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
 .conversation-preview-row-inbound .conversation-preview-bubble {
   background: #ffffff;
   border: 1px solid #d8e0dc;
   color: #13211f;
+}
+
+.conversation-purpose-chip {
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 0.73rem;
+  font-weight: 700;
+  padding: 4px 9px;
+  white-space: nowrap;
 }
 
 .conversation-preview-bubble p {
@@ -1870,6 +1888,12 @@ h3 {
 
 .conversation-preview-row-inbound .conversation-preview-bubble time {
   color: #687773;
+}
+
+.conversation-preview-row-inbound .conversation-purpose-chip {
+  background: #edf4f1;
+  border-color: #d5dfdb;
+  color: #29534f;
 }
 
 .client-simulator-shortcut {
