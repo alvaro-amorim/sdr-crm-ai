@@ -28,6 +28,8 @@ Base funcional do MVP criada com frontend React, schema Supabase, RLS, Edge Func
 
 1. Auth
    - Criar conta com e-mail fictício.
+   - Confirmar que o cadastro exige senha e confirmação de senha iguais.
+   - Confirmar que os campos de senha permitem revelar/ocultar o valor digitado.
    - Confirmar que o app exibe orientacao de verificacao de e-mail apos cadastro.
    - Usar `Esqueci a senha` e confirmar envio de link seguro.
    - Abrir link de recuperacao e definir nova senha.

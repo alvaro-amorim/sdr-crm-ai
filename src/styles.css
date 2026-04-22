@@ -79,6 +79,43 @@ label {
   gap: 6px;
 }
 
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  padding-right: 110px;
+}
+
+.password-toggle {
+  background: transparent;
+  border: 0;
+  border-left: 1px solid #d9dfdc;
+  border-radius: 0;
+  color: #35514d;
+  gap: 6px;
+  height: calc(100% - 2px);
+  min-height: 0;
+  padding: 0 12px;
+  position: absolute;
+  right: 1px;
+  top: 1px;
+}
+
+.password-toggle:hover {
+  background: #edf3f1;
+  color: #1d5f63;
+}
+
+.password-toggle svg {
+  height: 16px;
+  width: 16px;
+}
+
+.password-toggle span {
+  font-size: 0.79rem;
+}
+
 h1,
 h2,
 h3,

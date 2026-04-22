@@ -5,6 +5,8 @@ import {
   Building2,
   CircleAlert,
   CheckCircle2,
+  Eye,
+  EyeOff,
   KeyRound,
   LayoutDashboard,
   LogOut,
@@ -298,10 +300,62 @@ function FullPageState({ title }: { title: string }) {
   );
 }
 
+function PasswordField({
+  id,
+  name,
+  label,
+  value,
+  onChange,
+  autoComplete,
+  minLength = 6,
+  required = true,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  value: string;
+  onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  autoComplete: string;
+  minLength?: number;
+  required?: boolean;
+}) {
+  const [visible, setVisible] = useState(false);
+  const ToggleIcon = visible ? EyeOff : Eye;
+
+  return (
+    <label htmlFor={id}>
+      {label}
+      <div className="password-field">
+        <input
+          id={id}
+          name={name}
+          type={visible ? 'text' : 'password'}
+          autoComplete={autoComplete}
+          value={value}
+          onChange={onChange}
+          minLength={minLength}
+          required={required}
+        />
+        <button
+          type="button"
+          className="password-toggle"
+          onClick={() => setVisible((current) => !current)}
+          aria-label={visible ? `Ocultar ${label.toLowerCase()}` : `Mostrar ${label.toLowerCase()}`}
+          aria-pressed={visible}
+        >
+          <ToggleIcon aria-hidden />
+          <span>{visible ? 'Ocultar' : 'Mostrar'}</span>
+        </button>
+      </div>
+    </label>
+  );
+}
+
 function AuthScreen({ authError }: { authError?: string | null }) {
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(authError ?? null);
@@ -311,9 +365,23 @@ function AuthScreen({ authError }: { authError?: string | null }) {
     setError(authError ?? null);
   }, [authError]);
 
+  useEffect(() => {
+    setError(authError ?? null);
+    setSuccess(null);
+    if (mode !== 'signup') {
+      setConfirmPassword('');
+    }
+  }, [authError, mode]);
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase) return;
+
+    if (mode === 'signup' && password !== confirmPassword) {
+      setError('As senhas precisam ser iguais para criar a conta.');
+      return;
+    }
+
     setBusy(true);
     setError(null);
     setSuccess(null);
@@ -413,19 +481,24 @@ function AuthScreen({ authError }: { authError?: string | null }) {
           />
         </label>
         {mode !== 'forgot' && (
-          <label htmlFor="password">
-            Senha
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              minLength={6}
-              required
-            />
-          </label>
+          <PasswordField
+            id="password"
+            name="password"
+            label="Senha"
+            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+        )}
+        {mode === 'signup' && (
+          <PasswordField
+            id="confirmPassword"
+            name="confirmPassword"
+            label="Confirmar senha"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+          />
         )}
         {error && <p className="error">{error}</p>}
         {success && <p className="success-text">{success}</p>}
@@ -494,32 +567,22 @@ function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
         <KeyRound aria-hidden />
         <h1>Definir nova senha</h1>
         <p>Crie uma nova senha para continuar acessando o SDR Expert.</p>
-        <label htmlFor="newPassword">
-          Nova senha
-          <input
-            id="newPassword"
-            name="newPassword"
-            type="password"
-            autoComplete="new-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            minLength={6}
-            required
-          />
-        </label>
-        <label htmlFor="confirmNewPassword">
-          Confirmar senha
-          <input
-            id="confirmNewPassword"
-            name="confirmNewPassword"
-            type="password"
-            autoComplete="new-password"
-            value={confirmPassword}
-            onChange={(event) => setConfirmPassword(event.target.value)}
-            minLength={6}
-            required
-          />
-        </label>
+        <PasswordField
+          id="newPassword"
+          name="newPassword"
+          label="Nova senha"
+          autoComplete="new-password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+        <PasswordField
+          id="confirmNewPassword"
+          name="confirmNewPassword"
+          label="Confirmar senha"
+          autoComplete="new-password"
+          value={confirmPassword}
+          onChange={(event) => setConfirmPassword(event.target.value)}
+        />
         {error && <p className="error">{error}</p>}
         {success && <p className="success-text">{success}</p>}
         <button type="submit" disabled={busy}>
