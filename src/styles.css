@@ -80,11 +80,19 @@ label {
 }
 
 .password-field {
-  position: relative;
+  align-items: stretch;
+  background: #ffffff;
+  border: 1px solid #cbd5d1;
+  border-radius: 7px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  overflow: hidden;
 }
 
 .password-field input {
-  padding-right: 110px;
+  border: 0;
+  border-radius: 0;
+  min-width: 0;
 }
 
 .password-toggle {
@@ -93,13 +101,11 @@ label {
   border-left: 1px solid #d9dfdc;
   border-radius: 0;
   color: #35514d;
+  flex: 0 0 auto;
   gap: 6px;
-  height: calc(100% - 2px);
-  min-height: 0;
+  min-height: 40px;
   padding: 0 12px;
-  position: absolute;
-  right: 1px;
-  top: 1px;
+  white-space: nowrap;
 }
 
 .password-toggle:hover {
@@ -1501,9 +1507,12 @@ h3 {
     background: transparent;
     border: 1px solid #475653;
     color: #ffffff;
-    flex: 0 0 auto;
+    flex: 0 0 40px;
+    height: 40px;
+    justify-content: center;
     min-height: 40px;
-    padding: 0 12px;
+    padding: 0;
+    width: 40px;
   }
 
   .sidebar-close:hover {
