@@ -319,6 +319,8 @@ function PasswordField({
   value,
   onChange,
   autoComplete,
+  placeholder,
+  hint,
   minLength = 6,
   required = true,
 }: {
@@ -328,6 +330,8 @@ function PasswordField({
   value: string;
   onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   autoComplete: string;
+  placeholder?: string;
+  hint?: string;
   minLength?: number;
   required?: boolean;
 }) {
@@ -345,6 +349,7 @@ function PasswordField({
           autoComplete={autoComplete}
           value={value}
           onChange={onChange}
+          placeholder={placeholder}
           minLength={minLength}
           required={required}
         />
@@ -359,6 +364,7 @@ function PasswordField({
           <span>{visible ? 'Ocultar' : 'Mostrar'}</span>
         </button>
       </div>
+      {hint && <span className="field-hint">{hint}</span>}
     </label>
   );
 }
@@ -476,8 +482,9 @@ function AuthScreen({ authError }: { authError?: string | null }) {
               autoComplete="name"
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
-              placeholder="Nome do avaliador"
+              placeholder="Ex.: Álvaro Amorim ou Marina Teixeira"
             />
+            <span className="field-hint">Use o nome que deve aparecer no perfil. Ex.: Álvaro Amorim ou Marina Teixeira.</span>
           </label>
         )}
         <label htmlFor="email">
@@ -489,8 +496,10 @@ function AuthScreen({ authError }: { authError?: string | null }) {
             autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
+            placeholder="Ex.: alvaro@empresa.com ou marina.sdr@startup.com.br"
             required
           />
+          <span className="field-hint">Informe um e-mail válido. Ex.: alvaro@empresa.com ou marina.sdr@startup.com.br.</span>
         </label>
         {mode !== 'forgot' && (
           <PasswordField
@@ -500,6 +509,8 @@ function AuthScreen({ authError }: { authError?: string | null }) {
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
+            placeholder="Ex.: Vendas2026! ou Sdr#Operacao9"
+            hint="Crie uma senha forte. Ex.: Vendas2026! ou Sdr#Operacao9."
           />
         )}
         {mode === 'signup' && (
@@ -510,6 +521,8 @@ function AuthScreen({ authError }: { authError?: string | null }) {
             autoComplete="new-password"
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
+            placeholder="Ex.: Vendas2026! ou Sdr#Operacao9"
+            hint="Repita exatamente a senha criada acima. Ex.: Vendas2026! ou Sdr#Operacao9."
           />
         )}
         {error && <p className="error">{error}</p>}
@@ -586,6 +599,8 @@ function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
           autoComplete="new-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
+          placeholder="Ex.: NovaSenha2026! ou SDR#AcessoSeguro7"
+          hint="Escolha uma senha nova e forte. Ex.: NovaSenha2026! ou SDR#AcessoSeguro7."
         />
         <PasswordField
           id="confirmNewPassword"
@@ -594,6 +609,8 @@ function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
           autoComplete="new-password"
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
+          placeholder="Ex.: NovaSenha2026! ou SDR#AcessoSeguro7"
+          hint="Repita a mesma senha digitada acima. Ex.: NovaSenha2026! ou SDR#AcessoSeguro7."
         />
         {error && <p className="error">{error}</p>}
         {success && <p className="success-text">{success}</p>}
@@ -755,7 +772,13 @@ function WorkspaceOnboarding({
       <p>O workspace isola funil, leads, campos, campanhas e mensagens.</p>
       <label>
         Nome do workspace
-        <input name="workspaceName" value={name} onChange={(event) => setName(event.target.value)} />
+        <input
+          name="workspaceName"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder="Ex.: Operação SDR Brasil ou Pré-vendas Enterprise"
+        />
+        <span className="field-hint">Dê um nome operacional ao ambiente. Ex.: Operação SDR Brasil ou Pré-vendas Enterprise.</span>
       </label>
       {error && <p className="error">{error}</p>}
       <button type="button" onClick={() => onCreate(name)} disabled={busy || name.trim().length < 2}>
@@ -1174,27 +1197,65 @@ function LeadForm({
       </div>
       <label>
         Nome
-        <input name="leadName" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+        <input
+          name="leadName"
+          value={form.name}
+          onChange={(event) => setForm({ ...form, name: event.target.value })}
+          placeholder="Ex.: Priscila Amaral ou Bruno Accioly"
+          required
+        />
+        <span className="field-hint">Digite o nome completo do contato. Ex.: Priscila Amaral ou Bruno Accioly.</span>
       </label>
       <label>
         E-mail
-        <input name="leadEmail" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+        <input
+          name="leadEmail"
+          type="email"
+          value={form.email}
+          onChange={(event) => setForm({ ...form, email: event.target.value })}
+          placeholder="Ex.: priscila@loghub.com.br ou bruno@fasthaul.com"
+        />
+        <span className="field-hint">Use um e-mail profissional do lead. Ex.: priscila@loghub.com.br ou bruno@fasthaul.com.</span>
       </label>
       <label>
         Telefone
-        <input name="leadPhone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
+        <input
+          name="leadPhone"
+          value={form.phone}
+          onChange={(event) => setForm({ ...form, phone: event.target.value })}
+          placeholder="Ex.: 11987654321 ou 2133345566"
+        />
+        <span className="field-hint">Informe telefone com DDD. Ex.: 11987654321 ou 2133345566.</span>
       </label>
       <label>
         Empresa
-        <input name="leadCompany" value={form.company} onChange={(event) => setForm({ ...form, company: event.target.value })} />
+        <input
+          name="leadCompany"
+          value={form.company}
+          onChange={(event) => setForm({ ...form, company: event.target.value })}
+          placeholder="Ex.: LogHub ou Escola Integra"
+        />
+        <span className="field-hint">Use o nome comercial da conta. Ex.: LogHub ou Escola Integra.</span>
       </label>
       <label>
         Cargo
-        <input name="leadJobTitle" value={form.job_title} onChange={(event) => setForm({ ...form, job_title: event.target.value })} />
+        <input
+          name="leadJobTitle"
+          value={form.job_title}
+          onChange={(event) => setForm({ ...form, job_title: event.target.value })}
+          placeholder="Ex.: Head de Revenue ou Diretora Comercial"
+        />
+        <span className="field-hint">Registre o papel do lead no processo. Ex.: Head de Revenue ou Diretora Comercial.</span>
       </label>
       <label>
         Origem
-        <input name="leadSource" value={form.lead_source} onChange={(event) => setForm({ ...form, lead_source: event.target.value })} />
+        <input
+          name="leadSource"
+          value={form.lead_source}
+          onChange={(event) => setForm({ ...form, lead_source: event.target.value })}
+          placeholder="Ex.: Lista ICP 2026 ou Inbound orgânico"
+        />
+        <span className="field-hint">Explique de onde esse lead veio. Ex.: Lista ICP 2026 ou Inbound orgânico.</span>
       </label>
       <label>
         Etapa
@@ -1219,7 +1280,13 @@ function LeadForm({
       </label>
       <label className="wide">
         Observações
-        <textarea name="leadNotes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+        <textarea
+          name="leadNotes"
+          value={form.notes}
+          onChange={(event) => setForm({ ...form, notes: event.target.value })}
+          placeholder="Ex.: Quer reduzir tempo de resposta do time. ou Ex.: Pediu contato na próxima terça após 10h."
+        />
+        <span className="field-hint">Anote contexto útil para a próxima abordagem. Ex.: quer reduzir tempo de resposta do time ou pediu contato na próxima terça após 10h.</span>
       </label>
       {data.customFields.map((field) => (
         <label key={field.id}>
@@ -1228,6 +1295,7 @@ function LeadForm({
             name={`customField-${field.id}`}
             type={field.field_type === 'number' ? 'number' : 'text'}
             value={form.customValues[field.id] ?? ''}
+            placeholder={field.field_type === 'number' ? 'Ex.: 12 ou 45' : 'Ex.: Operação outbound ou Ticket enterprise'}
             onChange={(event) =>
               setForm({
                 ...form,
@@ -1235,6 +1303,11 @@ function LeadForm({
               })
             }
           />
+          <span className="field-hint">
+            {field.field_type === 'number'
+              ? 'Preencha com valor quantitativo. Ex.: 12 ou 45.'
+              : 'Preencha com um contexto objetivo. Ex.: Operação outbound ou Ticket enterprise.'}
+          </span>
         </label>
       ))}
       <div className="wide">
@@ -1468,7 +1541,13 @@ function FieldsView({
             </div>
             <label>
               Nome do campo
-              <input name="customFieldName" value={name} onChange={(event) => setName(event.target.value)} required />
+              <input
+                name="customFieldName"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Ex.: Segmento ou Número de vendedores"
+                required
+              />
               <span className="field-hint">Exemplo: segmento, ICP, ticket médio, número de vendedores.</span>
             </label>
             <label>
@@ -1838,8 +1917,14 @@ function CampaignForm({
       </div>
       <label>
         Nome
-        <input name="campaignName" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
-        <span className="field-hint">Use um nome que deixe claro o objetivo da abordagem.</span>
+        <input
+          name="campaignName"
+          value={form.name}
+          onChange={(event) => setForm({ ...form, name: event.target.value })}
+          placeholder="Ex.: Outbound ICP Operações ou Reativação de pipeline"
+          required
+        />
+        <span className="field-hint">Use um nome claro. Ex.: Outbound ICP Operações ou Reativação de pipeline.</span>
       </label>
       <label>
         Etapa gatilho
@@ -1868,7 +1953,14 @@ function CampaignForm({
       </label>
       <label className="wide">
         Contexto
-        <textarea name="campaignContext" value={form.context_text} onChange={(event) => setForm({ ...form, context_text: event.target.value })} required />
+        <textarea
+          name="campaignContext"
+          value={form.context_text}
+          onChange={(event) => setForm({ ...form, context_text: event.target.value })}
+          placeholder="Ex.: SaaS B2B com time SDR travado por baixa cadência. ou Ex.: Operação logística com dificuldade para qualificar leads."
+          required
+        />
+        <span className="field-hint">Ex.: SaaS B2B com time SDR travado por baixa cadência ou operação logística com dificuldade para qualificar leads.</span>
         <span className="field-hint">Descreva rapidamente o cenário, produto e dor comercial que a IA deve considerar.</span>
       </label>
       <label className="wide">
@@ -1877,8 +1969,10 @@ function CampaignForm({
           name="campaignPrompt"
           value={form.generation_prompt}
           onChange={(event) => setForm({ ...form, generation_prompt: event.target.value })}
+          placeholder="Ex.: Escreva em tom consultivo com CTA leve. ou Ex.: Gere mensagem curta com foco em reunião diagnóstica."
           required
         />
+        <span className="field-hint">Ex.: escreva em tom consultivo com CTA leve ou gere mensagem curta com foco em reunião diagnóstica.</span>
         <span className="field-hint">Explique o tom, a intenção e o tipo de CTA que a mensagem deve produzir.</span>
       </label>
       <div className="wide">

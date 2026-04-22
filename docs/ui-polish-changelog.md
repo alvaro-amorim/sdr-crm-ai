@@ -327,3 +327,25 @@ Deixar a operação de geração e simulação mais legível, garantindo que o s
 - `npm run lint`
 - `npm run build`
 - checagem visual local da tela `Mensagens IA`
+
+## 2026-04-22 — Exemplos de preenchimento nos formulários
+
+### Objetivo
+
+Reduzir dúvida de preenchimento nos formulários principais, deixando o formato esperado claro logo dentro do campo ou em dica curta abaixo dele.
+
+### Alterações
+
+- `src/App.tsx`
+  - adiciona exemplos de preenchimento em autenticação, redefinição de senha e criação de workspace
+  - adiciona exemplos nos campos principais de lead: nome, e-mail, telefone, empresa, cargo, origem, observações e campos personalizados
+  - adiciona exemplos nos campos principais de campanha: nome, contexto e prompt de geração
+
+- `src/components/messages-screen.tsx`
+  - adiciona exemplos no campo de busca de lead da tela `Mensagens IA`
+
+### Validação
+
+- `npm run test`
+- `npm run lint`
+- `npm run build`
