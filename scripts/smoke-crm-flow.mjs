@@ -563,7 +563,12 @@ async function createCampaigns(client, workspaceId, userId, stageMap) {
 
   const { data, error } = await client.from('campaigns').insert(rows).select();
   if (error || !data) throw new Error(`Falha ao criar campanhas: ${error?.message ?? 'sem retorno'}`);
-  return new Map(CAMPAIGNS.map((campaign) => [campaign.slug, data.find((record) => record.name === campaign.name)]));
+  return new Map(
+    CAMPAIGNS.map((campaign) => {
+      const record = data.find((item) => item.name === campaign.name);
+      return [campaign.slug, record ? { ...record, slug: campaign.slug, channel: campaign.channel, goal: campaign.goal } : null];
+    }),
+  );
 }
 
 async function createLeads(client, workspaceId, userId, stageMap) {
