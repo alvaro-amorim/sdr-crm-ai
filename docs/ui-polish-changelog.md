@@ -373,3 +373,21 @@ Fechar a base atual do CRM antes da etapa Lovable, corrigindo microcopy visível
 - `npm run test`
 - `npm run lint`
 - `npm run build`
+
+## 2026-04-22 — Ajuste do botão de minimizar no mobile
+
+### Objetivo
+
+Corrigir o botão de minimizar do guia rápido no mobile, que estava herdando largura total e ficando grande demais.
+
+### Alterações
+
+- `src/styles.css`
+  - adiciona exceção específica para `.operation-guide-actions .icon-only` no breakpoint mobile
+  - fixa altura e largura em `34px`
+  - remove o efeito visual de quadrado gigante causado por `aspect-ratio` com largura esticada
+
+### Validação
+
+- `npm run lint`
+- `npm run build`
