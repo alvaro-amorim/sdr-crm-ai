@@ -242,3 +242,30 @@ Preparar o ambiente para avaliação antes da etapa Lovable, com volume operacio
 - `npm run build`
 
 O smoke completo depende das migrations aplicadas e das Edge Functions publicadas no Supabase. `OPENAI_API_KEY` local é opcional quando os secrets remotos estão configurados.
+
+## 2026-04-22 — Correção do funil operacional e seletor do simulador
+
+### Objetivo
+
+Corrigir a leitura da tela de leads com grande volume de dados e permitir que o usuário escolha explicitamente qual conversa abrir no simulador autenticável.
+
+### Alterações
+
+- `src/styles.css`
+  - o funil operacional passou a usar colunas com largura controlada e rolagem horizontal estável
+  - cada coluna ganhou rolagem vertical própria, evitando sobreposição entre etapas
+  - os cards de lead deixaram de comprimir quando há muitos registros na mesma etapa
+  - textos longos de contato, cargo, empresa e etiquetas agora quebram linha sem estourar o layout
+
+- `src/components/messages-screen.tsx`
+  - o painel `Simulador autenticável` ganhou seletor de conversa por lead e campanha
+  - o atalho de abertura em nova janela agora usa a conversa selecionada no seletor
+  - a prévia da conversa passa a acompanhar o lead selecionado no simulador, sem depender apenas do lead ativo na bancada de geração
+
+### Validação
+
+- `npm run test`
+- `npm run lint`
+- `npm run build`
+- checagem visual local em `127.0.0.1:5173` da tela de leads com volume alto
+- checagem visual local do seletor de conversa em `Mensagens IA`

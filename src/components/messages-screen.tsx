@@ -84,6 +84,10 @@ function inferChannelKey(lead: Lead) {
   return 'linkedin';
 }
 
+function formatMessageCount(count: number) {
+  return `${count} ${count === 1 ? 'mensagem' : 'mensagens'}`;
+}
+
 export function MessagesScreen({
   data,
   user,
@@ -103,6 +107,7 @@ export function MessagesScreen({
   const [simulationMessage, setSimulationMessage] = useState<GeneratedMessage | null>(null);
   const [simulationBusy, setSimulationBusy] = useState(false);
   const [simulatorLinkBusy, setSimulatorLinkBusy] = useState(false);
+  const [simulatorThreadId, setSimulatorThreadId] = useState(data.conversationThreads[0]?.id ?? '');
   const activeCampaigns = data.campaigns.filter((campaign) => campaign.is_active);
   const selectedLead = data.leads.find((lead) => lead.id === leadId) ?? null;
   const selectedCampaign = data.campaigns.find((campaign) => campaign.id === campaignId) ?? null;
@@ -119,11 +124,38 @@ export function MessagesScreen({
     data.conversationThreads.find((thread) => thread.lead_id === leadId) ??
     data.conversationThreads[0] ??
     null;
-  const selectedThreadMessages = selectedThread
+  const conversationMessageStats = data.conversationMessages.reduce<Record<string, { count: number; lastMessageAt: number }>>((stats, message) => {
+    const current = stats[message.thread_id] ?? { count: 0, lastMessageAt: 0 };
+    const messageTime = new Date(message.created_at).getTime();
+    stats[message.thread_id] = {
+      count: current.count + 1,
+      lastMessageAt: Math.max(current.lastMessageAt, Number.isNaN(messageTime) ? 0 : messageTime),
+    };
+    return stats;
+  }, {});
+  const simulatorThreadOptions = data.conversationThreads
+    .map((thread) => ({
+      thread,
+      lead: data.leads.find((lead) => lead.id === thread.lead_id) ?? null,
+      campaign: data.campaigns.find((campaign) => campaign.id === thread.campaign_id) ?? null,
+      messageCount: conversationMessageStats[thread.id]?.count ?? 0,
+      lastMessageAt: conversationMessageStats[thread.id]?.lastMessageAt ?? 0,
+    }))
+    .sort((left, right) => {
+      const timeDiff = right.lastMessageAt - left.lastMessageAt;
+      if (timeDiff !== 0) return timeDiff;
+      return (left.lead?.name ?? '').localeCompare(right.lead?.name ?? '', 'pt-BR');
+    });
+  const activeSimulatorThread =
+    data.conversationThreads.find((thread) => thread.id === simulatorThreadId) ?? selectedThread ?? simulatorThreadOptions[0]?.thread ?? null;
+  const activeSimulatorThreadMessages = activeSimulatorThread
     ? data.conversationMessages
-        .filter((message) => message.thread_id === selectedThread.id)
+        .filter((message) => message.thread_id === activeSimulatorThread.id)
         .sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime())
     : [];
+  const activeSimulatorOption = activeSimulatorThread
+    ? simulatorThreadOptions.find((option) => option.thread.id === activeSimulatorThread.id) ?? null
+    : null;
 
   useEffect(() => {
     if (leadId && data.leads.some((lead) => lead.id === leadId)) return;
@@ -134,6 +166,11 @@ export function MessagesScreen({
     if (campaignId && activeCampaigns.some((campaign) => campaign.id === campaignId)) return;
     setCampaignId(activeCampaigns[0]?.id ?? '');
   }, [activeCampaigns, campaignId]);
+
+  useEffect(() => {
+    if (simulatorThreadId && data.conversationThreads.some((thread) => thread.id === simulatorThreadId)) return;
+    setSimulatorThreadId(selectedThread?.id ?? data.conversationThreads[0]?.id ?? '');
+  }, [data.conversationThreads, selectedThread?.id, simulatorThreadId]);
 
   async function generateMessages() {
     if (!supabase || !leadId || !campaignId) {
@@ -355,21 +392,45 @@ export function MessagesScreen({
           <button
             type="button"
             className="ghost compact"
-            onClick={() => void openClientSimulator(selectedThread)}
-            disabled={!selectedThread || simulatorLinkBusy}
+            onClick={() => void openClientSimulator(activeSimulatorThread)}
+            disabled={!activeSimulatorThread || simulatorLinkBusy}
           >
             <ExternalLink aria-hidden />
             {simulatorLinkBusy ? 'Abrindo...' : 'Abrir janela do cliente'}
           </button>
         </div>
 
-        {selectedThread ? (
-          <ConversationPreview
-            thread={selectedThread}
-            messages={selectedThreadMessages}
-            lead={data.leads.find((lead) => lead.id === selectedThread.lead_id) ?? null}
-            campaign={data.campaigns.find((campaign) => campaign.id === selectedThread.campaign_id) ?? null}
-          />
+        {activeSimulatorThread ? (
+          <>
+            <div className="conversation-selector-row">
+              <label className="conversation-thread-select">
+                Escolher conversa
+                <select
+                  name="simulatorThread"
+                  value={activeSimulatorThread.id}
+                  onChange={(event) => setSimulatorThreadId(event.target.value)}
+                >
+                  {simulatorThreadOptions.map((option) => (
+                    <option key={option.thread.id} value={option.thread.id}>
+                      {option.lead?.name ?? 'Lead removido'} · {option.campaign?.name ?? 'Campanha removida'} · {formatMessageCount(option.messageCount)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <span className="conversation-selector-meta">
+                {activeSimulatorOption
+                  ? `${formatMessageCount(activeSimulatorOption.messageCount)} no histórico`
+                  : 'Histórico selecionado'}
+              </span>
+            </div>
+
+            <ConversationPreview
+              thread={activeSimulatorThread}
+              messages={activeSimulatorThreadMessages}
+              lead={data.leads.find((lead) => lead.id === activeSimulatorThread.lead_id) ?? null}
+              campaign={data.campaigns.find((campaign) => campaign.id === activeSimulatorThread.campaign_id) ?? null}
+            />
+          </>
         ) : (
           <div className="empty-panel">
             <MessageCircleReply aria-hidden />
@@ -432,8 +493,8 @@ export function MessagesScreen({
       <button
         type="button"
         className="client-simulator-shortcut"
-        onClick={() => void openClientSimulator(selectedThread)}
-        disabled={!selectedThread || simulatorLinkBusy}
+        onClick={() => void openClientSimulator(activeSimulatorThread)}
+        disabled={!activeSimulatorThread || simulatorLinkBusy}
         aria-label="Abrir simulador do cliente em nova janela"
       >
         <MessageCircleReply aria-hidden />
