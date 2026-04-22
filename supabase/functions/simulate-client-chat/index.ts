@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { z } from 'https://deno.land/x/zod@v3.23.8/mod.ts';
+import { getDeterministicConversationOutcome, mergeConversationVerdict } from '../../../src/lib/conversation-verdict.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,6 +18,17 @@ type AiAttempt = {
   model: string;
   temperature: number;
   timeoutMs: number;
+};
+
+type AiCompletionVerdict = {
+  message_text: string;
+  sentiment_tag: 'positive' | 'neutral' | 'negative' | 'mixed';
+  intent_tag: string;
+  thread_status: 'open' | 'positive' | 'neutral' | 'negative' | 'meeting_scheduled' | 'closed';
+  lead_stage_action: 'keep_current' | 'desqualificado' | 'qualificado' | 'reuniao_agendada' | 'tentando_contato' | 'conexao_iniciada';
+  should_close: boolean;
+  model: string;
+  usage: unknown;
 };
 
 const aiFallbackChain: AiAttempt[] = [
@@ -52,6 +64,8 @@ function parseAiJson(content: string | null) {
   const messageText = String(parsed.message_text ?? '').trim();
   const sentimentTag = String(parsed.sentiment_tag ?? 'neutral').trim().toLowerCase();
   const intentTag = String(parsed.intent_tag ?? 'follow_up').trim().toLowerCase();
+  const threadStatus = String(parsed.thread_status ?? 'neutral').trim().toLowerCase();
+  const leadStageAction = String(parsed.lead_stage_action ?? 'keep_current').trim().toLowerCase();
 
   if (!messageText) {
     throw new Error('Resposta vazia.');
@@ -61,10 +75,15 @@ function parseAiJson(content: string | null) {
     message_text: messageText.slice(0, 2200),
     sentiment_tag: ['positive', 'neutral', 'negative', 'mixed'].includes(sentimentTag) ? sentimentTag : 'neutral',
     intent_tag: intentTag.slice(0, 80),
+    thread_status: ['open', 'positive', 'neutral', 'negative', 'meeting_scheduled', 'closed'].includes(threadStatus) ? threadStatus : 'neutral',
+    lead_stage_action: ['keep_current', 'desqualificado', 'qualificado', 'reuniao_agendada', 'tentando_contato', 'conexao_iniciada'].includes(leadStageAction)
+      ? leadStageAction
+      : 'keep_current',
+    should_close: Boolean(parsed.should_close),
   };
 }
 
-async function callOpenAiWithFallback(openAiKey: string, prompt: string) {
+async function callOpenAiWithFallback(openAiKey: string, prompt: string): Promise<AiCompletionVerdict> {
   let lastError = 'Falha desconhecida no provedor de IA.';
 
   for (const attempt of aiFallbackChain) {
@@ -87,7 +106,7 @@ async function callOpenAiWithFallback(openAiKey: string, prompt: string) {
             {
               role: 'system',
               content:
-                'Você é um SDR sênior B2B. Retorne somente JSON válido no formato {"message_text":"...","sentiment_tag":"positive|neutral|negative|mixed","intent_tag":"..."}',
+                'Voce e um SDR senior B2B. Retorne somente JSON valido no formato {"message_text":"...","sentiment_tag":"positive|neutral|negative|mixed","intent_tag":"...","thread_status":"open|positive|neutral|negative|meeting_scheduled|closed","lead_stage_action":"keep_current|desqualificado|qualificado|reuniao_agendada|tentando_contato|conexao_iniciada","should_close":true|false}.',
             },
             { role: 'user', content: prompt },
           ],
@@ -133,14 +152,18 @@ function buildPrompt({
     .join('\n');
 
   return [
-    'Continue uma conversa comercial realista em português do Brasil.',
-    'A pessoa que está respondendo no simulador está agindo como cliente. Responda como SDR, mantendo contexto e próximo passo claro.',
-    'Não invente compromisso fechado se o cliente não confirmou. Se houver objeção, reduza atrito. Se houver interesse, avance para diagnóstico ou envio de material.',
-    'Retorne JSON válido sem markdown.',
+    'Continue uma conversa comercial realista em portugues do Brasil.',
+    'A pessoa que esta respondendo no simulador esta agindo como cliente. Responda como SDR, mantendo contexto e proximo passo claro.',
+    'Nao invente compromisso fechado se o cliente nao confirmou.',
+    'Se houver objecao forte ou recusa, responda com encerramento cordial e sem insistir.',
+    'Se houver interesse, avance para diagnostico, envio de material ou agendamento.',
+    'Classifique a conversa com base principal na mensagem do cliente e no historico, nao no sentimento da sua propria resposta.',
+    'Retorne JSON valido sem markdown.',
     `Lead: ${JSON.stringify(lead)}`,
     `Campanha: ${JSON.stringify(campaign)}`,
-    `Histórico:\n${history || 'Sem histórico anterior.'}`,
+    `Historico:\n${history || 'Sem historico anterior.'}`,
     `Nova resposta do cliente: ${clientMessage}`,
+    `Guardrails deterministas: ${JSON.stringify(getDeterministicConversationOutcome(clientMessage))}`,
   ].join('\n\n');
 }
 
@@ -150,7 +173,7 @@ serve(async (request) => {
   }
 
   if (request.method !== 'POST') {
-    return json(405, { success: false, error: 'Método não permitido.' });
+    return json(405, { success: false, error: 'Metodo nao permitido.' });
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -158,12 +181,12 @@ serve(async (request) => {
   const openAiKey = Deno.env.get('OPENAI_API_KEY');
 
   if (!supabaseUrl || !publishableKey || !openAiKey) {
-    return json(500, { success: false, error: 'Serviço de simulação não configurado.' });
+    return json(500, { success: false, error: 'Servico de simulacao nao configurado.' });
   }
 
   const parsed = inputSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return json(400, { success: false, error: 'Payload inválido.' });
+    return json(400, { success: false, error: 'Payload invalido.' });
   }
 
   const publicClient = createClient(supabaseUrl, publishableKey, {
@@ -176,7 +199,7 @@ serve(async (request) => {
   });
 
   if (contextError || !context?.thread) {
-    return json(403, { success: false, error: 'Link de simulação inválido ou expirado.' });
+    return json(403, { success: false, error: 'Link de simulacao invalido ou expirado.' });
   }
 
   const thread = context.thread;
@@ -194,7 +217,7 @@ serve(async (request) => {
   });
 
   try {
-    const generated = await callOpenAiWithFallback(openAiKey, prompt);
+    const generated = mergeConversationVerdict(parsed.data.message, await callOpenAiWithFallback(openAiKey, prompt));
     const { data: saved, error: saveError } = await publicClient.rpc('append_simulation_exchange', {
       target_token_hash: tokenHash,
       client_message: parsed.data.message,
@@ -203,6 +226,9 @@ serve(async (request) => {
       ai_usage: generated.usage,
       ai_sentiment: generated.sentiment_tag,
       ai_intent: generated.intent_tag,
+      ai_thread_status: generated.thread_status,
+      ai_stage_action: generated.lead_stage_action,
+      ai_should_close: generated.should_close,
     });
 
     if (saveError || !saved?.messages) {
