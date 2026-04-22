@@ -1,132 +1,230 @@
 # SDR Expert CRM
 
-Mini CRM para equipes SDR com autenticação Supabase, isolamento por workspace, kanban de leads, campanhas e geração de mensagens com IA via Edge Function.
+Mini CRM para operação de SDR com autenticação Supabase, isolamento por workspace, funil comercial, campanhas com apoio de IA e simulador de conversa persistida.
+
+## Visão geral
+
+O projeto foi desenvolvido de forma iterativa:
+
+1. primeiro consolidou a base funcional do produto;
+2. depois estabilizou regras de negócio, integrações com IA, simulador e smoke operacional;
+3. agora o refinamento visual do frontend fica padronizado em **v0**, sempre preservando este repositório como fonte de verdade funcional.
+
+Regras operacionais ativas:
+
+- **GitHub** é a fonte de verdade do código;
+- **Vercel** é o fluxo preferencial de deploy do frontend;
+- **v0** é a ferramenta padrão para evolução visual e de UX do frontend existente, sem recriação total do sistema.
 
 ## Stack
 
-- React + TypeScript + Vite
+- React 19 + TypeScript + Vite
 - Supabase Auth, Postgres, RLS e Edge Functions
-- OpenAI para geração de mensagens
-- Zod para validação de ambiente e payload da Edge Function
-- Vitest para regras críticas isoladas
+- OpenAI para planejamento e geração de mensagens
+- Zod para validação de ambiente e payloads
+- Vitest para regras críticas e utilitários do smoke
+
+## Fluxo principal entregue
+
+O fluxo central hoje cobre:
+
+- cadastro, login, logout e recuperação de senha com Supabase Auth;
+- login com Google via Supabase OAuth;
+- criação do primeiro workspace com funil padrão;
+- CRUD de leads com campos padrão e personalizados;
+- validação de campos obrigatórios por etapa;
+- leitura do pipeline em kanban;
+- criação de campanhas com planejamento assistido por IA em duas etapas;
+- geração de 2 ou 3 mensagens por lead;
+- envio simulado com persistência de thread;
+- simulador público por token para responder como cliente;
+- dashboard operacional com métricas e drill-down.
 
 ## Funcionalidades implementadas
 
-- Cadastro, login e logout com Supabase Auth
-- Login com Google OAuth via Supabase
-- Recuperacao de senha com link por e-mail
-- Criação de workspace inicial com funil padrão
-- RLS e filtros por `workspace_id`
-- CRUD de leads com campos padrão e responsável opcional
-- Campos personalizados por workspace
-- Regras de campos obrigatórios por etapa
-- Kanban por etapa com bloqueio de movimentação quando faltam campos
-- CRUD básico de campanhas
-- Edge Function `generate-lead-messages`
-- Persistência de mensagens geradas
-- Envio simulado com mudança automática para `Tentando Contato`
-- Threads de conversa com histórico persistido
-- Simulador público por token para agir como cliente e testar a próxima resposta da IA
-- Dashboard com total de leads, mensagens e campanhas ativas
+- autenticação com Supabase Auth
+- login com Google OAuth
+- recuperação e redefinição de senha
+- workspace inicial com membership do owner
+- isolamento por `workspace_id`
+- RLS nas tabelas principais
+- CRUD de leads
+- campos personalizados por workspace
+- regras de obrigatoriedade por etapa
+- campanhas com briefing, plano de ação e prompt final revisável
+- Edge Functions:
+  - `generate-lead-messages`
+  - `plan-campaign-strategy`
+  - `create-simulation-link`
+  - `simulate-client-chat`
+  - `generate-smoke-conversation`
+- persistência de `generated_messages`, `sent_message_events`, `conversation_threads` e `conversation_messages`
+- simulador público por token
+- smoke test realista com volume operacional
 
-## Setup local
+## Setup local real
 
-1. Instale dependências:
+### 1. Instalar dependências
 
 ```bash
 npm install
 ```
 
-2. Crie `.env.local` a partir de `.env.example`:
+### 2. Configurar `.env.local`
+
+Use `.env.example` como base:
 
 ```bash
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
-3. Aplique as migrations em ordem:
+`OPENAI_API_KEY` é opcional no ambiente local e serve apenas para o smoke quando você quiser gerar as conversas diretamente do script. A chave nunca deve ficar no frontend publicado.
 
-- `supabase/migrations/20260421150000_initial_schema.sql`
-- `supabase/migrations/20260421162000_workspace_bootstrap_and_integrity.sql`
-- `supabase/migrations/20260421170000_authenticated_table_grants.sql`
-- `supabase/migrations/20260421171500_fix_portuguese_stage_accents.sql`
-
-Para novas migrations, use o CLI local instalado no projeto:
+### 3. Linkar o projeto Supabase
 
 ```bash
 npx supabase login
 npx supabase link --project-ref your-project-ref
-npx supabase migration repair 20260421150000 20260421162000 --status applied
+```
+
+### 4. Aplicar as migrations
+
+As migrations atuais do repositório são:
+
+- `20260421150000_initial_schema.sql`
+- `20260421162000_workspace_bootstrap_and_integrity.sql`
+- `20260421170000_authenticated_table_grants.sql`
+- `20260421171500_fix_portuguese_stage_accents.sql`
+- `20260421183000_fix_workspace_integrity_trigger.sql`
+- `20260421201000_enrich_sent_message_events_for_smoke_chat.sql`
+- `20260422093000_conversation_threads_and_simulator_tokens.sql`
+- `20260422104500_simulator_public_rpc.sql`
+- `20260422133500_fix_simulator_verdict_and_stage_movement.sql`
+- `20260422143000_prompt_purpose_state_machine.sql`
+
+Aplicação recomendada:
+
+```bash
 npx supabase db push
 ```
 
-4. Configure Auth no Supabase:
+Se o projeto remoto já tiver parte do histórico aplicada, use `migration repair` apenas para refletir o estado real do banco antes do `db push`.
 
-- habilite confirmacao de e-mail para cadastro tradicional
-- configure os templates de e-mail usando `docs/supabase-auth-email-templates.md`
-- use `https://sdr-crm-ai-wine.vercel.app` como `Site URL` para producao
-- adicione `https://sdr-crm-ai-wine.vercel.app`, `http://127.0.0.1:5173` e `http://localhost:5173` nas Redirect URLs
-- habilite Google OAuth em `Authentication > Providers > Google`
+### 5. Configurar Auth no Supabase
 
-5. Configure secrets da Edge Function no Supabase:
+- habilitar confirmação de e-mail para cadastro tradicional;
+- configurar templates de e-mail usando `docs/supabase-auth-email-templates.md`;
+- usar `https://sdr-crm-ai-wine.vercel.app` como `Site URL` de produção;
+- adicionar estas URLs de redirect:
+  - `https://sdr-crm-ai-wine.vercel.app`
+  - `http://127.0.0.1:5173`
+  - `http://localhost:5173`
+- habilitar Google em `Authentication > Sign In / Providers > Google`.
+
+### 6. Configurar secrets das Edge Functions
+
+No ambiente Supabase Functions:
 
 ```bash
-SUPABASE_SERVICE_ROLE_KEY=...
 OPENAI_API_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
-6. Publique as Edge Functions:
+### 7. Publicar as Edge Functions necessárias
 
 ```bash
-supabase functions deploy generate-lead-messages
-supabase functions deploy create-simulation-link
-supabase functions deploy simulate-client-chat
-supabase functions deploy generate-smoke-conversation
+npx supabase functions deploy generate-lead-messages
+npx supabase functions deploy plan-campaign-strategy
+npx supabase functions deploy create-simulation-link
+npx supabase functions deploy simulate-client-chat
+npx supabase functions deploy generate-smoke-conversation
 ```
 
-7. Rode localmente:
+### 8. Rodar o frontend local
 
 ```bash
 npm run dev
 ```
 
+## Estratégia de refinamento com v0
+
+O frontend não será refeito do zero. A estratégia ativa é:
+
+- preservar esta base funcional;
+- usar **v0** para refinar layout, hierarquia visual, UX e consistência;
+- reintegrar as melhorias em blocos pequenos no repositório principal;
+- validar `test`, `lint` e `build` a cada bloco reintegrado.
+
+Documentos de apoio:
+
+- `docs/v0/v0-project-context.md`
+- `docs/v0/v0-safe-boundaries.md`
+- `docs/v0/v0-priority-surfaces.md`
+- `docs/v0/v0-validation-checklist.md`
+- `docs/v0/v0-review-workflow.md`
+
 ## Deploy na Vercel
 
-- O deploy final obrigatório é a Vercel.
-- Configure apenas `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` no projeto Vercel.
-- `vercel.json` mantém fallback de SPA para rotas diretas como `/client-simulator`.
-- `OPENAI_API_KEY` e `SUPABASE_SERVICE_ROLE_KEY` ficam somente nos secrets das Supabase Edge Functions.
+- o deploy preferencial e final do frontend é a **Vercel**;
+- configurar na Vercel apenas:
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
+- `vercel.json` mantém fallback SPA para rotas diretas como `/client-simulator`;
+- `OPENAI_API_KEY` e `SUPABASE_SERVICE_ROLE_KEY` ficam apenas no Supabase, nunca na Vercel do frontend.
+
+Deploy atual de referência:
+
+- `https://sdr-crm-ai-wine.vercel.app`
 
 ## Segurança e multi-tenancy
 
-- A chave `SUPABASE_SERVICE_ROLE_KEY` não é usada no frontend.
-- Variaveis publicas do frontend devem usar apenas o prefixo `VITE_` quando forem seguras para exposicao no navegador.
-- `OPENAI_API_KEY` e `SUPABASE_SERVICE_ROLE_KEY` devem ficar apenas no ambiente da Supabase Edge Function.
-- Toda tabela funcional possui `workspace_id`.
-- RLS valida membership com `is_workspace_member`.
-- A criação inicial do workspace usa RPC segura para criar workspace, membership e funil padrão de forma atômica.
-- Triggers de integridade bloqueiam referências cruzadas entre workspace, lead, etapa, campanha e campos personalizados.
-- A Edge Function valida autenticação, membership, lead e campanha no mesmo workspace antes de chamar o LLM.
-- O frontend também filtra todas as consultas pelo workspace atual.
+- o frontend não usa `SUPABASE_SERVICE_ROLE_KEY`;
+- apenas variáveis `VITE_` seguras devem aparecer no navegador;
+- toda entidade de negócio é ligada a `workspace_id`;
+- o banco aplica membership e RLS nas tabelas principais;
+- triggers de integridade bloqueiam referências cruzadas entre workspace, etapa, lead, campanha e conversa;
+- as Edge Functions validam autenticação e vínculo com o workspace antes de operar.
 
-## Geração com IA
+## IA e Edge Functions
 
-O frontend chama apenas a Edge Function `generate-lead-messages` com `workspace_id`, `lead_id` e `campaign_id`. A função busca lead, campanha e campos personalizados no backend, monta o prompt de forma controlada, chama a OpenAI e salva 2 ou 3 variações em `generated_messages`.
+### Planejamento de campanha
 
-O simulador de cliente usa duas funções adicionais:
+`plan-campaign-strategy` recebe o briefing da campanha e devolve:
 
-- `create-simulation-link`: função autenticada que valida membership do workspace e cria um link temporário por token.
-- `simulate-client-chat`: função pública limitada pelo token; resolve a conversa por RPC `security definer`, grava a resposta do cliente e gera a próxima resposta SDR com OpenAI.
+- resumo da abordagem;
+- diferenciais sugeridos;
+- objeções previstas;
+- prompt final sugerido.
 
-A geração possui fallback em cadeia dentro da própria OpenAI:
+O usuário pode aprovar, regenerar ou editar antes de salvar a campanha.
 
-- tenta primeiro `gpt-4o-mini`
-- se houver timeout, indisponibilidade, rate limit, resposta incompleta ou JSON inválido, tenta `gpt-4o`
-- se ainda falhar, tenta `gpt-4.1-mini`
-- erros de autenticação/autorização da API não fazem fallback, pois indicam secret incorreto ou sem permissão
-- nenhuma mensagem é salva no banco se todas as tentativas falharem
+### Geração de mensagens
 
-## Testes
+`generate-lead-messages`:
+
+- valida usuário e workspace;
+- lê lead, campanha e campos relevantes;
+- monta o prompt de geração;
+- chama a OpenAI;
+- salva 2 ou 3 variações em `generated_messages`.
+
+Fallback atual na própria OpenAI:
+
+- `gpt-4o-mini`
+- `gpt-4o`
+- `gpt-4.1-mini`
+
+Sem sucesso em todas as tentativas, nenhuma mensagem é persistida.
+
+### Simulador público
+
+- `create-simulation-link` gera link temporário por token;
+- `simulate-client-chat` resolve a conversa pública, registra a resposta do cliente e gera a próxima resposta SDR.
+
+## Testes e validações
+
+Validação local padrão:
 
 ```bash
 npm run test
@@ -134,40 +232,48 @@ npm run lint
 npm run build
 ```
 
-Smoke test automatizado do fluxo principal:
+Smoke completo:
 
 ```bash
 TEST_USER_EMAIL=seu-usuario-teste@example.com TEST_USER_PASSWORD=sua-senha npm run test:smoke:crm
 ```
 
-O script autentica um usuário de teste, garante um workspace demo, limpa apenas esse workspace, cria 100 leads, 4 campanhas, 75 conversas, mensagens reais geradas pela OpenAI, eventos de envio e tokens de simulador. Quando `OPENAI_API_KEY` existe localmente, o script chama a OpenAI direto; quando não existe, usa a Edge Function autenticada `generate-smoke-conversation` com os secrets remotos do Supabase. A execução segue a estratégia documentada em `docs/smoke-realista-ondas.md`.
+O smoke:
 
-Cobertura atual:
+- autentica usuário real;
+- prepara um workspace demo;
+- cria 100 leads;
+- cria 4 campanhas;
+- gera 75 conversas operacionais;
+- persiste mensagens outbound e inbound;
+- cria tokens do simulador.
 
-- validação segura de variáveis públicas
-- geração de `field_key`
-- bloqueio de transição por campo padrão ausente
-- bloqueio de transição por campo personalizado ausente
-- permissão de transição quando todos os campos estão preenchidos
+Cobertura automatizada atual:
+
+- validação segura de env público;
+- veredito de conversa e máquina de estado;
+- bloqueio de transição por campos obrigatórios;
+- utilitários do smoke.
 
 ## Limitações conhecidas
 
-- Convites e múltiplos papéis avançados ficaram fora do MVP.
-- O kanban usa seletor de etapa em vez de drag and drop para reduzir risco.
-- Exclusão/arquivamento de leads não foi priorizado.
-- O link de deploy e o link do vídeo devem ser preenchidos após publicação.
+- convites e múltiplos papéis avançados ficaram fora do MVP;
+- o kanban usa seletor de etapa em vez de drag and drop;
+- exclusão ou arquivamento de leads não foi priorizado;
+- a experiência multi-workspace no frontend ainda é mínima;
+- o vídeo demonstrativo ainda precisa ser fechado fora do código.
 
-## Checklist de entrega
+## Checklist honesto de entrega
 
-- [x] Auth
-- [x] Workspace
-- [x] Pipeline padrão
-- [x] Leads
-- [x] Campos personalizados
-- [x] Validação por etapa
-- [x] Campanhas
-- [x] IA via Edge Function
-- [x] Envio simulado
-- [x] Dashboard
-- [ ] Deploy
-- [ ] Vídeo demonstrativo
+- [x] autenticação
+- [x] workspace
+- [x] pipeline padrão
+- [x] leads
+- [x] campos personalizados
+- [x] validação por etapa
+- [x] campanhas com planejamento por IA
+- [x] geração por Edge Function
+- [x] envio simulado
+- [x] dashboard operacional
+- [x] deploy preferencial na Vercel
+- [ ] vídeo demonstrativo final anexado à entrega

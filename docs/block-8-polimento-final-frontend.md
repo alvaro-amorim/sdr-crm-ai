@@ -1,8 +1,8 @@
-# Bloco 8 — Polimento final antes do Lovable
+# Bloco 8 — Polimento final antes do refinamento do frontend
 
 ## Objetivo
 
-Fechar a base atual do CRM antes da etapa Lovable com microcopy consistente, acentuação correta e um roteiro claro para validação final em um usuário limpo.
+Fechar a base atual do CRM antes da etapa de refinamento visual com microcopy consistente, acentuação correta e um roteiro claro para validação final em um usuário limpo.
 
 ## Alterações
 

@@ -67,7 +67,7 @@ O MVP deve contemplar, no mínimo:
 - deploy funcional obrigatoriamente na Vercel
 - README técnico
 - vídeo demonstrativo separado da aplicação
-- frontend construído obrigatoriamente a partir de fluxo de vibe coding no Lovable
+- frontend refinado prioritariamente com v0, preservando a base funcional existente
 
 ## 2.3 Estratégia de entrega
 
@@ -85,7 +85,7 @@ Diferenciais só devem ser implementados **depois** que o fluxo principal estive
 
 Este projeto possui três diretrizes operacionais de prioridade máxima:
 
-1. O frontend deve nascer do fluxo de vibe coding no **Lovable**. O Lovable é a plataforma padrão e obrigatória para a direção de interface, estrutura visual e experiência do frontend.
+1. O frontend deve evoluir a partir da base funcional já consolidada neste repositório. O **v0** passa a ser a ferramenta padrão para refinamento visual, estrutura de interface e melhoria incremental de UX.
 2. O desenvolvimento deve ter commits regulares, pequenos ou médios, claros e frequentes. Não é aceitável desenvolver tudo e commitar apenas no final.
 3. O deploy final da aplicação deve ser feito obrigatoriamente na **Vercel**, com ambiente de produção funcional, validado e acessível para avaliação.
 
@@ -152,11 +152,11 @@ Quando criar algo estrutural, registrar:
 
 Em caso de conflito, ambiguidade ou dúvida interpretativa dentro desta constituição:
 
-1. **Lovable prevalece** como plataforma obrigatória de frontend vibe coding.
+1. **v0 prevalece** como ferramenta padrão de refinamento visual e de UX do frontend.
 2. **Commits regulares, claros e frequentes prevalecem** como regra obrigatória de execução.
 3. **Vercel prevalece** como destino obrigatório do deploy final.
 4. Segurança, testes, clareza arquitetural, proteção de dados e documentação continuam obrigatórios e não podem ser enfraquecidos por nenhuma decisão de prazo.
-5. Qualquer trecho genérico sobre frontend deve ser reinterpretado como frontend alinhado ao Lovable.
+5. Qualquer trecho genérico sobre frontend deve ser reinterpretado como frontend alinhado ao fluxo atual de refinamento com v0 sobre a base funcional existente.
 6. Qualquer trecho genérico sobre deploy deve ser reinterpretado como deploy final na Vercel, salvo quando o trecho tratar explicitamente de ambiente local ou preview técnico.
 
 ---
@@ -231,7 +231,7 @@ O MVP é considerado bem-sucedido se um avaliador conseguir:
 
 ## 6.1 Stack obrigatória
 
-- Frontend: **Lovable obrigatório**, usando abordagem de vibe coding compatível com React
+- Frontend: React + TypeScript + Vite, com refinamento visual e de UX padronizado via **v0**
 - Backend: Supabase Edge Functions com TypeScript
 - Banco: Supabase Postgres
 - Auth: Supabase Auth
@@ -239,18 +239,18 @@ O MVP é considerado bem-sucedido se um avaliador conseguir:
 - Versionamento: Git + GitHub
 - Deploy final: **Vercel obrigatória**
 
-## 6.2 Regras obrigatórias para frontend com Lovable
+## 6.2 Regras obrigatórias para refinamento de frontend com v0
 
-- A interface deve nascer a partir do fluxo de vibe coding no Lovable.
-- A base visual, estrutura de telas, comportamento de navegação e direção de UX do frontend devem partir do Lovable.
-- O projeto não deve tratar o frontend como implementação manual tradicional isolada da plataforma de vibe coding.
-- Se o código for refinado posteriormente fora do Lovable, isso não altera a regra de origem e direção: o frontend continua subordinado à abordagem Lovable.
-- Sempre que houver dúvida entre uma abordagem genérica de frontend e uma abordagem alinhada ao Lovable, deve prevalecer a abordagem alinhada ao Lovable.
-- Após cada bloco importante gerado ou refinado a partir do Lovable, deve haver teste funcional básico do frontend para confirmar que o fluxo principal continua utilizável.
+- A interface deve preservar a base funcional já construída antes de qualquer refinamento visual.
+- O v0 é a ferramenta padrão para explorar, acelerar e consolidar o refinamento de layout, componentes e UX.
+- O projeto não deve tratar o frontend como uma recriação isolada da base funcional já validada.
+- Se o código for refinado manualmente fora do v0, isso não altera a direção vigente: o frontend continua subordinado à estratégia de refinamento incremental guiada por v0.
+- Sempre que houver dúvida entre uma abordagem genérica de frontend e uma abordagem alinhada ao fluxo atual com v0, deve prevalecer a abordagem alinhada ao v0 e aos contratos funcionais existentes.
+- Após cada bloco importante gerado ou refinado a partir do v0, deve haver teste funcional básico do frontend para confirmar que o fluxo principal continua utilizável.
 
 ## 6.3 Stack complementar permitida
 
-Usar somente quando houver ganho técnico claro e compatibilidade com Lovable:
+Usar somente quando houver ganho técnico claro e compatibilidade com a estratégia de frontend vigente:
 
 - React + TypeScript
 - Vite ou ambiente gerado pela plataforma escolhida
@@ -800,11 +800,11 @@ Ao terminar qualquer implementação, você deve registrar explicitamente:
 - quais bugs foram corrigidos
 - quais riscos ainda existem
 
-## 12.5 Validações obrigatórias de Lovable, commits e Vercel
+## 12.5 Validações obrigatórias de v0, commits e Vercel
 
 Além dos testes funcionais de cada feature:
 
-- após cada bloco importante de frontend gerado ou refinado a partir do Lovable, executar teste funcional básico da interface
+- após cada bloco importante de frontend gerado ou refinado a partir do v0, executar teste funcional básico da interface
 - antes de cada commit, validar os principais fluxos afetados para evitar registrar código quebrado
 - antes de cada commit, confirmar que não há secrets em arquivos rastreados
 - antes da entrega, validar a aplicação publicada na Vercel

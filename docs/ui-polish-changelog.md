@@ -4,7 +4,7 @@
 
 ### Objetivo do bloco
 
-Melhorar a percepção visual do app antes do Lovable, concentrando a primeira entrega em:
+Melhorar a percepção visual do app antes da etapa padronizada de refinamento com v0, concentrando a primeira entrega em:
 
 - layout-base
 - dashboard
@@ -68,7 +68,7 @@ Melhorar a percepção visual do app antes do Lovable, concentrando a primeira e
 1. finalizar refinamentos da tela de leads
 2. melhorar a tela de campanhas
 3. revisão final de responsividade
-4. polimento visual final antes do Lovable
+4. polimento visual final antes do refinamento com v0
 
 ## 2026-04-21 — Etapa 4 iniciada
 
@@ -141,13 +141,13 @@ Dar cara de operação comercial à tela de leads, reduzindo a sensação de CRU
 ### Próximo bloco
 
 1. revisão transversal de responsividade e consistência entre dashboard, campanhas, leads e mensagens
-2. polimento final de microcopy, estados vazios e feedbacks antes da etapa Lovable
+2. polimento final de microcopy, estados vazios e feedbacks antes da etapa de refinamento com v0
 
 ## 2026-04-21 — Etapa 5 executada
 
 ### Objetivo do bloco
 
-Fechar o polimento transversal antes do Lovable, reforçando leitura operacional, feedbacks de sucesso/erro e a clareza das telas de `Campos` e `Mensagens IA`.
+Fechar o polimento transversal antes da etapa de refinamento com v0, reforçando leitura operacional, feedbacks de sucesso/erro e a clareza das telas de `Campos` e `Mensagens IA`.
 
 ### Alterações implementadas
 
@@ -180,8 +180,8 @@ Fechar o polimento transversal antes do Lovable, reforçando leitura operacional
 
 ### Situação da fase
 
-- blocos planejados para o polimento pré-Lovable foram concluídos
-- o próximo passo deixa de ser refino local de UI e passa a ser validação final em produção e migração guiada para Lovable
+- blocos planejados para o polimento pré-refinamento foram concluídos
+- o próximo passo deixa de ser refino local de UI e passa a ser validação final em produção e refinamento guiado por v0
 
 ## 2026-04-21 — Aprimoramento do smoke test
 
@@ -210,7 +210,7 @@ Transformar o smoke test do CRM em um seed de demonstração realista, útil par
 
 ### Objetivo
 
-Preparar o ambiente para avaliação antes da etapa Lovable, com volume operacional e conversas realistas geradas por IA em vez de exemplos fixos.
+Preparar o ambiente para avaliação antes da etapa de refinamento com v0, com volume operacional e conversas realistas geradas por IA em vez de exemplos fixos.
 
 ### Alterações
 
@@ -350,11 +350,11 @@ Reduzir dúvida de preenchimento nos formulários principais, deixando o formato
 - `npm run lint`
 - `npm run build`
 
-## 2026-04-22 — Polimento final antes do Lovable
+## 2026-04-22 — Polimento final antes do refinamento com v0
 
 ### Objetivo
 
-Fechar a base atual do CRM antes da etapa Lovable, corrigindo microcopy visível, acentuação e documentação do teste final com usuário limpo.
+Fechar a base atual do CRM antes da etapa de refinamento com v0, corrigindo microcopy visível, acentuação e documentação do teste final com usuário limpo.
 
 ### Alterações
 
@@ -363,7 +363,7 @@ Fechar a base atual do CRM antes da etapa Lovable, corrigindo microcopy visível
   - padroniza mensagens de erro, placeholders e dicas do plano de ação gerado por IA
   - mantém o formulário de campanha mais claro para revisão, aprovação e edição do prompt antes de salvar
 
-- `docs/block-8-polimento-final-lovable.md`
+- `docs/block-8-polimento-final-frontend.md`
   - documenta o fechamento do bloco 8
   - registra como preparar o `.env.local` para o smoke final em usuário limpo
   - reforça que `OPENAI_API_KEY` não deve ser exposta na Vercel do frontend
