@@ -1,8 +1,13 @@
 import {
+  AlertTriangle,
   BarChart3,
   BookOpen,
+  CalendarCheck,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
+  Clock3,
+  FileText,
   MessageCircleReply,
   Megaphone,
   Send,
@@ -13,7 +18,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { CrmData, Lead, PipelineStage } from '../types/domain';
+import type { Campaign, ConversationMessage, ConversationThread, CrmData, Lead, PipelineStage } from '../types/domain';
 import { findStageByName, formatDateTime, getLeadMetaLine } from '../utils/crm-ui';
 
 type ActivityFeedItem = {
@@ -22,6 +27,40 @@ type ActivityFeedItem = {
   description: string;
   at: string;
   tone: 'lead' | 'campaign' | 'message' | 'send' | 'reply';
+};
+
+type OperationShortcutKey =
+  | 'no_response'
+  | 'secondary_follow_up'
+  | 'negative'
+  | 'positive'
+  | 'qualified'
+  | 'meeting'
+  | 'active_campaigns'
+  | 'risk';
+
+type OperationTone = 'neutral' | 'warning' | 'positive' | 'danger' | 'meeting';
+
+type OperationLeadRow = {
+  id: string;
+  lead: Lead;
+  stage: PipelineStage | null;
+  campaign: Campaign | null;
+  thread: ConversationThread | null;
+  latestMessage: ConversationMessage | null;
+  sortAt: string;
+};
+
+type OperationShortcut = {
+  key: OperationShortcutKey;
+  title: string;
+  value: number;
+  description: string;
+  meta: string;
+  recommendedAction: string;
+  tone: OperationTone;
+  icon: LucideIcon;
+  rows: OperationLeadRow[];
 };
 
 function formatPercent(value: number) {
@@ -35,6 +74,46 @@ function safeRate(part: number, total: number) {
 
 function formatLeadCount(count: number) {
   return `${count} ${count === 1 ? 'lead' : 'leads'}`;
+}
+
+function sortByNewest<T extends { sortAt: string }>(items: T[]) {
+  return [...items].sort((left, right) => new Date(right.sortAt).getTime() - new Date(left.sortAt).getTime());
+}
+
+function getMessagePreview(message: ConversationMessage | null) {
+  if (!message) return 'Sem mensagem registrada nesta conversa.';
+  return message.message_text.length > 180 ? `${message.message_text.slice(0, 180)}...` : message.message_text;
+}
+
+function getThreadLabel(thread: ConversationThread | null) {
+  if (!thread) return 'Sem conversa';
+  const statusLabels: Record<ConversationThread['status'], string> = {
+    closed: 'Fechada',
+    meeting_scheduled: 'Reunião sinalizada',
+    negative: 'Negativa',
+    neutral: 'Neutra',
+    open: 'Aberta',
+    positive: 'Positiva',
+  };
+  const sentimentLabels: Record<ConversationThread['sentiment_tag'], string> = {
+    mixed: 'mista',
+    negative: 'negativa',
+    neutral: 'neutra',
+    positive: 'positiva',
+  };
+  return `${statusLabels[thread.status]} · ${sentimentLabels[thread.sentiment_tag]}`;
+}
+
+function getPredominantStage(rows: OperationLeadRow[]) {
+  if (rows.length === 0) return 'Sem etapa';
+  const counts = rows.reduce<Map<string, { name: string; count: number }>>((map, row) => {
+    const name = row.stage?.name ?? 'Sem etapa';
+    const current = map.get(name) ?? { name, count: 0 };
+    current.count += 1;
+    map.set(name, current);
+    return map;
+  }, new Map());
+  return [...counts.values()].sort((left, right) => right.count - left.count)[0]?.name ?? 'Sem etapa';
 }
 
 function getStageNextAction(stage: PipelineStage | null, leads: Lead[], hasCampaignTrigger: boolean) {
@@ -53,6 +132,7 @@ export function DashboardScreen({ data }: { data: CrmData }) {
   const [selectedStageId, setSelectedStageId] = useState(data.stages[0]?.id ?? '');
   const [insightsCollapsed, setInsightsCollapsed] = useState(false);
   const [diagnosticOpen, setDiagnosticOpen] = useState(false);
+  const [activeShortcutKey, setActiveShortcutKey] = useState<OperationShortcutKey | null>(null);
 
   const activeCampaigns = data.campaigns.filter((campaign) => campaign.is_active).length;
   const leadsInContactStage = findStageByName(data.stages, 'Tentando Contato');
@@ -105,8 +185,47 @@ export function DashboardScreen({ data }: { data: CrmData }) {
   const selectedStageCampaigns = selectedStage
     ? data.campaigns.filter((campaign) => campaign.trigger_stage_id === selectedStage.id && campaign.is_active)
     : [];
+  const stagesById = new Map(data.stages.map((stage) => [stage.id, stage]));
   const leadsById = new Map(data.leads.map((lead) => [lead.id, lead]));
   const campaignsById = new Map(data.campaigns.map((campaign) => [campaign.id, campaign]));
+  const latestConversationMessageByThread = data.conversationMessages.reduce<Map<string, ConversationMessage>>((map, message) => {
+    const current = map.get(message.thread_id);
+    if (!current || new Date(message.created_at).getTime() > new Date(current.created_at).getTime()) {
+      map.set(message.thread_id, message);
+    }
+    return map;
+  }, new Map());
+  const messagesByThread = data.conversationMessages.reduce<Map<string, ConversationMessage[]>>((map, message) => {
+    const messages = map.get(message.thread_id) ?? [];
+    messages.push(message);
+    map.set(message.thread_id, messages);
+    return map;
+  }, new Map());
+  const operationalRows = data.conversationThreads
+    .map<OperationLeadRow | null>((thread) => {
+      const lead = leadsById.get(thread.lead_id);
+      if (!lead) return null;
+      const latestMessage = latestConversationMessageByThread.get(thread.id) ?? null;
+      return {
+        id: thread.id,
+        lead,
+        stage: stagesById.get(lead.current_stage_id) ?? null,
+        campaign: campaignsById.get(thread.campaign_id) ?? null,
+        thread,
+        latestMessage,
+        sortAt: latestMessage?.created_at ?? thread.updated_at,
+      };
+    })
+    .filter((row): row is OperationLeadRow => row !== null);
+  const leadOnlyRows = data.leads.map<OperationLeadRow>((lead) => ({
+    id: `lead-${lead.id}`,
+    lead,
+    stage: stagesById.get(lead.current_stage_id) ?? null,
+    campaign: null,
+    thread: null,
+    latestMessage: null,
+    sortAt: lead.updated_at,
+  }));
   const mostRecentConversation = [...data.conversationMessages].sort(
     (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime(),
   )[0];
@@ -168,6 +287,138 @@ export function DashboardScreen({ data }: { data: CrmData }) {
   ]
     .sort((left, right) => new Date(right.at).getTime() - new Date(left.at).getTime())
     .slice(0, 8);
+
+  const operationalShortcuts = useMemo<OperationShortcut[]>(() => {
+    const openThreadRows = operationalRows.filter((row) => {
+      if (!row.thread) return false;
+      return row.thread.status !== 'closed' && row.thread.status !== 'meeting_scheduled' && row.thread.sentiment_tag !== 'negative';
+    });
+    const noResponseRows = openThreadRows.filter(
+      (row) => row.latestMessage?.direction === 'outbound' && row.latestMessage.prompt_purpose === 'opening',
+    );
+    const secondaryFollowUpRows = openThreadRows.filter(
+      (row) => row.latestMessage?.direction === 'outbound' && row.latestMessage.prompt_purpose === 'secondary_follow_up',
+    );
+    const negativeRows = operationalRows.filter((row) => row.thread?.sentiment_tag === 'negative' || row.thread?.status === 'negative');
+    const positiveRows = operationalRows.filter(
+      (row) =>
+        row.thread?.sentiment_tag === 'positive' ||
+        row.thread?.status === 'positive' ||
+        row.thread?.status === 'meeting_scheduled',
+    );
+    const qualifiedRows = [
+      ...leadOnlyRows.filter((row) => row.lead.current_stage_id === qualifiedStage?.id),
+      ...positiveRows,
+    ].filter((row, index, rows) => rows.findIndex((candidate) => candidate.lead.id === row.lead.id && candidate.thread?.id === row.thread?.id) === index);
+    const meetingRows = [
+      ...leadOnlyRows.filter((row) => row.lead.current_stage_id === meetingStage?.id),
+      ...operationalRows.filter((row) => row.thread?.status === 'meeting_scheduled'),
+    ].filter((row, index, rows) => rows.findIndex((candidate) => candidate.lead.id === row.lead.id && candidate.thread?.id === row.thread?.id) === index);
+    const activeCampaignRows = operationalRows.filter((row) => row.campaign?.is_active);
+    const riskRows = operationalRows.filter((row) => {
+      const threadMessages = row.thread ? messagesByThread.get(row.thread.id) ?? [] : [];
+      const inboundCount = threadMessages.filter((message) => message.direction === 'inbound').length;
+      return (
+        row.thread?.sentiment_tag === 'mixed' ||
+        row.thread?.status === 'neutral' ||
+        (row.latestMessage?.direction === 'outbound' && inboundCount === 0 && row.latestMessage.prompt_purpose !== 'opening') ||
+        row.latestMessage?.sentiment_tag === 'negative'
+      );
+    });
+
+    return [
+      {
+        key: 'no_response',
+        title: 'Leads sem resposta',
+        value: noResponseRows.length,
+        description: 'Primeira abordagem enviada e nenhum retorno do cliente até agora.',
+        meta: 'Prioridade de cadência',
+        recommendedAction: 'Preparar follow-up secundário com referência à primeira mensagem, sem repetir a abordagem inicial.',
+        tone: 'warning',
+        icon: Clock3,
+        rows: sortByNewest(noResponseRows),
+      },
+      {
+        key: 'secondary_follow_up',
+        title: 'Follow-up secundário pendente',
+        value: secondaryFollowUpRows.length,
+        description: 'Leads que já receberam retomada e ainda precisam de resposta ou decisão.',
+        meta: 'Atenção operacional',
+        recommendedAction: 'Revisar contexto antes de insistir novamente; priorize canais alternativos ou encerramento limpo.',
+        tone: 'warning',
+        icon: Send,
+        rows: sortByNewest(secondaryFollowUpRows),
+      },
+      {
+        key: 'negative',
+        title: 'Recusas recentes',
+        value: negativeRows.length,
+        description: 'Conversas com sinal negativo ou fechamento por falta de interesse.',
+        meta: 'Aprendizado do playbook',
+        recommendedAction: 'Encerrar com cordialidade, preservar histórico e usar objeções recorrentes para ajustar campanhas.',
+        tone: 'danger',
+        icon: AlertTriangle,
+        rows: sortByNewest(negativeRows),
+      },
+      {
+        key: 'positive',
+        title: 'Conversas positivas',
+        value: positiveRows.length,
+        description: 'Clientes com interesse, abertura para próximo passo ou reunião sinalizada.',
+        meta: 'Oportunidades quentes',
+        recommendedAction: 'Acelerar qualificação, confirmar dados críticos e propor agenda objetiva.',
+        tone: 'positive',
+        icon: MessageCircleReply,
+        rows: sortByNewest(positiveRows),
+      },
+      {
+        key: 'qualified',
+        title: 'Leads em qualificação',
+        value: qualifiedRows.length,
+        description: 'Leads já em etapa de qualificação ou com conversa positiva.',
+        meta: 'Pipeline em avanço',
+        recommendedAction: 'Completar campos obrigatórios e preparar passagem para reunião ou fechamento da oportunidade.',
+        tone: 'positive',
+        icon: Target,
+        rows: sortByNewest(qualifiedRows),
+      },
+      {
+        key: 'meeting',
+        title: 'Reuniões sinalizadas',
+        value: meetingRows.length,
+        description: 'Leads que chegaram à etapa de reunião ou demonstraram intenção clara de agenda.',
+        meta: 'Conversão operacional',
+        recommendedAction: 'Confirmar horário, responsável e próximo passo no histórico do lead.',
+        tone: 'meeting',
+        icon: CalendarCheck,
+        rows: sortByNewest(meetingRows),
+      },
+      {
+        key: 'active_campaigns',
+        title: 'Campanhas mais ativas',
+        value: activeCampaigns,
+        description: 'Campanhas ativas com conversas vinculadas no workspace.',
+        meta: 'Playbooks disponíveis',
+        recommendedAction: 'Comparar taxa de resposta por campanha e priorizar as que geram avanço real no funil.',
+        tone: 'neutral',
+        icon: Megaphone,
+        rows: sortByNewest(activeCampaignRows),
+      },
+      {
+        key: 'risk',
+        title: 'Risco de perda',
+        value: riskRows.length,
+        description: 'Conversas mistas, neutras ou com retomada sem resposta após a primeira abordagem.',
+        meta: 'Prevenção de perda',
+        recommendedAction: 'Ler a última mensagem, reduzir pressão comercial e oferecer saída clara para o cliente.',
+        tone: 'danger',
+        icon: AlertTriangle,
+        rows: sortByNewest(riskRows),
+      },
+    ];
+  }, [activeCampaigns, leadOnlyRows, meetingStage?.id, messagesByThread, operationalRows, qualifiedStage?.id]);
+
+  const activeShortcut = operationalShortcuts.find((shortcut) => shortcut.key === activeShortcutKey) ?? null;
 
   return (
     <section className="stack">
@@ -244,6 +495,40 @@ export function DashboardScreen({ data }: { data: CrmData }) {
           helper={`${meetings + qualified} lead(s) já chegaram em qualificação ou reunião (${formatPercent(advancedRate)} do volume total).`}
         />
       </div>
+
+      <section className="panel dashboard-shortcuts-panel">
+        <div className="panel-heading">
+          <div>
+            <span className="section-kicker">Atalhos operacionais</span>
+            <h2>Painel clicável da operação</h2>
+          </div>
+          <span className="panel-meta">Abra uma categoria para ver leads, campanhas, última mensagem e ação recomendada.</span>
+        </div>
+        <div className="dashboard-shortcut-grid">
+          {operationalShortcuts.map((shortcut) => {
+            const Icon = shortcut.icon;
+            return (
+              <button
+                key={shortcut.key}
+                type="button"
+                className={`dashboard-shortcut-card dashboard-shortcut-card-${shortcut.tone}`}
+                onClick={() => setActiveShortcutKey(shortcut.key)}
+              >
+                <span className="dashboard-shortcut-icon" aria-hidden>
+                  <Icon />
+                </span>
+                <span className="dashboard-shortcut-copy">
+                  <small>{shortcut.meta}</small>
+                  <strong>{shortcut.title}</strong>
+                  <span>{shortcut.description}</span>
+                </span>
+                <span className="dashboard-shortcut-total">{shortcut.value}</span>
+                <ChevronRight className="dashboard-shortcut-chevron" aria-hidden />
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="panel dashboard-control-panel">
         <div className="panel-heading">
@@ -378,6 +663,82 @@ export function DashboardScreen({ data }: { data: CrmData }) {
                 <li>Revisar campos obrigatórios quando houver muito lead parado por falta de informação.</li>
               </ol>
             </div>
+          </section>
+        </div>
+      )}
+
+      {activeShortcut && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="dashboard-operation-title">
+          <section className="chat-modal dashboard-operation-modal">
+            <div className="chat-modal-header">
+              <div>
+                <span className="section-kicker">Drill-down operacional</span>
+                <h2 id="dashboard-operation-title">{activeShortcut.title}</h2>
+                <p>{activeShortcut.description}</p>
+              </div>
+              <button type="button" className="ghost compact icon-only" onClick={() => setActiveShortcutKey(null)} aria-label="Fechar análise operacional">
+                <X aria-hidden />
+              </button>
+            </div>
+
+            <div className="operation-summary-grid">
+              <article>
+                <span>Total</span>
+                <strong>{activeShortcut.value}</strong>
+                <p>{activeShortcut.meta}</p>
+              </article>
+              <article>
+                <span>Campanhas envolvidas</span>
+                <strong>{new Set(activeShortcut.rows.map((row) => row.campaign?.id).filter(Boolean)).size}</strong>
+                <p>{activeShortcut.rows.find((row) => row.campaign)?.campaign?.name ?? 'Sem campanha vinculada nos exemplos.'}</p>
+              </article>
+              <article>
+                <span>Etapa predominante</span>
+                <strong>{getPredominantStage(activeShortcut.rows)}</strong>
+                <p>Use esta leitura para escolher onde agir primeiro.</p>
+              </article>
+              <article>
+                <span>Ação recomendada</span>
+                <strong>Próximo passo</strong>
+                <p>{activeShortcut.recommendedAction}</p>
+              </article>
+            </div>
+
+            <section className="operation-modal-preview">
+              <div>
+                <span className="section-kicker">Prévia da conversa</span>
+                <h3>{activeShortcut.rows[0]?.lead.name ?? 'Sem lead para prévia'}</h3>
+              </div>
+              <p>{getMessagePreview(activeShortcut.rows[0]?.latestMessage ?? null)}</p>
+            </section>
+
+            {activeShortcut.rows.length === 0 ? (
+              <div className="empty-panel">
+                <FileText aria-hidden />
+                <div>
+                  <strong>Nenhum item nesta categoria agora.</strong>
+                  <p>A categoria continua disponível para quando houver dados suficientes no workspace.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="operation-row-list">
+                {activeShortcut.rows.slice(0, 24).map((row) => (
+                  <article key={row.id} className="operation-row">
+                    <div className="operation-row-main">
+                      <strong>{row.lead.name}</strong>
+                      <span>{getLeadMetaLine(row.lead)}</span>
+                      <p>{getMessagePreview(row.latestMessage)}</p>
+                    </div>
+                    <div className="operation-row-tags">
+                      <span>{row.stage?.name ?? 'Sem etapa'}</span>
+                      <span>{row.campaign?.name ?? 'Sem campanha'}</span>
+                      <span>{getThreadLabel(row.thread)}</span>
+                    </div>
+                    <time dateTime={row.sortAt}>{formatDateTime(row.sortAt)}</time>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
         </div>
       )}
