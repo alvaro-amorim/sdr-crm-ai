@@ -418,6 +418,46 @@ async function callOpenAiConversation(openAiKey, prompt, expectedCount) {
   throw new Error(lastError);
 }
 
+async function callEdgeConversation(client, { workspaceId, lead, campaign, scenario, wave }, expectedCount) {
+  const { data, error } = await client.functions.invoke('generate-smoke-conversation', {
+    body: {
+      workspace_id: workspaceId,
+      wave,
+      scenario,
+      lead,
+      campaign: {
+        name: campaign.name,
+        channel: campaign.channel,
+        context_text: campaign.context_text,
+        generation_prompt: campaign.generation_prompt,
+        goal: campaign.goal,
+      },
+    },
+  });
+
+  if (error) {
+    throw new Error(`Falha na Edge Function de smoke: ${error.message}`);
+  }
+
+  if (!data?.success || !data?.data) {
+    throw new Error(data?.error ?? 'A Edge Function de smoke não retornou conversa.');
+  }
+
+  return {
+    messages: parseConversation(JSON.stringify({ messages: data.data.messages }), expectedCount),
+    model: data.data.model ?? 'supabase-edge-openai',
+    usage: data.data.usage ?? null,
+  };
+}
+
+async function generateConversation({ client, workspaceId, openAiKey, lead, campaign, scenario, wave, expectedCount }) {
+  if (openAiKey) {
+    return callOpenAiConversation(openAiKey, buildConversationPrompt({ lead, campaign, scenario, wave }), expectedCount);
+  }
+
+  return callEdgeConversation(client, { workspaceId, lead, campaign, scenario, wave }, expectedCount);
+}
+
 async function getOrCreateWorkspace(client, workspaceName) {
   const { data: existingWorkspace, error: existingWorkspaceError } = await client
     .from('workspaces')
@@ -595,8 +635,16 @@ async function insertConversation({
   const { record: lead, profile } = leadBundle;
   const expectedCount = wave === 1 ? 3 : 4;
   const scenario = scenarioForIndex(index);
-  const prompt = buildConversationPrompt({ lead: profile, campaign, scenario, wave });
-  const generated = await callOpenAiConversation(openAiKey, prompt, expectedCount);
+  const generated = await generateConversation({
+    client,
+    workspaceId: workspace.id,
+    openAiKey,
+    lead: profile,
+    campaign,
+    scenario,
+    wave,
+    expectedCount,
+  });
   const createdAt = isoHoursAgo(80 - index * 0.7);
   const status = generated.messages.some((message) => message.sentiment_tag === 'negative')
     ? 'negative'
@@ -726,7 +774,7 @@ async function main() {
   const env = { ...readEnvFile(path.join(cwd, '.env.local')), ...process.env };
   const supabaseUrl = requireEnv(env, 'VITE_SUPABASE_URL');
   const supabaseAnonKey = requireEnv(env, 'VITE_SUPABASE_ANON_KEY');
-  const openAiKey = requireEnv(env, 'OPENAI_API_KEY');
+  const openAiKey = env.OPENAI_API_KEY?.trim() || '';
   const testUserEmail = requireEnv(env, 'TEST_USER_EMAIL');
   const testUserPassword = requireEnv(env, 'TEST_USER_PASSWORD');
   const workspaceName = env.SMOKE_WORKSPACE_NAME?.trim() || 'Operação SDR Demo';
@@ -739,6 +787,7 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  console.log(`0/11 Modo de geração IA: ${openAiKey ? 'OpenAI local com fallback' : 'Supabase Edge Function com secrets remotos'}.`);
   console.log('1/11 Autenticando usuário de teste...');
   const { data: authData, error: authError } = await client.auth.signInWithPassword({
     email: testUserEmail,

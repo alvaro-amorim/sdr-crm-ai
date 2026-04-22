@@ -84,7 +84,7 @@ Base funcional do MVP criada com frontend React, schema Supabase, RLS, Edge Func
 - As credenciais do usuário de teste e a chave OpenAI local devem ficar apenas no `.env.local`:
   - `TEST_USER_EMAIL`
   - `TEST_USER_PASSWORD`
-  - `OPENAI_API_KEY`
+  - `OPENAI_API_KEY` local opcional; se ausente, o smoke usa a Edge Function autenticada `generate-smoke-conversation`.
 
 ## Revisão de segurança
 

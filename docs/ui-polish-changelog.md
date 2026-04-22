@@ -231,6 +231,7 @@ Preparar o ambiente para avaliação antes da etapa Lovable, com volume operacio
 - `scripts/smoke-crm-flow.mjs`
   - passa a criar 100 leads, 4 campanhas e 75 conversas em duas ondas
   - persiste mensagens reais geradas por IA, eventos simulados e tokens do simulador
+  - usa OpenAI local quando disponível ou Edge Function autenticada com secrets remotos quando a chave local não existe
 - `docs/smoke-realista-ondas.md`
   - documenta estratégia, variáveis, validações e execução
 
@@ -240,4 +241,4 @@ Preparar o ambiente para avaliação antes da etapa Lovable, com volume operacio
 - `npm run lint`
 - `npm run build`
 
-O smoke completo depende de `OPENAI_API_KEY`, migrations aplicadas e Edge Functions publicadas no Supabase.
+O smoke completo depende das migrations aplicadas e das Edge Functions publicadas no Supabase. `OPENAI_API_KEY` local é opcional quando os secrets remotos estão configurados.

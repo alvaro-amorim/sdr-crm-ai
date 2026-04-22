@@ -81,6 +81,7 @@ OPENAI_API_KEY=...
 supabase functions deploy generate-lead-messages
 supabase functions deploy create-simulation-link
 supabase functions deploy simulate-client-chat
+supabase functions deploy generate-smoke-conversation
 ```
 
 7. Rode localmente:
@@ -129,10 +130,10 @@ npm run build
 Smoke test automatizado do fluxo principal:
 
 ```bash
-TEST_USER_EMAIL=seu-usuario-teste@example.com TEST_USER_PASSWORD=sua-senha OPENAI_API_KEY=sua-chave npm run test:smoke:crm
+TEST_USER_EMAIL=seu-usuario-teste@example.com TEST_USER_PASSWORD=sua-senha npm run test:smoke:crm
 ```
 
-O script autentica um usuário de teste, garante um workspace demo, limpa apenas esse workspace, cria 100 leads, 4 campanhas, 75 conversas, mensagens reais geradas pela OpenAI, eventos de envio e tokens de simulador. A execução segue a estratégia documentada em `docs/smoke-realista-ondas.md`.
+O script autentica um usuário de teste, garante um workspace demo, limpa apenas esse workspace, cria 100 leads, 4 campanhas, 75 conversas, mensagens reais geradas pela OpenAI, eventos de envio e tokens de simulador. Quando `OPENAI_API_KEY` existe localmente, o script chama a OpenAI direto; quando não existe, usa a Edge Function autenticada `generate-smoke-conversation` com os secrets remotos do Supabase. A execução segue a estratégia documentada em `docs/smoke-realista-ondas.md`.
 
 Cobertura atual:
 

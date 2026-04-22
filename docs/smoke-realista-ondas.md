@@ -36,7 +36,7 @@ Este projeto usa `npm run test:smoke:crm` como seed operacional e validação po
 
 ## Variáveis locais
 
-O smoke exige autenticação real no Supabase e chave OpenAI local:
+O smoke exige autenticação real no Supabase. A chave OpenAI local é opcional:
 
 ```bash
 TEST_USER_EMAIL=avaliador@example.com
@@ -49,7 +49,7 @@ SMOKE_THREAD_LIMIT=75
 SMOKE_AI_DELAY_MS=500
 ```
 
-`OPENAI_API_KEY` não deve ser configurada na Vercel do frontend. Em produção, a chave deve existir apenas como secret das Supabase Edge Functions. O uso local existe para o smoke gerar o dataset realista sem expor a chave ao navegador.
+`OPENAI_API_KEY` não deve ser configurada na Vercel do frontend. Em produção, a chave deve existir apenas como secret das Supabase Edge Functions. Se a chave não existir localmente, o smoke usa a função autenticada `generate-smoke-conversation`, que chama a OpenAI com os secrets remotos do Supabase e retorna conversas reais para o script persistir.
 
 ## Execução
 
