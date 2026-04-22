@@ -90,6 +90,13 @@ supabase functions deploy generate-smoke-conversation
 npm run dev
 ```
 
+## Deploy na Vercel
+
+- O deploy final obrigatório é a Vercel.
+- Configure apenas `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` no projeto Vercel.
+- `vercel.json` mantém fallback de SPA para rotas diretas como `/client-simulator`.
+- `OPENAI_API_KEY` e `SUPABASE_SERVICE_ROLE_KEY` ficam somente nos secrets das Supabase Edge Functions.
+
 ## Segurança e multi-tenancy
 
 - A chave `SUPABASE_SERVICE_ROLE_KEY` não é usada no frontend.
