@@ -7,15 +7,28 @@
   text-rendering: optimizeLegibility;
 }
 
+html {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  max-width: 100%;
   min-width: 320px;
   min-height: 100vh;
   overflow-x: hidden;
+  width: 100%;
+}
+
+#root {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
 }
 
 button,
@@ -273,8 +286,11 @@ h3 {
 .app-shell {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
+  max-width: 100%;
   min-height: 100vh;
+  overflow-x: clip;
   position: relative;
+  width: 100%;
 }
 
 .sidebar {
@@ -364,18 +380,24 @@ h3 {
 .content {
   display: grid;
   gap: 20px;
+  max-width: 100%;
   min-width: 0;
+  overflow-x: clip;
   padding: 28px;
+  width: 100%;
 }
 
 .content-shell {
   display: grid;
   gap: 24px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .stack {
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .operation-guide {
@@ -2651,6 +2673,8 @@ h3 {
 
   .app-shell {
     min-height: 100svh;
+    overflow-x: clip;
+    width: 100%;
   }
 
   .sidebar {
@@ -2664,7 +2688,10 @@ h3 {
 
   .content {
     gap: 16px;
+    max-width: 100%;
+    overflow-x: clip;
     padding: 16px;
+    width: 100%;
   }
 
   .dashboard-shortcut-card {
@@ -2691,6 +2718,18 @@ h3 {
 
   .content-shell {
     gap: 16px;
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .mobile-shell-bar,
+  .operation-guide,
+  .panel,
+  .metric,
+  .message-card {
+    max-width: 100%;
+    min-width: 0;
   }
 
   .form-heading,

@@ -391,3 +391,24 @@ Corrigir o botão de minimizar do guia rápido no mobile, que estava herdando la
 
 - `npm run lint`
 - `npm run build`
+
+## 2026-04-22 — Trava contra rolagem horizontal no mobile
+
+### Objetivo
+
+Impedir que telas autenticadas fiquem descentralizadas ou abram rolagem horizontal em viewports mobile.
+
+### Alterações
+
+- `src/styles.css`
+  - adiciona limites globais em `html`, `body`, `#root`, `.app-shell`, `.content`, `.content-shell` e `.stack`
+  - reforça `max-width: 100%`, `min-width: 0` e `overflow-x: clip/hidden` nos contêineres principais
+  - adiciona proteção mobile para barra superior, guia operacional, painéis, métricas e cards
+
+### Validação
+
+- inspeção local em viewport mobile `390px`
+- inspeção local em viewport mobile `360px`
+- checagem de `scrollWidth === innerWidth`
+- `npm run lint`
+- `npm run build`
