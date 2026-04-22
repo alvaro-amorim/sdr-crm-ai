@@ -92,4 +92,19 @@ describe('smoke-flow-lib', () => {
       ),
     ).not.toThrow();
   });
+
+  it('aceita nomes de etapa equivalentes com acento na validacao final', () => {
+    expect(() =>
+      validateScenarioThreadSummary(
+        {
+          threadId: 'thread-2',
+          threadStatus: 'positive',
+          threadSentiment: 'positive',
+          leadStageName: 'Conexão Iniciada',
+          leadName: 'Lead Demo',
+        },
+        'interested_follow_up',
+      ),
+    ).not.toThrow();
+  });
 });

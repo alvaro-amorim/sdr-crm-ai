@@ -68,13 +68,12 @@ function parseConversation(
   const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
   const normalized = messages
     .map((message, index) => {
-      const fallbackDirection = scenarioProfile.sequence[index]?.direction ?? (index % 2 === 0 ? 'outbound' : 'inbound');
-      const direction = message.direction === 'inbound' || message.direction === 'outbound' ? message.direction : fallbackDirection;
+      const direction = scenarioProfile.sequence[index]?.direction ?? (message.direction === 'inbound' || message.direction === 'outbound' ? message.direction : 'outbound');
       const sentiment = ['positive', 'neutral', 'negative', 'mixed'].includes(message.sentiment_tag) ? message.sentiment_tag : 'neutral';
 
       return {
         direction,
-        sender_name: String(message.sender_name ?? (direction === 'outbound' ? 'SDR Expert' : 'Cliente')).trim(),
+        sender_name: direction === 'outbound' ? 'SDR Expert' : String(message.sender_name ?? 'Cliente').trim(),
         message_text: String(message.message_text ?? '').trim(),
         sentiment_tag: sentiment,
         intent_tag: String(message.intent_tag ?? 'follow_up').trim().slice(0, 80),

@@ -68,6 +68,9 @@ O script é reexecutável: ele limpa somente os dados do workspace informado em 
 - Tokens de simulador criados para todas as threads.
 - Eventos de envio simulados persistidos em `sent_message_events`.
 - Mensagens outbound persistidas também em `generated_messages`.
+- Respostas da IA que violem a sequência obrigatória do cenário são descartadas e geradas novamente antes de abortar o smoke.
+- Os metadados `direction` e `sender_name` são normalizados conforme a sequência do cenário antes da persistência, evitando que uma marcação incorreta da IA quebre as métricas operacionais.
+- A validação final compara nomes de etapa de forma normalizada, aceitando diferenças de acentuação entre schema antigo e schema atual.
 
 ## Simulador do cliente
 

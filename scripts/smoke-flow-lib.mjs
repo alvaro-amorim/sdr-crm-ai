@@ -308,6 +308,14 @@ export function getSmokeExpectedMetrics(assignments) {
   );
 }
 
+function normalizeComparableLabel(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 export function validateScenarioConversation(messages, scenarioKey) {
   const scenario = getSmokeScenarioByKey(scenarioKey);
 
@@ -358,7 +366,7 @@ export function validateScenarioThreadSummary(threadSummary, scenarioKey) {
     );
   }
 
-  if (threadSummary.leadStageName !== scenario.resultStageName) {
+  if (normalizeComparableLabel(threadSummary.leadStageName) !== normalizeComparableLabel(scenario.resultStageName)) {
     throw new Error(
       `Lead ${threadSummary.leadName} terminou em ${threadSummary.leadStageName}, esperado ${scenario.resultStageName}.`,
     );
