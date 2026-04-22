@@ -4,6 +4,7 @@ import { readClientEnv } from './env';
 const { env, error } = readClientEnv();
 
 export const envError = error;
+export const supabaseEnv = env;
 
 export const supabase = env
   ? createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY, {

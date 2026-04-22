@@ -418,9 +418,15 @@ async function callOpenAiConversation(openAiKey, prompt, expectedCount) {
   throw new Error(lastError);
 }
 
-async function callEdgeConversation(client, { workspaceId, lead, campaign, scenario, wave }, expectedCount) {
-  const { data, error } = await client.functions.invoke('generate-smoke-conversation', {
-    body: {
+async function callEdgeConversation({ supabaseUrl, supabaseAnonKey, authToken, workspaceId, lead, campaign, scenario, wave }, expectedCount) {
+  const response = await fetch(`${supabaseUrl.replace(/\/$/, '')}/functions/v1/generate-smoke-conversation`, {
+    method: 'POST',
+    headers: {
+      apikey: supabaseAnonKey,
+      'content-type': 'application/json',
+      'x-sdr-auth-token': authToken,
+    },
+    body: JSON.stringify({
       workspace_id: workspaceId,
       wave,
       scenario,
@@ -432,11 +438,13 @@ async function callEdgeConversation(client, { workspaceId, lead, campaign, scena
         generation_prompt: campaign.generation_prompt,
         goal: campaign.goal,
       },
-    },
+    }),
   });
 
-  if (error) {
-    throw new Error(`Falha na Edge Function de smoke: ${error.message}`);
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(`Falha na Edge Function de smoke: HTTP ${response.status} ${data?.error ?? data?.message ?? ''}`.trim());
   }
 
   if (!data?.success || !data?.data) {
@@ -450,12 +458,12 @@ async function callEdgeConversation(client, { workspaceId, lead, campaign, scena
   };
 }
 
-async function generateConversation({ client, workspaceId, openAiKey, lead, campaign, scenario, wave, expectedCount }) {
+async function generateConversation({ supabaseUrl, supabaseAnonKey, authToken, workspaceId, openAiKey, lead, campaign, scenario, wave, expectedCount }) {
   if (openAiKey) {
     return callOpenAiConversation(openAiKey, buildConversationPrompt({ lead, campaign, scenario, wave }), expectedCount);
   }
 
-  return callEdgeConversation(client, { workspaceId, lead, campaign, scenario, wave }, expectedCount);
+  return callEdgeConversation({ supabaseUrl, supabaseAnonKey, authToken, workspaceId, lead, campaign, scenario, wave }, expectedCount);
 }
 
 async function getOrCreateWorkspace(client, workspaceName) {
@@ -622,6 +630,9 @@ function scenarioForIndex(index) {
 
 async function insertConversation({
   client,
+  supabaseUrl,
+  supabaseAnonKey,
+  authToken,
   workspace,
   userId,
   leadBundle,
@@ -636,7 +647,9 @@ async function insertConversation({
   const expectedCount = wave === 1 ? 3 : 4;
   const scenario = scenarioForIndex(index);
   const generated = await generateConversation({
-    client,
+    supabaseUrl,
+    supabaseAnonKey,
+    authToken,
     workspaceId: workspace.id,
     openAiKey,
     lead: profile,
@@ -829,6 +842,9 @@ async function main() {
     const campaign = campaignMap.get(campaignForStage(profile.stageName));
     const result = await insertConversation({
       client,
+      supabaseUrl,
+      supabaseAnonKey,
+      authToken: authData.session.access_token,
       workspace,
       userId: authData.user.id,
       leadBundle,
@@ -852,6 +868,9 @@ async function main() {
     const campaign = campaignMap.get(campaignForStage(profile.stageName));
     const result = await insertConversation({
       client,
+      supabaseUrl,
+      supabaseAnonKey,
+      authToken: authData.session.access_token,
       workspace,
       userId: authData.user.id,
       leadBundle,

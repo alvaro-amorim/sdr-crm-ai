@@ -1,10 +1,10 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.47.10';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { z } from 'https://deno.land/x/zod@v3.23.8/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-sdr-auth-token, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -121,7 +121,7 @@ serve(async (request) => {
     return json(500, { success: false, error: 'Serviço de geração não configurado.' });
   }
 
-  const authorization = request.headers.get('Authorization');
+  const authorization = request.headers.get('Authorization') ?? (request.headers.get('x-sdr-auth-token') ? `Bearer ${request.headers.get('x-sdr-auth-token')}` : null);
   if (!authorization) {
     return json(401, { success: false, error: 'Autenticação obrigatória.' });
   }

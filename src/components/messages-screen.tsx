@@ -1,7 +1,7 @@
 import { Activity, Building2, Clock3, ExternalLink, MessageCircleReply, MessageSquareText, Send, Sparkles, Workflow, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseEnv } from '../lib/supabase';
 import { moveLead } from '../services/crm';
 import type {
   Campaign,
@@ -32,6 +32,35 @@ function formatDeliveryStatus(status: SentMessageEvent['delivery_status']) {
     default:
       return 'Registrada';
   }
+}
+
+async function invokeAuthenticatedFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
+  if (!supabase || !supabaseEnv) {
+    throw new Error('Supabase não configurado.');
+  }
+
+  const { data, error } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (error || !token) {
+    throw new Error('Sessão expirada. Entre novamente.');
+  }
+
+  const response = await fetch(`${supabaseEnv.VITE_SUPABASE_URL.replace(/\/$/, '')}/functions/v1/${name}`, {
+    method: 'POST',
+    headers: {
+      apikey: supabaseEnv.VITE_SUPABASE_ANON_KEY,
+      'content-type': 'application/json',
+      'x-sdr-auth-token': token,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(payload?.error ?? payload?.message ?? `Falha HTTP ${response.status}.`);
+  }
+
+  return payload as T;
 }
 
 function inferChannelLabel(channel: string | null | undefined, lead: Lead) {
@@ -116,11 +145,11 @@ export function MessagesScreen({
     setError(null);
 
     try {
-      const { error: functionError } = await supabase.functions.invoke('generate-lead-messages', {
-        body: { workspace_id: data.workspace.id, lead_id: leadId, campaign_id: campaignId },
+      await invokeAuthenticatedFunction('generate-lead-messages', {
+        workspace_id: data.workspace.id,
+        lead_id: leadId,
+        campaign_id: campaignId,
       });
-
-      if (functionError) throw functionError;
 
       setNotice('Mensagens geradas e salvas.');
       await onReload();
@@ -191,16 +220,14 @@ export function MessagesScreen({
     setSimulatorLinkBusy(true);
     setError(null);
     try {
-      const { data: result, error: functionError } = await supabase.functions.invoke('create-simulation-link', {
-        body: {
-          workspace_id: data.workspace.id,
-          thread_id: thread.id,
-          origin: window.location.origin,
-        },
+      const result = await invokeAuthenticatedFunction<{ success: boolean; error?: string; data?: { url: string } }>('create-simulation-link', {
+        workspace_id: data.workspace.id,
+        thread_id: thread.id,
+        origin: window.location.origin,
       });
 
-      if (functionError) throw functionError;
       if (!result?.success) throw new Error(result?.error ?? 'Falha ao criar link do simulador.');
+      if (!result.data?.url) throw new Error('Link do simulador não retornado.');
 
       window.open(result.data.url, '_blank', 'noopener,noreferrer,width=430,height=760');
     } catch (linkError) {
