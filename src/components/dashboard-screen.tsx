@@ -8,7 +8,6 @@ import {
   Send,
   Sparkles,
   Target,
-  TrendingUp,
   Users,
   X,
   type LucideIcon,
@@ -64,17 +63,34 @@ export function DashboardScreen({ data }: { data: CrmData }) {
     : 0;
   const meetings = meetingStage ? data.leads.filter((lead) => lead.current_stage_id === meetingStage.id).length : 0;
   const qualified = qualifiedStage ? data.leads.filter((lead) => lead.current_stage_id === qualifiedStage.id).length : 0;
-  const sentCount = data.sentMessageEvents.length;
+  const outboundEvents = data.sentMessageEvents.filter((event) => event.direction === 'outbound');
+  const inboundEvents = data.sentMessageEvents.filter((event) => event.direction === 'inbound');
   const outboundMessages = data.conversationMessages.filter((message) => message.direction === 'outbound').length;
-  const inboundMessages = data.conversationMessages.filter((message) => message.direction === 'inbound').length;
   const threadsWithInbound = new Set(
     data.conversationMessages
       .filter((message) => message.direction === 'inbound')
       .map((message) => message.thread_id),
   ).size;
+  const latestMessageByThread = data.conversationMessages.reduce<Map<string, { direction: 'outbound' | 'inbound'; created_at: string }>>(
+    (map, message) => {
+      const current = map.get(message.thread_id);
+      if (!current || new Date(message.created_at).getTime() > new Date(current.created_at).getTime()) {
+        map.set(message.thread_id, { direction: message.direction, created_at: message.created_at });
+      }
+      return map;
+    },
+    new Map(),
+  );
   const positiveThreads = data.conversationThreads.filter((thread) => thread.sentiment_tag === 'positive').length;
   const negativeThreads = data.conversationThreads.filter((thread) => thread.sentiment_tag === 'negative').length;
   const meetingThreads = data.conversationThreads.filter((thread) => thread.status === 'meeting_scheduled').length;
+  const followUpPendingThreads = data.conversationThreads.filter((thread) => {
+    const latest = latestMessageByThread.get(thread.id);
+    if (!latest || latest.direction !== 'outbound') return false;
+    return thread.status !== 'meeting_scheduled' && thread.status !== 'closed' && thread.sentiment_tag !== 'negative';
+  }).length;
+  const realOutboundCount = outboundEvents.length;
+  const realInboundCount = inboundEvents.length;
   const responseRate = safeRate(threadsWithInbound, data.conversationThreads.length);
   const positiveRate = safeRate(positiveThreads + meetingThreads, Math.max(1, data.conversationThreads.length));
   const advancedRate = safeRate(meetings + qualified, data.leads.length);
@@ -111,15 +127,17 @@ export function DashboardScreen({ data }: { data: CrmData }) {
       },
       {
         title: 'Ação recomendada',
-        value: activeCampaigns > 0 ? 'Usar playbook ativo' : 'Criar campanha ativa',
-        detail: activeCampaigns > 0
+        value: followUpPendingThreads > 0 ? 'Executar follow-up' : activeCampaigns > 0 ? 'Usar playbook ativo' : 'Criar campanha ativa',
+        detail: followUpPendingThreads > 0
+          ? `${followUpPendingThreads} conversa(s) aguardam retorno depois da última mensagem outbound.`
+          : activeCampaigns > 0
           ? 'O workspace já tem campanhas prontas para acionar a geração de mensagens.'
           : 'Sem campanha ativa, a tela de Mensagens IA perde força na demonstração.',
       },
     ];
 
     return insights;
-  }, [activeCampaigns, bottleneck, meetingThreads, negativeThreads, positiveRate, positiveThreads]);
+  }, [activeCampaigns, bottleneck, followUpPendingThreads, meetingThreads, negativeThreads, positiveRate, positiveThreads]);
 
   const recentActivity: ActivityFeedItem[] = [
     ...data.conversationMessages.map((message) => {
@@ -131,17 +149,6 @@ export function DashboardScreen({ data }: { data: CrmData }) {
         description: campaign ? `${campaign.name}: ${message.message_text}` : message.message_text,
         at: message.created_at,
         tone: message.direction === 'inbound' ? 'reply' as const : 'message' as const,
-      };
-    }),
-    ...data.sentMessageEvents.map((event) => {
-      const lead = leadsById.get(event.lead_id);
-      const campaign = campaignsById.get(event.campaign_id);
-      return {
-        id: `send-${event.id}`,
-        title: `Envio simulado para ${lead?.name ?? 'lead'}`,
-        description: campaign ? `Campanha ${campaign.name}` : 'Envio registrado no histórico comercial.',
-        at: event.sent_at,
-        tone: 'send' as const,
       };
     }),
     ...data.leads.map((lead) => ({
@@ -219,22 +226,22 @@ export function DashboardScreen({ data }: { data: CrmData }) {
           helper="Volume total disponível para qualificação."
         />
         <Metric
-          icon={MessageCircleReply}
-          label="Taxa de resposta"
-          value={formatPercent(responseRate)}
-          helper={`${threadsWithInbound} conversa(s) com resposta, ${inboundMessages} resposta(s) no total.`}
+          icon={Send}
+          label="Envios do SDR"
+          value={realOutboundCount}
+          helper={`${outboundMessages} mensagem(ns) outbound no histórico conversacional.`}
         />
         <Metric
-          icon={TrendingUp}
-          label="Sinais positivos"
-          value={formatPercent(positiveRate)}
-          helper="Conversas positivas ou com reunião sinalizada."
+          icon={MessageCircleReply}
+          label="Respostas do cliente"
+          value={realInboundCount}
+          helper={`${threadsWithInbound} conversa(s) com resposta e ${followUpPendingThreads} aguardando follow-up ou retorno.`}
         />
         <Metric
           icon={Target}
-          label="Reuniões e qualificados"
-          value={meetings + qualified}
-          helper={`${formatPercent(advancedRate)} do volume total já chegou em etapa avançada.`}
+          label="Conversas com avanço"
+          value={formatPercent(positiveRate)}
+          helper={`${meetings + qualified} lead(s) já chegaram em qualificação ou reunião (${formatPercent(advancedRate)} do volume total).`}
         />
       </div>
 
@@ -291,7 +298,7 @@ export function DashboardScreen({ data }: { data: CrmData }) {
               <span className="section-kicker">Funil atual</span>
               <h2>Leads por etapa</h2>
             </div>
-            <span className="panel-meta">{sentCount} envio(s) simulados já registrados</span>
+            <span className="panel-meta">{realOutboundCount} envio(s) do SDR e {realInboundCount} resposta(s) reais do cliente</span>
           </div>
           <div className="stage-bars stage-bars-rich">
             {stageCounts.map(({ stage, count }) => (
@@ -359,14 +366,14 @@ export function DashboardScreen({ data }: { data: CrmData }) {
             <div className="diagnostic-grid">
               <DiagnosticItem icon={BarChart3} title="Gargalo" value={bottleneck ? `${bottleneck.stage.name} concentra ${formatLeadCount(bottleneck.count)}` : 'Sem gargalo detectado'} />
               <DiagnosticItem icon={MessageCircleReply} title="Engajamento" value={`${formatPercent(responseRate)} das conversas tiveram resposta`} />
-              <DiagnosticItem icon={Sparkles} title="IA" value={`${outboundMessages} mensagem(ns) outbound no histórico conversacional`} />
+              <DiagnosticItem icon={Sparkles} title="IA" value={`${realOutboundCount} envio(s) do SDR e ${realInboundCount} resposta(s) do cliente`} />
               <DiagnosticItem icon={Target} title="Avanço" value={`${meetings + qualified} lead(s) em etapas de qualificação ou reunião`} />
             </div>
             <div className="diagnostic-actions-list">
               <h3>Próximas ações sugeridas</h3>
               <ol>
                 <li>Atacar primeiro a etapa com maior concentração de leads.</li>
-                <li>Usar campanhas ativas para gerar ou continuar abordagens com IA.</li>
+                <li>Priorizar os leads com última mensagem outbound e sem retorno quando houver follow-up pendente.</li>
                 <li>Abrir o simulador do cliente nas conversas com sinal positivo ou misto.</li>
                 <li>Revisar campos obrigatórios quando houver muito lead parado por falta de informação.</li>
               </ol>
