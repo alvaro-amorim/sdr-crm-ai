@@ -261,6 +261,7 @@ h3 {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   min-height: 100vh;
+  position: relative;
 }
 
 .sidebar {
@@ -270,6 +271,12 @@ h3 {
   flex-direction: column;
   gap: 24px;
   padding: 22px;
+}
+
+.sidebar-overlay,
+.mobile-shell-bar,
+.sidebar-close {
+  display: none;
 }
 
 .brand {
@@ -332,6 +339,13 @@ h3 {
 
 .sidebar .ghost:hover {
   background: #2d3a38;
+}
+
+.sidebar-topline {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
 }
 
 .content {
@@ -1406,7 +1420,6 @@ h3 {
 
 @media (max-width: 900px) {
   .auth-screen,
-  .app-shell,
   .metric-grid,
   .metric-grid-large,
   .form-grid,
@@ -1434,13 +1447,106 @@ h3 {
     padding: 24px;
   }
 
+  .app-shell {
+    display: block;
+  }
+
+  .sidebar-overlay {
+    background: rgba(8, 14, 13, 0.52);
+    border: 0;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    position: fixed;
+    transition: opacity 0.2s ease;
+    z-index: 19;
+  }
+
+  .sidebar-overlay-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   .sidebar {
     gap: 16px;
-    position: static;
+    bottom: 0;
+    left: 0;
+    max-width: 320px;
+    pointer-events: none;
+    position: fixed;
+    top: 0;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    visibility: hidden;
+    width: min(82vw, 320px);
+    z-index: 20;
+  }
+
+  .sidebar-open {
+    pointer-events: auto;
+    transform: translateX(0);
+    visibility: visible;
   }
 
   .sidebar nav {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .sidebar-close,
+  .mobile-shell-bar {
+    display: flex;
+  }
+
+  .sidebar-close {
+    background: transparent;
+    border: 1px solid #475653;
+    color: #ffffff;
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 0 12px;
+  }
+
+  .sidebar-close:hover {
+    background: #2d3a38;
+  }
+
+  .mobile-shell-bar {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #d9dfdc;
+    border-radius: 8px;
+    box-shadow: 0 20px 60px rgba(31, 43, 40, 0.08);
+    gap: 14px;
+    justify-content: space-between;
+    padding: 12px 14px;
+  }
+
+  .mobile-shell-copy {
+    display: grid;
+    flex: 1 1 auto;
+    gap: 2px;
+    min-width: 0;
+    text-align: right;
+  }
+
+  .mobile-shell-copy strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-shell-copy span {
+    color: #657572;
+    font-size: 0.78rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-nav-toggle {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding-inline: 14px;
   }
 
   .brand span {
@@ -1505,6 +1611,7 @@ h3 {
   }
 
   .sidebar {
+    width: min(88vw, 320px);
     padding: 16px;
   }
 
@@ -1515,6 +1622,15 @@ h3 {
   .content {
     gap: 16px;
     padding: 16px;
+  }
+
+  .mobile-shell-bar {
+    align-items: start;
+    gap: 10px;
+  }
+
+  .mobile-shell-copy {
+    text-align: left;
   }
 
   .content-shell {

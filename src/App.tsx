@@ -12,11 +12,13 @@ import {
   LogOut,
   Mail,
   MailCheck,
+  Menu,
   Megaphone,
   Phone,
   Plus,
   RefreshCcw,
   ShieldAlert,
+  X,
   Users,
   Workflow,
 } from 'lucide-react';
@@ -611,6 +613,7 @@ function Shell({
   onRefresh: () => void;
   busy: boolean;
 }) {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const nav = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'leads' as const, label: 'Leads', icon: Users },
@@ -619,27 +622,70 @@ function Shell({
     { id: 'messages' as const, label: 'Mensagens IA', icon: Bot },
   ];
 
+  useEffect(() => {
+    function handleResize() {
+      if (window.innerWidth > 900) {
+        setMobileNavOpen(false);
+      }
+    }
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  function handleTabSelect(nextTab: Tab) {
+    onTabChange(nextTab);
+    setMobileNavOpen(false);
+  }
+
+  function handleRefreshClick() {
+    onRefresh();
+    setMobileNavOpen(false);
+  }
+
+  async function handleSignOut() {
+    setMobileNavOpen(false);
+    await supabase?.auth.signOut();
+  }
+
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <button
+        type="button"
+        className={`sidebar-overlay ${mobileNavOpen ? 'sidebar-overlay-open' : ''}`}
+        aria-hidden={!mobileNavOpen}
+        tabIndex={mobileNavOpen ? 0 : -1}
+        onClick={() => setMobileNavOpen(false)}
+      />
+      <aside className={`sidebar ${mobileNavOpen ? 'sidebar-open' : ''}`} id="app-sidebar-nav">
         <div className="sidebar-top">
-          <div className="brand">
-            <Bot aria-hidden />
-            <div>
-              <strong>SDR Expert</strong>
-              <span>{user.email}</span>
+          <div className="sidebar-topline">
+            <div className="brand">
+              <Bot aria-hidden />
+              <div>
+                <strong>SDR Expert</strong>
+                <span>{user.email}</span>
+              </div>
             </div>
+            <button
+              type="button"
+              className="sidebar-close"
+              onClick={() => setMobileNavOpen(false)}
+              aria-label="Fechar menu"
+            >
+              <X aria-hidden />
+            </button>
           </div>
           <div className="workspace-badge">
             <small>Workspace ativo</small>
-            <strong>{workspaceName ?? 'Configuração inicial'}</strong>
+            <strong>{workspaceName ?? 'Configura??o inicial'}</strong>
           </div>
         </div>
         <nav>
           {nav.map((item) => {
             const Icon = item.icon;
             return (
-              <button key={item.id} className={tab === item.id ? 'active' : ''} onClick={() => onTabChange(item.id)}>
+              <button key={item.id} className={tab === item.id ? 'active' : ''} onClick={() => handleTabSelect(item.id)}>
                 <Icon aria-hidden />
                 {item.label}
               </button>
@@ -647,17 +693,33 @@ function Shell({
           })}
         </nav>
         <div className="sidebar-actions">
-          <button type="button" className="ghost" onClick={onRefresh} disabled={busy}>
+          <button type="button" className="ghost" onClick={handleRefreshClick} disabled={busy}>
             <RefreshCcw aria-hidden />
             Atualizar
           </button>
-          <button type="button" className="ghost" onClick={() => void supabase?.auth.signOut()}>
+          <button type="button" className="ghost" onClick={() => void handleSignOut()}>
             <LogOut aria-hidden />
             Sair
           </button>
         </div>
       </aside>
       <main className="content">
+        <div className="mobile-shell-bar">
+          <button
+            type="button"
+            className="mobile-nav-toggle"
+            onClick={() => setMobileNavOpen((current) => !current)}
+            aria-expanded={mobileNavOpen}
+            aria-controls="app-sidebar-nav"
+          >
+            <Menu aria-hidden />
+            Menu
+          </button>
+          <div className="mobile-shell-copy">
+            <strong>SDR Expert</strong>
+            <span>{workspaceName ?? 'Configura??o inicial'}</span>
+          </div>
+        </div>
         <div className="content-shell">{children}</div>
       </main>
     </div>

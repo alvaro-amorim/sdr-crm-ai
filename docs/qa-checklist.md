@@ -63,6 +63,10 @@ Base funcional do MVP criada com frontend React, schema Supabase, RLS, Edge Func
    - Confirmar contagens reais de leads por etapa.
    - Confirmar estado vazio sem erro.
 
+7. Navegação mobile
+   - Confirmar que o menu lateral abre via botão `Menu`.
+   - Confirmar que o menu fecha ao tocar fora, ao fechar manualmente e ao trocar de aba.
+
 ## Convenção do smoke realista
 
 - O smoke usa um workspace dedicado para demonstração.
