@@ -349,3 +349,27 @@ Reduzir dúvida de preenchimento nos formulários principais, deixando o formato
 - `npm run test`
 - `npm run lint`
 - `npm run build`
+
+## 2026-04-22 — Polimento final antes do Lovable
+
+### Objetivo
+
+Fechar a base atual do CRM antes da etapa Lovable, corrigindo microcopy visível, acentuação e documentação do teste final com usuário limpo.
+
+### Alterações
+
+- `src/App.tsx`
+  - corrige acentuação do fluxo de campanha em duas etapas
+  - padroniza mensagens de erro, placeholders e dicas do plano de ação gerado por IA
+  - mantém o formulário de campanha mais claro para revisão, aprovação e edição do prompt antes de salvar
+
+- `docs/block-8-polimento-final-lovable.md`
+  - documenta o fechamento do bloco 8
+  - registra como preparar o `.env.local` para o smoke final em usuário limpo
+  - reforça que `OPENAI_API_KEY` não deve ser exposta na Vercel do frontend
+
+### Validação
+
+- `npm run test`
+- `npm run lint`
+- `npm run build`

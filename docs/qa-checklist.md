@@ -81,10 +81,12 @@ Base funcional do MVP criada com frontend React, schema Supabase, RLS, Edge Func
 - O smoke usa um workspace dedicado para demonstração.
 - O nome padrão é `Operação SDR Demo`, mas pode ser sobrescrito por `SMOKE_WORKSPACE_NAME`.
 - O script foi desenhado para ser reexecutável no mesmo perfil de teste sem contaminar outros workspaces.
+- Para a validação final, use um usuário limpo e confirmado no Supabase Auth antes de rodar `npm run test:smoke:crm`.
 - As credenciais do usuário de teste e a chave OpenAI local devem ficar apenas no `.env.local`:
   - `TEST_USER_EMAIL`
   - `TEST_USER_PASSWORD`
   - `OPENAI_API_KEY` local opcional; se ausente, o smoke usa a Edge Function autenticada `generate-smoke-conversation`.
+- Não use aspas nos valores do `.env.local`; o script lê os valores literalmente.
 
 ## Revisão de segurança
 
