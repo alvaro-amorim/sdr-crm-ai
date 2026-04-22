@@ -1,9 +1,18 @@
-import { Activity, Building2, Clock3, MessageSquareText, Send, Sparkles, Workflow, X } from 'lucide-react';
+import { Activity, Building2, Clock3, ExternalLink, MessageCircleReply, MessageSquareText, Send, Sparkles, Workflow, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { moveLead } from '../services/crm';
-import type { Campaign, CrmData, GeneratedMessage, Lead, PipelineStage, SentMessageEvent } from '../types/domain';
+import type {
+  Campaign,
+  ConversationMessage,
+  ConversationThread,
+  CrmData,
+  GeneratedMessage,
+  Lead,
+  PipelineStage,
+  SentMessageEvent,
+} from '../types/domain';
 import { findStageByName, formatDateTime, getLeadChannel, getLeadMetaLine } from '../utils/crm-ui';
 
 function formatDeliveryStatus(status: SentMessageEvent['delivery_status']) {
@@ -64,6 +73,7 @@ export function MessagesScreen({
   const [busy, setBusy] = useState(false);
   const [simulationMessage, setSimulationMessage] = useState<GeneratedMessage | null>(null);
   const [simulationBusy, setSimulationBusy] = useState(false);
+  const [simulatorLinkBusy, setSimulatorLinkBusy] = useState(false);
   const activeCampaigns = data.campaigns.filter((campaign) => campaign.is_active);
   const selectedLead = data.leads.find((lead) => lead.id === leadId) ?? null;
   const selectedCampaign = data.campaigns.find((campaign) => campaign.id === campaignId) ?? null;
@@ -75,6 +85,16 @@ export function MessagesScreen({
   const leadTimeline = data.sentMessageEvents
     .filter((event) => event.lead_id === leadId)
     .sort((left, right) => new Date(left.sent_at).getTime() - new Date(right.sent_at).getTime());
+  const selectedThread =
+    data.conversationThreads.find((thread) => thread.lead_id === leadId && (!campaignId || thread.campaign_id === campaignId)) ??
+    data.conversationThreads.find((thread) => thread.lead_id === leadId) ??
+    data.conversationThreads[0] ??
+    null;
+  const selectedThreadMessages = selectedThread
+    ? data.conversationMessages
+        .filter((message) => message.thread_id === selectedThread.id)
+        .sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime())
+    : [];
 
   useEffect(() => {
     if (leadId && data.leads.some((lead) => lead.id === leadId)) return;
@@ -159,6 +179,34 @@ export function MessagesScreen({
       setError(sendError instanceof Error ? sendError.message : 'Falha inesperada ao simular envio.');
     } finally {
       setSimulationBusy(false);
+    }
+  }
+
+  async function openClientSimulator(thread: ConversationThread | null) {
+    if (!supabase || !thread) {
+      setError('Nenhuma conversa com simulador disponível para este contexto.');
+      return;
+    }
+
+    setSimulatorLinkBusy(true);
+    setError(null);
+    try {
+      const { data: result, error: functionError } = await supabase.functions.invoke('create-simulation-link', {
+        body: {
+          workspace_id: data.workspace.id,
+          thread_id: thread.id,
+          origin: window.location.origin,
+        },
+      });
+
+      if (functionError) throw functionError;
+      if (!result?.success) throw new Error(result?.error ?? 'Falha ao criar link do simulador.');
+
+      window.open(result.data.url, '_blank', 'noopener,noreferrer,width=430,height=760');
+    } catch (linkError) {
+      setError(linkError instanceof Error ? linkError.message : 'Falha inesperada ao abrir simulador.');
+    } finally {
+      setSimulatorLinkBusy(false);
     }
   }
 
@@ -271,6 +319,41 @@ export function MessagesScreen({
         </div>
       </section>
 
+      <section className="panel conversation-preview-panel">
+        <div className="panel-heading">
+          <div>
+            <span className="section-kicker">Simulador autenticável</span>
+            <h2>Conversa operacional do cliente</h2>
+          </div>
+          <button
+            type="button"
+            className="ghost compact"
+            onClick={() => void openClientSimulator(selectedThread)}
+            disabled={!selectedThread || simulatorLinkBusy}
+          >
+            <ExternalLink aria-hidden />
+            {simulatorLinkBusy ? 'Abrindo...' : 'Abrir janela do cliente'}
+          </button>
+        </div>
+
+        {selectedThread ? (
+          <ConversationPreview
+            thread={selectedThread}
+            messages={selectedThreadMessages}
+            lead={data.leads.find((lead) => lead.id === selectedThread.lead_id) ?? null}
+            campaign={data.campaigns.find((campaign) => campaign.id === selectedThread.campaign_id) ?? null}
+          />
+        ) : (
+          <div className="empty-panel">
+            <MessageCircleReply aria-hidden />
+            <div>
+              <h2>Nenhuma conversa simulável criada</h2>
+              <p className="empty">Rode o smoke realista para popular threads, respostas de clientes e links de simulação.</p>
+            </div>
+          </div>
+        )}
+      </section>
+
       <section className="message-grid">
         {leadMessages.length === 0 ? (
           <div className="panel empty-panel">
@@ -318,7 +401,64 @@ export function MessagesScreen({
         }}
         onConfirm={(message) => void simulateSend(message)}
       />
+
+      <button
+        type="button"
+        className="client-simulator-shortcut"
+        onClick={() => void openClientSimulator(selectedThread)}
+        disabled={!selectedThread || simulatorLinkBusy}
+        aria-label="Abrir simulador do cliente em nova janela"
+      >
+        <MessageCircleReply aria-hidden />
+        <span>
+          Abra o simulador para agir como cliente e testar a próxima resposta da IA em outra janela.
+        </span>
+      </button>
     </section>
+  );
+}
+
+function ConversationPreview({
+  thread,
+  messages,
+  lead,
+  campaign,
+}: {
+  thread: ConversationThread;
+  messages: ConversationMessage[];
+  lead: Lead | null;
+  campaign: Campaign | null;
+}) {
+  return (
+    <div className="conversation-preview-layout">
+      <div className="conversation-preview-meta">
+        <article>
+          <span className="section-kicker">Lead</span>
+          <strong>{lead?.name ?? 'Lead removido'}</strong>
+          <p>{lead ? getLeadMetaLine(lead) : 'Sem contexto de lead.'}</p>
+        </article>
+        <article>
+          <span className="section-kicker">Campanha</span>
+          <strong>{campaign?.name ?? 'Campanha removida'}</strong>
+          <p>Status: {thread.status} · Sentimento: {thread.sentiment_tag}</p>
+        </article>
+      </div>
+
+      <div className="conversation-preview-thread">
+        {messages.slice(-6).map((message) => (
+          <div
+            key={message.id}
+            className={`conversation-preview-row ${message.direction === 'inbound' ? 'conversation-preview-row-inbound' : ''}`}
+          >
+            <div className="conversation-preview-bubble">
+              <strong>{message.sender_name}</strong>
+              <p>{message.message_text}</p>
+              <time dateTime={message.created_at}>{formatDateTime(message.created_at)}</time>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

@@ -119,6 +119,40 @@ export type SentMessageEvent = {
   sent_at: string;
 };
 
+export type ConversationThread = {
+  id: string;
+  workspace_id: string;
+  lead_id: string;
+  campaign_id: string;
+  title: string;
+  channel: 'email' | 'whatsapp' | 'linkedin';
+  status: 'open' | 'positive' | 'neutral' | 'negative' | 'meeting_scheduled' | 'closed';
+  sentiment_tag: 'positive' | 'neutral' | 'negative' | 'mixed';
+  simulation_enabled: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConversationMessage = {
+  id: string;
+  workspace_id: string;
+  thread_id: string;
+  lead_id: string;
+  campaign_id: string;
+  direction: 'outbound' | 'inbound';
+  sender_type: 'sdr_ai' | 'client' | 'system';
+  sender_name: string;
+  message_text: string;
+  model_name: string | null;
+  prompt_purpose: string | null;
+  sentiment_tag: 'positive' | 'neutral' | 'negative' | 'mixed' | null;
+  intent_tag: string | null;
+  generated_by: 'openai' | 'user' | 'seed';
+  token_usage: Record<string, unknown> | null;
+  created_at: string;
+};
+
 export type CrmData = {
   workspace: Workspace;
   stages: PipelineStage[];
@@ -129,4 +163,6 @@ export type CrmData = {
   campaigns: Campaign[];
   generatedMessages: GeneratedMessage[];
   sentMessageEvents: SentMessageEvent[];
+  conversationThreads: ConversationThread[];
+  conversationMessages: ConversationMessage[];
 };

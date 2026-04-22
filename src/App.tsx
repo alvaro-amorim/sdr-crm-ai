@@ -23,6 +23,7 @@ import {
   Workflow,
 } from 'lucide-react';
 import { DashboardScreen } from './components/dashboard-screen';
+import { ClientSimulatorScreen } from './components/client-simulator-screen';
 import { MessagesScreen } from './components/messages-screen';
 import { envError, supabase } from './lib/supabase';
 import {
@@ -203,6 +204,10 @@ export default function App() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (window.location.pathname === '/client-simulator') {
+    return <ClientSimulatorScreen />;
   }
 
   if (envError || !supabase) {

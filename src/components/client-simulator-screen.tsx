@@ -1,0 +1,187 @@
+import { ArrowLeft, Bot, RefreshCcw, Send, UserRound } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import type { ConversationMessage, ConversationThread, Campaign, Lead } from '../types/domain';
+import { formatDateTime } from '../utils/crm-ui';
+
+type SimulatorThread = ConversationThread & {
+  leads?: Lead;
+  campaigns?: Campaign;
+};
+
+type SimulatorPayload = {
+  thread: SimulatorThread;
+  messages: ConversationMessage[];
+  generated_model?: string;
+};
+
+function getTokenFromUrl() {
+  return new URLSearchParams(window.location.search).get('token') ?? '';
+}
+
+function getChannelLabel(channel: string | null | undefined) {
+  switch (channel) {
+    case 'whatsapp':
+      return 'WhatsApp simulado';
+    case 'linkedin':
+      return 'LinkedIn simulado';
+    default:
+      return 'E-mail simulado';
+  }
+}
+
+export function ClientSimulatorScreen() {
+  const token = useMemo(getTokenFromUrl, []);
+  const [payload, setPayload] = useState<SimulatorPayload | null>(null);
+  const [reply, setReply] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadThread() {
+    if (!supabase || !token) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { data, error: functionError } = await supabase.functions.invoke('simulate-client-chat', {
+        body: { token },
+      });
+      if (functionError) throw functionError;
+      if (!data?.success) throw new Error(data?.error ?? 'Falha ao carregar conversa.');
+      setPayload(data.data);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Falha ao carregar simulador.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase || !reply.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { data, error: functionError } = await supabase.functions.invoke('simulate-client-chat', {
+        body: { token, message: reply.trim() },
+      });
+      if (functionError) throw functionError;
+      if (!data?.success) throw new Error(data?.error ?? 'Falha ao gerar resposta.');
+      setPayload(data.data);
+      setReply('');
+    } catch (replyError) {
+      setError(replyError instanceof Error ? replyError.message : 'Falha ao responder como cliente.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadThread();
+  }, []);
+
+  if (!token) {
+    return (
+      <main className="client-simulator-screen">
+        <section className="client-simulator-empty">
+          <Bot aria-hidden />
+          <h1>Link de simulação inválido</h1>
+          <p>Abra o simulador pelo atalho da tela Mensagens IA.</p>
+        </section>
+      </main>
+    );
+  }
+
+  const lead = payload?.thread.leads;
+  const campaign = payload?.thread.campaigns;
+
+  return (
+    <main className="client-simulator-screen">
+      <section className="client-simulator-shell">
+        <header className="client-simulator-header">
+          <div>
+            <span className="section-kicker">Simulador do cliente</span>
+            <h1>{lead ? `Conversa com ${lead.name}` : 'Carregando conversa'}</h1>
+            <p>
+              Responda como cliente em uma janela separada. A próxima mensagem é gerada pela IA e gravada no histórico da
+              operação.
+            </p>
+          </div>
+          <button type="button" className="ghost compact" onClick={() => window.close()}>
+            <ArrowLeft aria-hidden />
+            Fechar janela
+          </button>
+        </header>
+
+        {error && (
+          <div className="status error-box">
+            <strong>{error}</strong>
+            <button type="button" className="ghost compact" onClick={() => void loadThread()}>
+              <RefreshCcw aria-hidden />
+              Tentar novamente
+            </button>
+          </div>
+        )}
+
+        <div className="client-simulator-context">
+          <article>
+            <strong>{lead?.company ?? 'Empresa'}</strong>
+            <span>{lead?.job_title ?? 'Cargo não informado'}</span>
+          </article>
+          <article>
+            <strong>{campaign?.name ?? 'Campanha'}</strong>
+            <span>{payload ? getChannelLabel(payload.thread.channel) : 'Canal simulado'}</span>
+          </article>
+          <article>
+            <strong>{payload?.messages.length ?? 0} mensagens</strong>
+            <span>{payload?.generated_model ? `Último modelo: ${payload.generated_model}` : 'Histórico persistido'}</span>
+          </article>
+        </div>
+
+        <section className="client-chat-window" aria-live="polite">
+          {busy && !payload ? (
+            <div className="client-simulator-loading">
+              <RefreshCcw className="spin" aria-hidden />
+              <span>Carregando conversa...</span>
+            </div>
+          ) : (
+            payload?.messages.map((message) => {
+              const inbound = message.direction === 'inbound';
+              return (
+                <article key={message.id} className={`client-chat-message ${inbound ? 'client-chat-message-inbound' : ''}`}>
+                  <div className="client-chat-avatar">{inbound ? <UserRound aria-hidden /> : <Bot aria-hidden />}</div>
+                  <div className="client-chat-bubble">
+                    <div className="client-chat-meta">
+                      <strong>{message.sender_name}</strong>
+                      <time dateTime={message.created_at}>{formatDateTime(message.created_at)}</time>
+                    </div>
+                    <p>{message.message_text}</p>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </section>
+
+        <form className="client-reply-form" onSubmit={submit}>
+          <label htmlFor="clientReply">
+            Responder como cliente
+            <textarea
+              id="clientReply"
+              name="clientReply"
+              value={reply}
+              onChange={(event) => setReply(event.target.value)}
+              placeholder="Exemplo: Tenho interesse, mas preciso entender prazo de implantação e esforço do meu time."
+              maxLength={1200}
+              disabled={busy}
+              required
+            />
+          </label>
+          <button type="submit" disabled={busy || reply.trim().length === 0}>
+            <Send aria-hidden />
+            {busy ? 'Gerando resposta...' : 'Enviar resposta'}
+          </button>
+        </form>
+      </section>
+    </main>
+  );
+}
