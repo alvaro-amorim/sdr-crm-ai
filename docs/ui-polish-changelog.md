@@ -412,3 +412,23 @@ Impedir que telas autenticadas fiquem descentralizadas ou abram rolagem horizont
 - checagem de `scrollWidth === innerWidth`
 - `npm run lint`
 - `npm run build`
+
+## 2026-04-22 — Reposicionamento das ações da sidebar
+
+### Objetivo
+
+Deixar as ações globais mais fáceis de encontrar, movendo `Atualizar` e `Sair` para baixo do bloco `Workspace ativo`.
+
+### Alterações
+
+- `src/App.tsx`
+  - move os botões `Atualizar` e `Sair` para dentro do bloco superior da sidebar
+  - mantém o comportamento de fechar o menu mobile ao atualizar ou sair
+
+- `src/styles.css`
+  - remove o empurrão automático das ações para o rodapé da sidebar
+
+### Validação
+
+- `npm run lint`
+- `npm run build`

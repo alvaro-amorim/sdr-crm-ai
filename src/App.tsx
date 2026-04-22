@@ -774,6 +774,16 @@ function Shell({
             <small>Workspace ativo</small>
             <strong>{workspaceName ?? 'Configuração inicial'}</strong>
           </div>
+          <div className="sidebar-actions">
+            <button type="button" className="ghost" onClick={handleRefreshClick} disabled={busy}>
+              <RefreshCcw aria-hidden />
+              Atualizar
+            </button>
+            <button type="button" className="ghost" onClick={() => void handleSignOut()}>
+              <LogOut aria-hidden />
+              Sair
+            </button>
+          </div>
         </div>
         <nav>
           {nav.map((item) => {
@@ -786,16 +796,6 @@ function Shell({
             );
           })}
         </nav>
-        <div className="sidebar-actions">
-          <button type="button" className="ghost" onClick={handleRefreshClick} disabled={busy}>
-            <RefreshCcw aria-hidden />
-            Atualizar
-          </button>
-          <button type="button" className="ghost" onClick={() => void handleSignOut()}>
-            <LogOut aria-hidden />
-            Sair
-          </button>
-        </div>
       </aside>
       <main className="content">
         <div className="mobile-shell-bar">
