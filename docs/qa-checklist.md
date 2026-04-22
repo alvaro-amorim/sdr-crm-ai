@@ -94,3 +94,4 @@ Base funcional do MVP criada com frontend React, schema Supabase, RLS, Edge Func
 - RLS adicionada nas tabelas funcionais.
 - Edge Functions autenticadas validam usuário e membership antes de acessar dados internos.
 - O simulador público acessa apenas uma conversa específica via token temporário, sem expor o workspace inteiro.
+- O simulador público resolve e grava mensagens por RPC `security definer` usando o hash do token como autorização, sem depender de service role no cliente público.

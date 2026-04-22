@@ -154,10 +154,10 @@ serve(async (request) => {
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const publishableKey = Deno.env.get('SUPABASE_ANON_KEY');
   const openAiKey = Deno.env.get('OPENAI_API_KEY');
 
-  if (!supabaseUrl || !serviceRoleKey || !openAiKey) {
+  if (!supabaseUrl || !publishableKey || !openAiKey) {
     return json(500, { success: false, error: 'Serviço de simulação não configurado.' });
   }
 
@@ -166,122 +166,54 @@ serve(async (request) => {
     return json(400, { success: false, error: 'Payload inválido.' });
   }
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
+  const publicClient = createClient(supabaseUrl, publishableKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
   const tokenHash = await sha256(parsed.data.token);
-  const { data: tokenRecord, error: tokenError } = await admin
-    .from('conversation_simulation_tokens')
-    .select('id, workspace_id, thread_id, expires_at, revoked_at')
-    .eq('token_hash', tokenHash)
-    .maybeSingle();
+  const { data: context, error: contextError } = await publicClient.rpc('get_simulation_context', {
+    target_token_hash: tokenHash,
+  });
 
-  if (tokenError || !tokenRecord || tokenRecord.revoked_at || new Date(tokenRecord.expires_at).getTime() < Date.now()) {
+  if (contextError || !context?.thread) {
     return json(403, { success: false, error: 'Link de simulação inválido ou expirado.' });
   }
 
-  const [{ data: thread }, { data: messages }] = await Promise.all([
-    admin
-      .from('conversation_threads')
-      .select('*, leads(*), campaigns(*)')
-      .eq('workspace_id', tokenRecord.workspace_id)
-      .eq('id', tokenRecord.thread_id)
-      .maybeSingle(),
-    admin
-      .from('conversation_messages')
-      .select('*')
-      .eq('workspace_id', tokenRecord.workspace_id)
-      .eq('thread_id', tokenRecord.thread_id)
-      .order('created_at', { ascending: true }),
-  ]);
-
-  if (!thread || !thread.simulation_enabled) {
-    return json(404, { success: false, error: 'Conversa não encontrada.' });
-  }
-
-  await admin
-    .from('conversation_simulation_tokens')
-    .update({ last_used_at: new Date().toISOString() })
-    .eq('id', tokenRecord.id);
+  const thread = context.thread;
+  const messages = Array.isArray(context.messages) ? context.messages : [];
 
   if (!parsed.data.message) {
-    return json(200, { success: true, data: { thread, messages: messages ?? [] } });
-  }
-
-  const clientName = thread.leads?.name?.split(' ')?.[0] ?? 'Cliente';
-  const now = new Date().toISOString();
-  const { data: inbound, error: inboundError } = await admin
-    .from('conversation_messages')
-    .insert({
-      workspace_id: thread.workspace_id,
-      thread_id: thread.id,
-      lead_id: thread.lead_id,
-      campaign_id: thread.campaign_id,
-      direction: 'inbound',
-      sender_type: 'client',
-      sender_name: clientName,
-      message_text: parsed.data.message,
-      sentiment_tag: 'neutral',
-      intent_tag: 'simulator_client_reply',
-      generated_by: 'user',
-      created_at: now,
-    })
-    .select()
-    .single();
-
-  if (inboundError || !inbound) {
-    return json(500, { success: false, error: 'Falha ao registrar resposta do cliente.' });
+    return json(200, { success: true, data: { thread, messages } });
   }
 
   const prompt = buildPrompt({
     lead: thread.leads,
     campaign: thread.campaigns,
-    messages: [...(messages ?? []), inbound],
+    messages,
     clientMessage: parsed.data.message,
   });
 
   try {
     const generated = await callOpenAiWithFallback(openAiKey, prompt);
-    const { data: outbound, error: outboundError } = await admin
-      .from('conversation_messages')
-      .insert({
-        workspace_id: thread.workspace_id,
-        thread_id: thread.id,
-        lead_id: thread.lead_id,
-        campaign_id: thread.campaign_id,
-        direction: 'outbound',
-        sender_type: 'sdr_ai',
-        sender_name: 'SDR Expert',
-        message_text: generated.message_text,
-        model_name: generated.model,
-        prompt_purpose: 'simulator_follow_up',
-        sentiment_tag: generated.sentiment_tag,
-        intent_tag: generated.intent_tag,
-        generated_by: 'openai',
-        token_usage: generated.usage,
-      })
-      .select()
-      .single();
+    const { data: saved, error: saveError } = await publicClient.rpc('append_simulation_exchange', {
+      target_token_hash: tokenHash,
+      client_message: parsed.data.message,
+      ai_message: generated.message_text,
+      ai_model: generated.model,
+      ai_usage: generated.usage,
+      ai_sentiment: generated.sentiment_tag,
+      ai_intent: generated.intent_tag,
+    });
 
-    if (outboundError || !outbound) {
+    if (saveError || !saved?.messages) {
       return json(500, { success: false, error: 'Falha ao salvar resposta da IA.' });
     }
-
-    await admin
-      .from('conversation_threads')
-      .update({
-        sentiment_tag: generated.sentiment_tag,
-        status: generated.sentiment_tag === 'negative' ? 'negative' : generated.sentiment_tag === 'positive' ? 'positive' : 'neutral',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', thread.id);
 
     return json(200, {
       success: true,
       data: {
-        thread,
-        messages: [...(messages ?? []), inbound, outbound],
+        thread: { ...thread, ...(saved.thread ?? {}) },
+        messages: saved.messages,
         generated_model: generated.model,
       },
     });

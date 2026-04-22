@@ -116,7 +116,7 @@ O frontend chama apenas a Edge Function `generate-lead-messages` com `workspace_
 O simulador de cliente usa duas funções adicionais:
 
 - `create-simulation-link`: função autenticada que valida membership do workspace e cria um link temporário por token.
-- `simulate-client-chat`: função pública limitada pelo token; grava a resposta do cliente e gera a próxima resposta SDR com OpenAI.
+- `simulate-client-chat`: função pública limitada pelo token; resolve a conversa por RPC `security definer`, grava a resposta do cliente e gera a próxima resposta SDR com OpenAI.
 
 A geração possui fallback em cadeia dentro da própria OpenAI:
 
