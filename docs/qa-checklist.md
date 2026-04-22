@@ -13,6 +13,16 @@ Base funcional do MVP criada com frontend React, schema Supabase, RLS, Edge Func
   - valida bloqueio por campo padrão obrigatório ausente
   - valida bloqueio por campo personalizado obrigatório ausente
   - valida transição quando obrigatórios estão preenchidos
+- `npm run test:smoke:crm`
+  - autentica com um usuário real de teste
+  - cria ou reutiliza o workspace dedicado `Operação SDR Demo`
+  - limpa o workspace demo antes de reseedar
+  - cria campos personalizados e regras por etapa
+  - cria leads com nomes e empresas realistas em vários estágios do funil
+  - cria campanhas/playbooks com contextos e gatilhos plausíveis
+  - valida a Edge Function de IA gerando mensagens reais para o lead principal
+  - semeia histórico de mensagens com envios simulados e respostas do cliente
+  - deixa a interface pronta para avaliação com múltiplos estados operacionais
 
 ## Testes manuais previstos
 
@@ -50,6 +60,15 @@ Base funcional do MVP criada com frontend React, schema Supabase, RLS, Edge Func
 6. Dashboard
    - Confirmar contagens reais de leads por etapa.
    - Confirmar estado vazio sem erro.
+
+## Convenção do smoke realista
+
+- O smoke usa um workspace dedicado para demonstração.
+- O nome padrão é `Operação SDR Demo`, mas pode ser sobrescrito por `SMOKE_WORKSPACE_NAME`.
+- O script foi desenhado para ser reexecutável no mesmo perfil de teste sem contaminar outros workspaces.
+- As credenciais do usuário de teste devem ficar apenas no `.env.local`:
+  - `TEST_USER_EMAIL`
+  - `TEST_USER_PASSWORD`
 
 ## Revisão de segurança
 

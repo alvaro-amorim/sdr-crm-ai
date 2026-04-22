@@ -182,3 +182,26 @@ Fechar o polimento transversal antes do Lovable, reforçando leitura operacional
 
 - blocos planejados para o polimento pré-Lovable foram concluídos
 - o próximo passo deixa de ser refino local de UI e passa a ser validação final em produção e migração guiada para Lovable
+
+## 2026-04-21 — Aprimoramento do smoke test
+
+### Objetivo do bloco
+
+Transformar o smoke test do CRM em um seed de demonstração realista, útil para validar a operação e também para deixar o produto visualmente crível em um perfil zerado.
+
+### Alterações implementadas
+
+- `scripts/smoke-crm-flow.mjs`
+  - o smoke deixou de criar um único lead/campanha
+  - agora cria um workspace demo dedicado e reexecutável
+  - semeia campos personalizados, regras por etapa, leads realistas, campanhas com gatilho e histórico de conversa
+  - mantém validação real da Edge Function com geração de mensagens pela OpenAI
+
+- `supabase/migrations/20260421201000_enrich_sent_message_events_for_smoke_chat.sql`
+  - adiciona metadados leves no histórico de mensagens para suportar direção, remetente, canal e status de entrega/leitura/resposta
+
+- `src/components/messages-screen.tsx`
+  - o mock de chat passa a diferenciar mensagens do SDR e respostas do cliente no mesmo histórico
+
+- `docs/qa-checklist.md` e `.env.example`
+  - documentação das novas variáveis e do comportamento do smoke realista

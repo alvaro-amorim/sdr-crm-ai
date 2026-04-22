@@ -1160,6 +1160,10 @@ h3 {
   justify-content: flex-end;
 }
 
+.chat-row-inbound {
+  justify-content: flex-start;
+}
+
 .chat-row-highlight .chat-bubble {
   border-color: rgba(29, 95, 99, 0.22);
   box-shadow: 0 0 0 1px rgba(29, 95, 99, 0.1);
@@ -1177,6 +1181,12 @@ h3 {
 
 .chat-bubble-preview {
   background: #edf4f2;
+}
+
+.chat-bubble-inbound {
+  background: #ffffff;
+  border-radius: 16px 16px 16px 4px;
+  border-color: #d4ddd9;
 }
 
 .chat-bubble p {

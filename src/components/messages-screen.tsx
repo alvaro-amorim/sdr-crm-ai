@@ -6,6 +6,46 @@ import { moveLead } from '../services/crm';
 import type { Campaign, CrmData, GeneratedMessage, Lead, PipelineStage, SentMessageEvent } from '../types/domain';
 import { findStageByName, formatDateTime, getLeadChannel, getLeadMetaLine } from '../utils/crm-ui';
 
+function formatDeliveryStatus(status: SentMessageEvent['delivery_status']) {
+  switch (status) {
+    case 'draft':
+      return 'Rascunho';
+    case 'scheduled':
+      return 'Agendada';
+    case 'sent':
+      return 'Enviada';
+    case 'delivered':
+      return 'Entregue';
+    case 'read':
+      return 'Lida';
+    case 'replied':
+      return 'Respondida';
+    default:
+      return 'Registrada';
+  }
+}
+
+function inferChannelLabel(channel: string | null | undefined, lead: Lead) {
+  if (!channel) return getLeadChannel(lead);
+
+  switch (channel.toLowerCase()) {
+    case 'email':
+      return 'E-mail simulado';
+    case 'whatsapp':
+      return 'WhatsApp simulado';
+    case 'linkedin':
+      return 'LinkedIn simulado';
+    default:
+      return channel;
+  }
+}
+
+function inferChannelKey(lead: Lead) {
+  if (lead.phone) return 'whatsapp';
+  if (lead.email) return 'email';
+  return 'linkedin';
+}
+
 export function MessagesScreen({
   data,
   user,
@@ -51,13 +91,17 @@ export function MessagesScreen({
       setError('Selecione lead e campanha ativa.');
       return;
     }
+
     setBusy(true);
     setError(null);
+
     try {
       const { error: functionError } = await supabase.functions.invoke('generate-lead-messages', {
         body: { workspace_id: data.workspace.id, lead_id: leadId, campaign_id: campaignId },
       });
+
       if (functionError) throw functionError;
+
       setNotice('Mensagens geradas e salvas.');
       await onReload();
     } catch (generateError) {
@@ -74,8 +118,15 @@ export function MessagesScreen({
       return;
     }
 
+    const messageLead = data.leads.find((lead) => lead.id === message.lead_id) ?? selectedLead;
+    if (!messageLead) {
+      setError('Lead da mensagem não encontrado.');
+      return;
+    }
+
     try {
       setSimulationBusy(true);
+
       const { error: eventError } = await supabase.from('sent_message_events').insert({
         workspace_id: data.workspace.id,
         lead_id: message.lead_id,
@@ -84,7 +135,12 @@ export function MessagesScreen({
         message_text: message.message_text,
         sent_by_user_id: user.id,
         is_simulated: true,
+        direction: 'outbound',
+        sender_name: 'SDR Expert',
+        channel: inferChannelKey(messageLead),
+        delivery_status: 'sent',
       });
+
       if (eventError) throw eventError;
 
       const { error: messageError } = await supabase
@@ -92,6 +148,7 @@ export function MessagesScreen({
         .update({ generation_status: 'sent' })
         .eq('workspace_id', data.workspace.id)
         .eq('id', message.id);
+
       if (messageError) throw messageError;
 
       await moveLead(supabase, data.workspace.id, message.lead_id, targetStage.id);
@@ -124,6 +181,7 @@ export function MessagesScreen({
               ))}
             </select>
           </label>
+
           <label>
             Campanha ativa
             <select name="messageCampaign" value={campaignId} onChange={(event) => setCampaignId(event.target.value)}>
@@ -134,6 +192,7 @@ export function MessagesScreen({
               ))}
             </select>
           </label>
+
           <button type="button" onClick={generateMessages} disabled={busy || data.leads.length === 0 || activeCampaigns.length === 0}>
             <Sparkles aria-hidden />
             {busy ? 'Gerando mensagens...' : 'Gerar mensagens'}
@@ -287,7 +346,7 @@ function ChatSimulationModal({
   if (!message || !lead || !campaign) return null;
 
   const matchedHistory = history.find((event) => event.generated_message_id === message.id) ?? null;
-  const threadItems = matchedHistory
+  const threadItems: SentMessageEvent[] = matchedHistory
     ? history
     : [
         ...history,
@@ -300,6 +359,10 @@ function ChatSimulationModal({
           message_text: message.message_text,
           sent_by_user_id: '',
           is_simulated: true,
+          direction: 'outbound',
+          sender_name: 'SDR Expert',
+          channel: inferChannelKey(lead),
+          delivery_status: 'draft',
           sent_at: new Date().toISOString(),
         },
       ];
@@ -345,7 +408,7 @@ function ChatSimulationModal({
                 ? `Lead já está em ${currentStage?.name ?? targetStage?.name ?? 'etapa atual'}.`
                 : `Ao confirmar, o lead será movido para ${targetStage?.name ?? 'Tentando Contato'}.`}
             </p>
-            <span>Canal: {getLeadChannel(lead)}</span>
+            <span>Canal: {inferChannelLabel(matchedHistory?.channel, lead)}</span>
           </article>
         </div>
 
@@ -353,14 +416,22 @@ function ChatSimulationModal({
           {threadItems.map((item) => {
             const isPreview = item.id === `preview-${message.id}`;
             const isHighlighted = item.generated_message_id === message.id;
+            const isInbound = item.direction === 'inbound';
+            const senderLabel =
+              item.sender_name?.trim() ||
+              (isInbound ? (lead.name.includes(' ') ? lead.name.split(' ')[0] : lead.name) : 'SDR Expert');
+            const statusLabel = isPreview && !matchedHistory ? 'Aguardando confirmação' : formatDeliveryStatus(item.delivery_status);
+            const channelLabel = inferChannelLabel(item.channel, lead);
 
             return (
-              <div key={item.id} className={`chat-row ${isHighlighted ? 'chat-row-highlight' : ''}`}>
-                <div className={`chat-bubble ${isPreview ? 'chat-bubble-preview' : ''}`}>
-                  <span className="chat-bubble-label">{isPreview && !matchedHistory ? 'Prévia do envio' : 'SDR Expert'}</span>
+              <div key={item.id} className={`chat-row ${isHighlighted ? 'chat-row-highlight' : ''} ${isInbound ? 'chat-row-inbound' : ''}`}>
+                <div className={`chat-bubble ${isPreview ? 'chat-bubble-preview' : ''} ${isInbound ? 'chat-bubble-inbound' : ''}`}>
+                  <span className="chat-bubble-label">{isPreview && !matchedHistory ? 'Prévia do envio' : senderLabel}</span>
                   <p>{item.message_text}</p>
                   <div className="chat-bubble-meta">
-                    <span>{isPreview && !matchedHistory ? 'Aguardando confirmação' : 'Enviado simulado'}</span>
+                    <span>
+                      {channelLabel} · {statusLabel}
+                    </span>
                     <time dateTime={item.sent_at}>{formatDateTime(item.sent_at)}</time>
                   </div>
                 </div>

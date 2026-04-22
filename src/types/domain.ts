@@ -112,6 +112,10 @@ export type SentMessageEvent = {
   message_text: string;
   sent_by_user_id: string;
   is_simulated: boolean;
+  direction: 'outbound' | 'inbound';
+  sender_name: string | null;
+  channel: string;
+  delivery_status: 'draft' | 'scheduled' | 'sent' | 'delivered' | 'read' | 'replied';
   sent_at: string;
 };
 
