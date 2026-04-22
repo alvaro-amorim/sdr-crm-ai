@@ -445,43 +445,47 @@ async function callOpenAiConversation(openAiKey, prompt, expectedCount) {
 }
 
 async function callEdgeConversation({ supabaseUrl, supabaseAnonKey, authToken, workspaceId, lead, campaign, scenario, wave }, expectedCount) {
-  const response = await fetch(`${supabaseUrl.replace(/\/$/, '')}/functions/v1/generate-smoke-conversation`, {
-    method: 'POST',
-    headers: {
-      apikey: supabaseAnonKey,
-      'content-type': 'application/json',
-      'x-sdr-auth-token': authToken,
-    },
-    body: JSON.stringify({
-      workspace_id: workspaceId,
-      wave,
-      scenario,
-      lead,
-      campaign: {
-        name: campaign.name,
-        channel: campaign.channel,
-        context_text: campaign.context_text,
-        generation_prompt: campaign.generation_prompt,
-        goal: campaign.goal,
+  let lastError = 'Falha desconhecida na Edge Function de smoke.';
+
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    const response = await fetch(`${supabaseUrl.replace(/\/$/, '')}/functions/v1/generate-smoke-conversation`, {
+      method: 'POST',
+      headers: {
+        apikey: supabaseAnonKey,
+        'content-type': 'application/json',
+        'x-sdr-auth-token': authToken,
       },
-    }),
-  });
+      body: JSON.stringify({
+        workspace_id: workspaceId,
+        wave,
+        scenario,
+        lead,
+        campaign: {
+          name: campaign.name,
+          channel: campaign.channel,
+          context_text: campaign.context_text,
+          generation_prompt: campaign.generation_prompt,
+          goal: campaign.goal,
+        },
+      }),
+    }).catch((error) => ({ ok: false, status: 0, json: async () => ({ error: error.message }) }));
 
-  const data = await response.json().catch(() => null);
+    const data = await response.json().catch(() => null);
 
-  if (!response.ok) {
-    throw new Error(`Falha na Edge Function de smoke: HTTP ${response.status} ${data?.error ?? data?.message ?? ''}`.trim());
+    if (response.ok && data?.success && data?.data) {
+      return {
+        messages: parseConversation(JSON.stringify({ messages: data.data.messages }), expectedCount),
+        model: data.data.model ?? 'supabase-edge-openai',
+        usage: data.data.usage ?? null,
+      };
+    }
+
+    lastError = `Falha na Edge Function de smoke: HTTP ${response.status} ${data?.error ?? data?.message ?? ''}`.trim();
+    if (![0, 429, 502, 503, 504].includes(response.status) || attempt === 4) break;
+    await sleep(1200 * attempt);
   }
 
-  if (!data?.success || !data?.data) {
-    throw new Error(data?.error ?? 'A Edge Function de smoke não retornou conversa.');
-  }
-
-  return {
-    messages: parseConversation(JSON.stringify({ messages: data.data.messages }), expectedCount),
-    model: data.data.model ?? 'supabase-edge-openai',
-    usage: data.data.usage ?? null,
-  };
+  throw new Error(lastError);
 }
 
 async function generateConversation({ supabaseUrl, supabaseAnonKey, authToken, workspaceId, openAiKey, lead, campaign, scenario, wave, expectedCount }) {
