@@ -29,7 +29,7 @@ import {
 import { DashboardScreen } from './components/dashboard-screen';
 import { ClientSimulatorScreen } from './components/client-simulator-screen';
 import { MessagesScreen } from './components/messages-screen';
-import { envError, supabase } from './lib/supabase';
+import { envError, supabase, supabaseEnv } from './lib/supabase';
 import {
   createWorkspaceWithDefaults,
   getFirstWorkspace,
@@ -73,8 +73,75 @@ const emptyCampaignInput: CampaignInput = {
   is_active: true,
 };
 
+type CampaignStrategyPlan = {
+  objective_summary: string;
+  icp_summary: string;
+  pain_summary: string;
+  tone_guidelines: string;
+  cta_strategy: string;
+  objection_handling: string;
+  sequence_strategy: string;
+  final_prompt: string;
+};
+
+const emptyCampaignStrategyPlan: CampaignStrategyPlan = {
+  objective_summary: '',
+  icp_summary: '',
+  pain_summary: '',
+  tone_guidelines: '',
+  cta_strategy: '',
+  objection_handling: '',
+  sequence_strategy: '',
+  final_prompt: '',
+};
+
+function derivePlanFromCampaign(campaign: Campaign | null): CampaignStrategyPlan {
+  if (!campaign) return emptyCampaignStrategyPlan;
+
+  return {
+    objective_summary: `Campanha ${campaign.name} pronta para gera??o contextual.`,
+    icp_summary: campaign.trigger_stage_id ? 'Campanha conectada a uma etapa espec?fica do funil.' : 'Campanha sem gatilho autom?tico definido.',
+    pain_summary: campaign.context_text,
+    tone_guidelines: 'Tom consultivo, objetivo e alinhado ao contexto comercial salvo.',
+    cta_strategy: 'CTA compat?vel com o contexto e o est?gio de maturidade do lead.',
+    objection_handling: 'Responder obje??es sem insist?ncia excessiva e sem inventar informa??es.',
+    sequence_strategy: 'Usar abertura, retomada amig?vel e avan?o de qualifica??o conforme a resposta do lead.',
+    final_prompt: campaign.generation_prompt,
+  };
+}
+
 function getSafeMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Falha inesperada. Tente novamente.';
+}
+
+async function invokeAuthenticatedFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
+  if (!supabase || !supabaseEnv) {
+    throw new Error('Supabase n?o configurado.');
+  }
+
+  const { data, error } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (error || !token) {
+    throw new Error('Sess?o expirada. Entre novamente.');
+  }
+
+  const response = await fetch(`${supabaseEnv.VITE_SUPABASE_URL.replace(/\/$/, '')}/functions/v1/${name}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      apikey: supabaseEnv.VITE_SUPABASE_ANON_KEY,
+      'content-type': 'application/json',
+      'x-sdr-auth-token': token,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(payload?.error ?? payload?.message ?? `Falha HTTP ${response.status}.`);
+  }
+
+  return payload as T;
 }
 
 function getAuthRedirectTo(): string {
@@ -1883,18 +1950,75 @@ function CampaignForm({
       }
     : emptyCampaignInput;
   const [form, setForm] = useState<CampaignInput>(initial);
+  const [plan, setPlan] = useState<CampaignStrategyPlan>(derivePlanFromCampaign(campaign));
+  const [planningBusy, setPlanningBusy] = useState(false);
+  const [planMeta, setPlanMeta] = useState<{ model: string } | null>(null);
 
-  useEffect(() => setForm(initial), [campaign]);
+  useEffect(() => {
+    setForm(initial);
+    setPlan(derivePlanFromCampaign(campaign));
+    setPlanMeta(null);
+  }, [campaign]);
+
+  async function generatePlan() {
+    if (!form.name.trim() || !form.context_text.trim()) {
+      setError('Nome e contexto s?o obrigat?rios para montar o plano da campanha.');
+      return;
+    }
+
+    setPlanningBusy(true);
+    setError(null);
+
+    try {
+      const result = await invokeAuthenticatedFunction<{
+        success: boolean;
+        error?: string;
+        data?: CampaignStrategyPlan & { model: string };
+      }>('plan-campaign-strategy', {
+        workspace_id: data.workspace.id,
+        name: form.name,
+        context_text: form.context_text,
+        trigger_stage_id: form.trigger_stage_id,
+      });
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error ?? 'Falha ao montar o plano da campanha.');
+      }
+
+      setPlan({
+        objective_summary: result.data.objective_summary,
+        icp_summary: result.data.icp_summary,
+        pain_summary: result.data.pain_summary,
+        tone_guidelines: result.data.tone_guidelines,
+        cta_strategy: result.data.cta_strategy,
+        objection_handling: result.data.objection_handling,
+        sequence_strategy: result.data.sequence_strategy,
+        final_prompt: result.data.final_prompt,
+      });
+      setPlanMeta({ model: result.data.model });
+    } catch (planError) {
+      setError(getSafeMessage(planError));
+    } finally {
+      setPlanningBusy(false);
+    }
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase) return;
-    if (!form.name.trim() || !form.context_text.trim() || !form.generation_prompt.trim()) {
-      setError('Nome, contexto e prompt são obrigatórios.');
+    if (!form.name.trim() || !form.context_text.trim()) {
+      setError('Nome e contexto s?o obrigat?rios.');
+      return;
+    }
+    if (!plan.final_prompt.trim()) {
+      setError('Gere ou revise o plano da campanha antes de salvar.');
       return;
     }
     try {
-      await upsertCampaign(supabase, data.workspace, user, form);
+      await upsertCampaign(supabase, data.workspace, user, {
+        ...form,
+        generation_prompt: plan.final_prompt,
+      });
       onSaved();
     } catch (campaignError) {
       setError(getSafeMessage(campaignError));
@@ -1907,11 +2031,11 @@ function CampaignForm({
         <div className="campaign-form-heading">
           <span className="section-kicker">{campaign ? 'Refinando playbook' : 'Novo playbook'}</span>
           <h2>{campaign ? 'Editar campanha' : 'Nova campanha'}</h2>
-          <p>Configure o contexto comercial que alimenta a Edge Function e deixa a demonstração da IA mais convincente.</p>
+          <p>Defina o briefing comercial e deixe a IA montar o plano da campanha antes de salvar o playbook.</p>
         </div>
         {campaign && (
           <button type="button" className="ghost compact" onClick={onCancel}>
-            Cancelar edição
+            Cancelar edi??o
           </button>
         )}
       </div>
@@ -1921,10 +2045,10 @@ function CampaignForm({
           name="campaignName"
           value={form.name}
           onChange={(event) => setForm({ ...form, name: event.target.value })}
-          placeholder="Ex.: Outbound ICP Operações ou Reativação de pipeline"
+          placeholder="Ex.: Outbound ICP Opera??es ou Reativa??o de pipeline"
           required
         />
-        <span className="field-hint">Use um nome claro. Ex.: Outbound ICP Operações ou Reativação de pipeline.</span>
+        <span className="field-hint">Use um nome claro. Ex.: Outbound ICP Opera??es ou Reativa??o de pipeline.</span>
       </label>
       <label>
         Etapa gatilho
@@ -1952,29 +2076,110 @@ function CampaignForm({
         Campanha ativa
       </label>
       <label className="wide">
-        Contexto
+        Contexto do briefing
         <textarea
           name="campaignContext"
           value={form.context_text}
           onChange={(event) => setForm({ ...form, context_text: event.target.value })}
-          placeholder="Ex.: SaaS B2B com time SDR travado por baixa cadência. ou Ex.: Operação logística com dificuldade para qualificar leads."
+          placeholder="Ex.: SaaS B2B com time SDR travado por baixa cad?ncia. ou Ex.: Opera??o log?stica com dificuldade para qualificar leads."
           required
         />
-        <span className="field-hint">Ex.: SaaS B2B com time SDR travado por baixa cadência ou operação logística com dificuldade para qualificar leads.</span>
-        <span className="field-hint">Descreva rapidamente o cenário, produto e dor comercial que a IA deve considerar.</span>
+        <span className="field-hint">Ex.: SaaS B2B com time SDR travado por baixa cad?ncia ou opera??o log?stica com dificuldade para qualificar leads.</span>
+        <span className="field-hint">Descreva rapidamente o cen?rio, produto e dor comercial que a IA deve considerar.</span>
       </label>
-      <label className="wide">
-        Prompt de geração
-        <textarea
-          name="campaignPrompt"
-          value={form.generation_prompt}
-          onChange={(event) => setForm({ ...form, generation_prompt: event.target.value })}
-          placeholder="Ex.: Escreva em tom consultivo com CTA leve. ou Ex.: Gere mensagem curta com foco em reunião diagnóstica."
-          required
-        />
-        <span className="field-hint">Ex.: escreva em tom consultivo com CTA leve ou gere mensagem curta com foco em reunião diagnóstica.</span>
-        <span className="field-hint">Explique o tom, a intenção e o tipo de CTA que a mensagem deve produzir.</span>
-      </label>
+      <div className="wide campaign-plan-actions">
+        <button type="button" className="secondary" onClick={generatePlan} disabled={planningBusy}>
+          {planningBusy ? 'Montando plano com IA...' : plan.final_prompt.trim() ? 'Gerar novo plano com IA' : 'Gerar plano com IA'}
+        </button>
+        <span className="field-hint">A IA monta o plano da campanha e o prompt final. Voc? pode aprovar, editar ou gerar novamente antes de salvar.</span>
+      </div>
+      <section className="wide campaign-plan-panel" aria-label="Plano de a??o da campanha">
+        <div className="campaign-card-header">
+          <div>
+            <span className="section-kicker">Revis?o antes do salvamento</span>
+            <h3>Plano de a??o da campanha</h3>
+            <p>Revise o racional sugerido pela IA, ajuste o que precisar e s? ent?o salve a campanha.</p>
+          </div>
+          <div className="campaign-chip-row">
+            <span className="campaign-chip campaign-chip-stage">{planMeta ? `Gerado por ${planMeta.model}` : 'Ainda n?o gerado'}</span>
+          </div>
+        </div>
+        <div className="campaign-plan-grid">
+          <label>
+            Objetivo
+            <textarea
+              name="campaignPlanObjective"
+              value={plan.objective_summary}
+              onChange={(event) => setPlan((current) => ({ ...current, objective_summary: event.target.value }))}
+              placeholder="Ex.: Abrir diagn?stico com l?deres comerciais que ainda operam o pipeline manualmente."
+            />
+          </label>
+          <label>
+            ICP
+            <textarea
+              name="campaignPlanIcp"
+              value={plan.icp_summary}
+              onChange={(event) => setPlan((current) => ({ ...current, icp_summary: event.target.value }))}
+              placeholder="Ex.: Heads de vendas, opera??es e revenue em empresas B2B com time SDR ativo."
+            />
+          </label>
+          <label>
+            Dor principal
+            <textarea
+              name="campaignPlanPain"
+              value={plan.pain_summary}
+              onChange={(event) => setPlan((current) => ({ ...current, pain_summary: event.target.value }))}
+              placeholder="Ex.: Baixa cad?ncia, dificuldade de qualifica??o e pouca visibilidade do funil."
+            />
+          </label>
+          <label>
+            Tom recomendado
+            <textarea
+              name="campaignPlanTone"
+              value={plan.tone_guidelines}
+              onChange={(event) => setPlan((current) => ({ ...current, tone_guidelines: event.target.value }))}
+              placeholder="Ex.: Consultivo, objetivo, respeitoso e sem promessas exageradas."
+            />
+          </label>
+          <label>
+            CTA recomendado
+            <textarea
+              name="campaignPlanCta"
+              value={plan.cta_strategy}
+              onChange={(event) => setPlan((current) => ({ ...current, cta_strategy: event.target.value }))}
+              placeholder="Ex.: Convidar para uma conversa curta de diagn?stico ou pedir contexto do processo atual."
+            />
+          </label>
+          <label>
+            Tratamento de obje??es
+            <textarea
+              name="campaignPlanObjections"
+              value={plan.objection_handling}
+              onChange={(event) => setPlan((current) => ({ ...current, objection_handling: event.target.value }))}
+              placeholder="Ex.: Responder timing, prioridade, ferramenta atual e falta de tempo sem insist?ncia agressiva."
+            />
+          </label>
+          <label className="wide">
+            Sequ?ncia sugerida
+            <textarea
+              name="campaignPlanSequence"
+              value={plan.sequence_strategy}
+              onChange={(event) => setPlan((current) => ({ ...current, sequence_strategy: event.target.value }))}
+              placeholder="Ex.: Abertura consultiva, retomada amig?vel sem resposta e avan?o para qualifica??o quando houver interesse."
+            />
+          </label>
+          <label className="wide">
+            Prompt final aprovado
+            <textarea
+              name="campaignPlanPrompt"
+              value={plan.final_prompt}
+              onChange={(event) => setPlan((current) => ({ ...current, final_prompt: event.target.value }))}
+              placeholder="Ex.: Gere 3 mensagens curtas, consultivas, personalizadas e sem inventar dados, usando o contexto do lead e CTA leve."
+            />
+            <span className="field-hint">Esse ? o prompt que ser? salvo e usado pela Edge Function de gera??o.</span>
+          </label>
+        </div>
+      </section>
       <div className="wide">
         <button type="submit">Salvar campanha</button>
       </div>
