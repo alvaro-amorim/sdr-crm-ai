@@ -536,9 +536,14 @@ export function DashboardScreen({ data }: { data: CrmData }) {
             <span className="section-kicker">Análise interativa</span>
             <h2>Selecionar etapa para leitura operacional</h2>
           </div>
-          <label className="dashboard-stage-selector">
+          <label className="dashboard-stage-selector" htmlFor="dashboardStageSelector">
             Etapa analisada
-            <select value={selectedStage?.id ?? ''} onChange={(event) => setSelectedStageId(event.target.value)}>
+            <select
+              id="dashboardStageSelector"
+              name="dashboardStageSelector"
+              value={selectedStage?.id ?? ''}
+              onChange={(event) => setSelectedStageId(event.target.value)}
+            >
               {data.stages.map((stage) => (
                 <option key={stage.id} value={stage.id}>
                   {stage.name}

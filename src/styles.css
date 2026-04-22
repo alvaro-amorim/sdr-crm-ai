@@ -162,6 +162,7 @@ h3 {
   border: 1px solid #d9dfdc;
   border-radius: 8px;
   box-shadow: 0 20px 60px rgba(31, 43, 40, 0.08);
+  min-width: 0;
 }
 
 .setup-panel {
@@ -569,6 +570,14 @@ h3 {
   display: grid;
   gap: 16px;
   padding: 18px;
+}
+
+.panel *,
+.metric *,
+.message-card *,
+.overview-card *,
+.chat-summary-card * {
+  min-width: 0;
 }
 
 .narrow {
@@ -1045,6 +1054,7 @@ h3 {
   border-radius: 8px;
   display: grid;
   gap: 7px;
+  min-width: 0;
   padding: 14px;
 }
 
@@ -1090,6 +1100,7 @@ h3 {
   display: grid;
   gap: 14px;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 0.72fr) auto;
+  min-width: 0;
   padding: 14px;
 }
 
@@ -1766,12 +1777,14 @@ h3 {
 }
 
 .chat-modal.flow-guide-modal,
-.chat-modal.dashboard-diagnostic-modal {
+.chat-modal.dashboard-diagnostic-modal,
+.chat-modal.dashboard-operation-modal {
   overflow: auto;
 }
 
 .chat-modal.flow-guide-modal > *,
-.chat-modal.dashboard-diagnostic-modal > * {
+.chat-modal.dashboard-diagnostic-modal > *,
+.chat-modal.dashboard-operation-modal > * {
   max-width: 100%;
   min-width: 0;
 }
@@ -1818,6 +1831,7 @@ h3 {
   max-height: min(42vh, 420px);
   overflow: auto;
   padding: 16px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .chat-row {
@@ -1921,6 +1935,7 @@ h3 {
   padding: 4px 2px 12px;
   scroll-snap-type: x proximity;
   scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
 }
 
 .kanban-column {
@@ -2079,6 +2094,7 @@ h3 {
   max-height: 390px;
   overflow: auto;
   padding: 16px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .conversation-preview-row {
@@ -2237,6 +2253,7 @@ h3 {
   min-height: 420px;
   overflow: auto;
   padding: 18px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .client-simulator-loading {
@@ -2403,6 +2420,10 @@ h3 {
     width: 100%;
   }
 
+  .dashboard-shortcut-card {
+    min-height: auto;
+  }
+
   .auth-screen {
     align-items: start;
     min-height: 100svh;
@@ -2534,7 +2555,12 @@ h3 {
 
   .chat-modal {
     max-height: calc(100vh - 32px);
+    overflow: auto;
     padding: 18px;
+  }
+
+  .dashboard-operation-modal {
+    max-width: calc(100vw - 32px);
   }
 
   .client-simulator-screen {
@@ -2548,7 +2574,10 @@ h3 {
 
   .client-simulator-shortcut {
     bottom: 14px;
+    left: 14px;
+    max-width: none;
     right: 14px;
+    width: auto;
   }
 
   .kanban {
@@ -2558,6 +2587,12 @@ h3 {
   .kanban-column {
     flex-basis: min(86vw, 340px);
     max-height: 68vh;
+  }
+
+  .conversation-preview-bubble,
+  .client-chat-bubble,
+  .chat-bubble {
+    max-width: 100%;
   }
 }
 
@@ -2592,6 +2627,20 @@ h3 {
     padding: 16px;
   }
 
+  .password-field {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+
+  .password-toggle {
+    min-width: 44px;
+    padding: 0;
+    width: 44px;
+  }
+
+  .password-toggle span {
+    display: none;
+  }
+
   .app-shell {
     min-height: 100svh;
   }
@@ -2608,6 +2657,19 @@ h3 {
   .content {
     gap: 16px;
     padding: 16px;
+  }
+
+  .dashboard-shortcut-card {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding-right: 36px;
+  }
+
+  .dashboard-shortcut-total {
+    font-size: 1.45rem;
+  }
+
+  .dashboard-shortcut-chevron {
+    right: 10px;
   }
 
   .mobile-shell-bar {
@@ -2682,10 +2744,13 @@ h3 {
 
   .chat-modal {
     border-radius: 8px;
+    max-height: none;
     padding: 16px;
   }
 
   .modal-backdrop {
+    align-items: start;
+    overflow: auto;
     padding: 12px;
   }
 
@@ -2701,5 +2766,35 @@ h3 {
 
   .icon-only {
     width: auto;
+  }
+
+  .icon-button,
+  .password-toggle,
+  .sidebar-close {
+    width: 40px;
+  }
+
+  .client-simulator-shortcut {
+    border-radius: 8px;
+    bottom: 10px;
+    left: 10px;
+    min-height: 44px;
+    padding: 10px 12px;
+    right: 10px;
+    width: auto;
+  }
+
+  .client-simulator-shortcut span {
+    max-width: none;
+  }
+
+  .client-chat-message {
+    align-items: start;
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .client-chat-avatar {
+    height: 28px;
+    width: 28px;
   }
 }
