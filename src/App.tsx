@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import {
   Bot,
+  BookOpen,
   Building2,
+  ChevronDown,
+  ChevronUp,
   CircleAlert,
   CheckCircle2,
   Eye,
@@ -17,6 +20,7 @@ import {
   Phone,
   Plus,
   RefreshCcw,
+  Route,
   ShieldAlert,
   X,
   Users,
@@ -247,6 +251,7 @@ export default function App() {
         setNotice(null);
         setError(null);
       }} />
+      <OperationGuide tab={tab} />
 
       {tab === 'dashboard' && <Dashboard data={data} />}
       {tab === 'leads' && (
@@ -777,6 +782,114 @@ function StatusBar({ notice, error, onClear }: { notice: string | null; error: s
         Fechar
       </button>
     </div>
+  );
+}
+
+function OperationGuide({ tab }: { tab: Tab }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const steps: Array<{ id: Tab; title: string; description: string }> = [
+    {
+      id: 'dashboard',
+      title: 'Ler a operação',
+      description: 'Veja volume, gargalos, respostas e próximos movimentos antes de operar.',
+    },
+    {
+      id: 'leads',
+      title: 'Qualificar leads',
+      description: 'Cadastre contexto, selecione o lead em foco e mova pelo funil com validação.',
+    },
+    {
+      id: 'fields',
+      title: 'Controlar qualidade',
+      description: 'Defina campos obrigatórios por etapa para impedir avanço com dados frágeis.',
+    },
+    {
+      id: 'campaigns',
+      title: 'Preparar playbooks',
+      description: 'Crie campanhas com contexto e prompt para orientar a IA por objetivo comercial.',
+    },
+    {
+      id: 'messages',
+      title: 'Simular abordagem',
+      description: 'Gere mensagens, registre envio e abra o simulador do cliente para testar respostas.',
+    },
+  ];
+  const activeStep = steps.find((step) => step.id === tab) ?? steps[0];
+
+  return (
+    <>
+      <section className={`operation-guide ${collapsed ? 'operation-guide-collapsed' : ''}`}>
+        <div className="operation-guide-main">
+          <span className="operation-guide-icon" aria-hidden>
+            <Route />
+          </span>
+          <div>
+            <span className="section-kicker">Guia rápido do fluxo</span>
+            <strong>{activeStep.title}</strong>
+            {!collapsed && <p>{activeStep.description}</p>}
+          </div>
+        </div>
+        {!collapsed && (
+          <div className="operation-guide-steps" aria-label="Fluxo recomendado do CRM">
+            {steps.map((step, index) => (
+              <span key={step.id} className={step.id === tab ? 'operation-step operation-step-active' : 'operation-step'}>
+                {index + 1}. {step.title}
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="operation-guide-actions">
+          <button type="button" className="ghost compact" onClick={() => setModalOpen(true)}>
+            <BookOpen aria-hidden />
+            Ver lógica
+          </button>
+          <button
+            type="button"
+            className="ghost compact icon-only"
+            onClick={() => setCollapsed((current) => !current)}
+            aria-label={collapsed ? 'Expandir guia do fluxo' : 'Minimizar guia do fluxo'}
+          >
+            {collapsed ? <ChevronDown aria-hidden /> : <ChevronUp aria-hidden />}
+          </button>
+        </div>
+      </section>
+
+      {modalOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="flow-guide-title">
+          <section className="chat-modal flow-guide-modal">
+            <div className="chat-modal-header">
+              <div>
+                <span className="section-kicker">Lógica operacional</span>
+                <h2 id="flow-guide-title">Como o SDR Expert deve ser avaliado</h2>
+                <p>O app simula uma operação de pré-vendas com dados isolados por workspace, funil, playbooks e IA.</p>
+              </div>
+              <button type="button" className="ghost compact icon-only" onClick={() => setModalOpen(false)} aria-label="Fechar guia">
+                <X aria-hidden />
+              </button>
+            </div>
+            <div className="flow-guide-grid">
+              {steps.map((step, index) => (
+                <article key={step.id} className={step.id === tab ? 'flow-guide-card flow-guide-card-active' : 'flow-guide-card'}>
+                  <span>{index + 1}</span>
+                  <div>
+                    <strong>{step.title}</strong>
+                    <p>{step.description}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="flow-guide-note">
+              <strong>Fluxo principal:</strong>
+              <span>
+                dashboard identifica prioridade, leads guardam contexto, campos protegem a qualidade, campanhas definem a estratégia e
+                mensagens IA demonstram a abordagem com simulador de cliente.
+              </span>
+            </div>
+          </section>
+        </div>
+      )}
+    </>
   );
 }
 

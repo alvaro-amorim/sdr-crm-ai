@@ -269,3 +269,37 @@ Corrigir a leitura da tela de leads com grande volume de dados e permitir que o 
 - `npm run build`
 - checagem visual local em `127.0.0.1:5173` da tela de leads com volume alto
 - checagem visual local do seletor de conversa em `Mensagens IA`
+
+## 2026-04-22 — Guia operacional e dashboard estratégico
+
+### Objetivo
+
+Melhorar a compreensão do fluxo completo do CRM e transformar o dashboard em uma leitura mais estratégica para avaliação e operação.
+
+### Alterações
+
+- `src/App.tsx`
+  - adiciona um guia operacional minimizável no topo das telas autenticadas
+  - adiciona modal `Ver lógica` com a explicação do fluxo completo: dashboard, leads, campos, campanhas e mensagens IA
+  - o guia muda o foco conforme a aba ativa, ajudando o usuário a entender o que fazer em cada tela
+
+- `src/components/dashboard-screen.tsx`
+  - transforma o dashboard em cockpit estratégico
+  - adiciona diagnóstico executivo em modal sobreposto
+  - adiciona cartões de gargalo, qualidade de conversas e ação recomendada
+  - adiciona seletor interativo de etapa com volume, campanha ligada e amostra de leads
+  - torna as barras do funil clicáveis para destacar rapidamente uma etapa
+  - troca a taxa de resposta para métrica limitada a conversas com pelo menos uma resposta, evitando percentual acima de 100%
+
+- `src/styles.css`
+  - adiciona estilos do guia operacional, modal de lógica, diagnóstico executivo e cards estratégicos
+  - reforça responsividade dos novos blocos e evita overflow em modais no mobile
+
+### Validação
+
+- `npm run test`
+- `npm run lint`
+- `npm run build`
+- checagem visual desktop do dashboard em `127.0.0.1:5173`
+- checagem visual mobile do guia, modal e menu de navegação
+- conferência de console sem erros
