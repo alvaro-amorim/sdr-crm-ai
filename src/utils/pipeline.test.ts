@@ -107,6 +107,29 @@ describe('pipeline rules', () => {
     ).toEqual([]);
   });
 
+  it('rotula corretamente o responsável do workspace quando ele é obrigatório', () => {
+    const requiredFields: StageRequiredField[] = [
+      {
+        id: 'rule-2',
+        workspace_id: 'workspace-1',
+        stage_id: stage.id,
+        field_key: 'assigned_user_id',
+        custom_field_id: null,
+        created_at: new Date().toISOString(),
+      },
+    ];
+
+    expect(
+      findMissingRequiredFields({
+        lead,
+        targetStage: stage,
+        requiredFields,
+        customFields: [],
+        customValues: [],
+      }),
+    ).toEqual(['Responsável do workspace']);
+  });
+
   it('gera field_key estável e seguro', () => {
     expect(createFieldKey('Tamanho da Equipe!')).toBe('tamanho_da_equipe');
   });

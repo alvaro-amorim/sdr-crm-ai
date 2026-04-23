@@ -32,13 +32,13 @@ const STAGE_REQUIRED_RULES = [
   ['Lead Mapeado', 'job_title', null],
   ['Lead Mapeado', 'lead_source', null],
   ['Lead Mapeado', null, 'segmento'],
-  ['Conexao Iniciada', 'email', null],
-  ['Conexao Iniciada', null, 'canal_preferencial'],
+  ['Conexão Iniciada', 'email', null],
+  ['Conexão Iniciada', null, 'canal_preferencial'],
   ['Qualificado', 'phone', null],
   ['Qualificado', 'assigned_user_id', null],
   ['Qualificado', null, 'maturidade_sdr'],
-  ['Reuniao Agendada', 'notes', null],
-  ['Reuniao Agendada', null, 'stack_comercial'],
+  ['Reunião Agendada', 'notes', null],
+  ['Reunião Agendada', null, 'stack_comercial'],
 ];
 
 const CAMPAIGNS = [
@@ -584,19 +584,7 @@ async function createCustomFields(client, workspaceId) {
 }
 
 async function saveStageRequiredFields(client, workspaceId, stageMap, customFieldMap) {
-  const rows = [
-    ['Lead Mapeado', 'company', null],
-    ['Lead Mapeado', 'job_title', null],
-    ['Lead Mapeado', 'lead_source', null],
-    ['Lead Mapeado', null, 'segmento'],
-    ['Conexão Iniciada', 'email', null],
-    ['Conexão Iniciada', null, 'canal_preferencial'],
-    ['Qualificado', 'phone', null],
-    ['Qualificado', 'assigned_user_id', null],
-    ['Qualificado', null, 'maturidade_sdr'],
-    ['Reunião Agendada', 'notes', null],
-    ['Reunião Agendada', null, 'stack_comercial'],
-  ]
+  const rows = STAGE_REQUIRED_RULES
     .map(([stageName, fieldKey, customKey]) => ({
       workspace_id: workspaceId,
       stage_id: stageIdByName(stageMap, stageName),
@@ -1116,3 +1104,4 @@ main().catch((error) => {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 });
+

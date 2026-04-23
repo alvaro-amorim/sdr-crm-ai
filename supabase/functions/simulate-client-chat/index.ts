@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { z } from 'https://deno.land/x/zod@v3.23.8/mod.ts';
-import { getDeterministicConversationOutcome, mergeConversationVerdict, resolveNextOutboundPurpose } from '../../../src/lib/conversation-verdict.ts';
+import { getDeterministicConversationOutcome, mergeConversationVerdict, resolveNextOutboundPurpose } from './conversation-verdict.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,6 +30,8 @@ type AiCompletionVerdict = {
   model: string;
   usage: unknown;
 };
+
+type FallbackReason = 'openai_not_configured' | 'openai_call_failed';
 
 const aiFallbackChain: AiAttempt[] = [
   { model: 'gpt-4o-mini', temperature: 0.55, timeoutMs: 12000 },
@@ -80,6 +82,52 @@ function parseAiJson(content: string | null) {
       ? leadStageAction
       : 'keep_current',
     should_close: Boolean(parsed.should_close),
+  };
+}
+
+function buildFallbackReply(clientMessage: string) {
+  const deterministic = getDeterministicConversationOutcome(clientMessage);
+
+  if (deterministic.thread_status === 'meeting_scheduled') {
+    return {
+      message_text:
+        'Perfeito, vamos avançar com o agendamento. Pode me confirmar dois horários possíveis para esta semana que eu te envio o convite?',
+      sentiment_tag: deterministic.sentiment_tag ?? 'positive',
+      intent_tag: deterministic.intent_tag ?? 'meeting_confirmation',
+      thread_status: deterministic.thread_status ?? 'meeting_scheduled',
+      lead_stage_action: deterministic.lead_stage_action ?? 'reuniao_agendada',
+      should_close: deterministic.should_close ?? false,
+    } satisfies Omit<AiCompletionVerdict, 'model' | 'usage'>;
+  }
+
+  if (deterministic.thread_status === 'negative') {
+    return {
+      message_text:
+        'Entendido, obrigado pela transparência. Se o cenário mudar no futuro, fico à disposição para retomar com você no momento certo.',
+      sentiment_tag: deterministic.sentiment_tag ?? 'negative',
+      intent_tag: deterministic.intent_tag ?? 'closing_note',
+      thread_status: deterministic.thread_status ?? 'negative',
+      lead_stage_action: deterministic.lead_stage_action ?? 'desqualificado',
+      should_close: deterministic.should_close ?? true,
+    } satisfies Omit<AiCompletionVerdict, 'model' | 'usage'>;
+  }
+
+  return {
+    message_text:
+      'Obrigado pelo retorno. Para te responder com precisão, me confirma o principal objetivo e o prazo que vocês querem atingir com essa frente?',
+    sentiment_tag: 'neutral',
+    intent_tag: 'qualification_follow_up',
+    thread_status: 'open',
+    lead_stage_action: 'keep_current',
+    should_close: false,
+  } satisfies Omit<AiCompletionVerdict, 'model' | 'usage'>;
+}
+
+function fallbackVerdict(clientMessage: string, reason: FallbackReason): AiCompletionVerdict {
+  return {
+    ...buildFallbackReply(clientMessage),
+    model: reason === 'openai_not_configured' ? 'fallback-rule-engine:missing-openai-key' : 'fallback-rule-engine:openai-recovery',
+    usage: null,
   };
 }
 
@@ -183,7 +231,7 @@ serve(async (request) => {
   const publishableKey = Deno.env.get('SUPABASE_ANON_KEY');
   const openAiKey = Deno.env.get('OPENAI_API_KEY');
 
-  if (!supabaseUrl || !publishableKey || !openAiKey) {
+  if (!supabaseUrl || !publishableKey) {
     return json(500, { success: false, error: 'Servico de simulacao nao configurado.' });
   }
 
@@ -230,7 +278,18 @@ serve(async (request) => {
   });
 
   try {
-    const generated = mergeConversationVerdict(parsed.data.message, await callOpenAiWithFallback(openAiKey, prompt));
+    let completion: AiCompletionVerdict;
+    if (openAiKey) {
+      try {
+        completion = await callOpenAiWithFallback(openAiKey, prompt);
+      } catch (_openAiError) {
+        completion = fallbackVerdict(parsed.data.message, 'openai_call_failed');
+      }
+    } else {
+      completion = fallbackVerdict(parsed.data.message, 'openai_not_configured');
+    }
+
+    const generated = mergeConversationVerdict(parsed.data.message, completion);
     const promptPurpose = resolveNextOutboundPurpose({
       history: [...messages, { direction: 'inbound', sentiment_tag: generated.sentiment_tag }],
       threadStatus: generated.thread_status,
@@ -259,6 +318,7 @@ serve(async (request) => {
         thread: { ...thread, ...(saved.thread ?? {}) },
         messages: saved.messages,
         generated_model: generated.model,
+        used_fallback: generated.model.startsWith('fallback-rule-engine'),
       },
     });
   } catch (_error) {

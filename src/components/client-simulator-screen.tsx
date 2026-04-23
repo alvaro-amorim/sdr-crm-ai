@@ -1,7 +1,7 @@
 import { ArrowLeft, Bot, RefreshCcw, Send, UserRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import type { ConversationMessage, ConversationThread, Campaign, Lead } from '../types/domain';
+import type { Campaign, ConversationMessage, ConversationThread, Lead } from '../types/domain';
 import { formatDateTime } from '../utils/crm-ui';
 
 type SimulatorThread = ConversationThread & {
@@ -13,6 +13,7 @@ type SimulatorPayload = {
   thread: SimulatorThread;
   messages: ConversationMessage[];
   generated_model?: string;
+  used_fallback?: boolean;
 };
 
 function getTokenFromUrl() {
@@ -28,6 +29,17 @@ function getChannelLabel(channel: string | null | undefined) {
     default:
       return 'E-mail simulado';
   }
+}
+
+function getFriendlySimulatorError(error: unknown) {
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('Edge Function returned a non-2xx status code')) {
+    return 'A simulação não conseguiu gerar a resposta da IA nesta tentativa. Tente novamente.';
+  }
+  if (message.includes('Failed to fetch')) {
+    return 'Falha de conexão ao chamar a simulação. Verifique a internet e tente novamente.';
+  }
+  return message || 'Falha ao responder como cliente.';
 }
 
 export function ClientSimulatorScreen() {
@@ -49,7 +61,7 @@ export function ClientSimulatorScreen() {
       if (!data?.success) throw new Error(data?.error ?? 'Falha ao carregar conversa.');
       setPayload(data.data);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Falha ao carregar simulador.');
+      setError(getFriendlySimulatorError(loadError));
     } finally {
       setBusy(false);
     }
@@ -58,18 +70,57 @@ export function ClientSimulatorScreen() {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase || !reply.trim()) return;
+
+    const trimmedReply = reply.trim();
+    const optimisticMessage: ConversationMessage | null = payload
+      ? {
+          id: `optimistic-${Date.now()}`,
+          workspace_id: payload.thread.workspace_id,
+          thread_id: payload.thread.id,
+          lead_id: payload.thread.lead_id,
+          campaign_id: payload.thread.campaign_id,
+          direction: 'inbound',
+          sender_type: 'client',
+          sender_name: payload.thread.leads?.name ?? 'Cliente',
+          message_text: trimmedReply,
+          model_name: null,
+          prompt_purpose: null,
+          sentiment_tag: null,
+          intent_tag: null,
+          generated_by: 'user',
+          token_usage: null,
+          created_at: new Date().toISOString(),
+        }
+      : null;
+
+    if (optimisticMessage) {
+      setPayload((current) => (current ? { ...current, messages: [...current.messages, optimisticMessage] } : current));
+    }
+
+    setReply('');
     setBusy(true);
     setError(null);
+
     try {
       const { data, error: functionError } = await supabase.functions.invoke('simulate-client-chat', {
-        body: { token, message: reply.trim() },
+        body: { token, message: trimmedReply },
       });
       if (functionError) throw functionError;
       if (!data?.success) throw new Error(data?.error ?? 'Falha ao gerar resposta.');
       setPayload(data.data);
-      setReply('');
     } catch (replyError) {
-      setError(replyError instanceof Error ? replyError.message : 'Falha ao responder como cliente.');
+      setError(getFriendlySimulatorError(replyError));
+      if (optimisticMessage) {
+        setPayload((current) =>
+          current
+            ? {
+                ...current,
+                messages: current.messages.filter((message) => message.id !== optimisticMessage.id),
+              }
+            : current,
+        );
+      }
+      setReply(trimmedReply);
     } finally {
       setBusy(false);
     }

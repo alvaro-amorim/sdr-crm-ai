@@ -22,6 +22,7 @@ export type WorkspaceMember = {
   user_id: string;
   role: 'owner' | 'member';
   created_at: string;
+  profile_full_name?: string | null;
   workspaces?: Workspace;
 };
 
@@ -157,6 +158,7 @@ export type ConversationMessage = {
 
 export type CrmData = {
   workspace: Workspace;
+  workspaceMembers: WorkspaceMember[];
   stages: PipelineStage[];
   requiredFields: StageRequiredField[];
   customFields: WorkspaceCustomField[];
