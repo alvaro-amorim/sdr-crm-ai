@@ -552,7 +552,12 @@ export function MessagesScreen({
             </select>
           </label>
 
-          <button type="button" onClick={generateMessages} disabled={busy || !leadId || data.leads.length === 0 || activeCampaigns.length === 0}>
+          <button
+            type="button"
+            className="message-primary-action"
+            onClick={generateMessages}
+            disabled={busy || !leadId || data.leads.length === 0 || activeCampaigns.length === 0}
+          >
             <Sparkles aria-hidden />
             {busy ? 'Gerando mensagens...' : 'Gerar mensagens'}
           </button>
@@ -574,8 +579,27 @@ export function MessagesScreen({
           </span>
         </div>
 
+        <article className={`message-simulator-cta ${activeSimulatorThread ? 'message-simulator-cta-ready' : ''}`}>
+          <span className="section-kicker">Janela do cliente</span>
+          <strong>{activeSimulatorThread ? 'Simulador pronto para demonstração' : 'Abra o chat assim que houver uma thread simulável'}</strong>
+          <p>
+            {activeSimulatorThread
+              ? 'Use esta janela para agir como cliente, validar o tempo de resposta da IA e mostrar a conversa em tempo real.'
+              : 'Gere mensagens ou use uma conversa existente para abrir a experiência do cliente em outra janela.'}
+          </p>
+          <button
+            type="button"
+            className="secondary message-launch-button"
+            onClick={() => void openClientSimulator(activeSimulatorThread)}
+            disabled={!activeSimulatorThread || simulatorLinkBusy}
+          >
+            <ExternalLink aria-hidden />
+            {simulatorLinkBusy ? 'Abrindo simulador...' : 'Abrir simulador'}
+          </button>
+        </article>
+
         <div className="message-overview-grid">
-          <article className="overview-card">
+          <article className="overview-card message-overview-card message-overview-card-lead">
             <div className="overview-card-topline">
               <span className="section-kicker">Lead selecionado</span>
               <Building2 aria-hidden />
@@ -595,7 +619,7 @@ export function MessagesScreen({
             )}
           </article>
 
-          <article className="overview-card">
+          <article className="overview-card message-overview-card message-overview-card-campaign">
             <div className="overview-card-topline">
               <span className="section-kicker">Campanha em uso</span>
               <Workflow aria-hidden />
@@ -614,7 +638,7 @@ export function MessagesScreen({
             )}
           </article>
 
-          <article className="overview-card overview-card-accent">
+          <article className="overview-card overview-card-accent message-overview-card message-overview-card-evaluation">
             <div className="overview-card-topline">
               <span className="section-kicker">Leitura da avaliação</span>
               <Activity aria-hidden />
@@ -638,7 +662,7 @@ export function MessagesScreen({
           </div>
           <button
             type="button"
-            className="ghost compact"
+            className="ghost compact message-launch-button-inline"
             onClick={() => void openClientSimulator(activeSimulatorThread)}
             disabled={!activeSimulatorThread || simulatorLinkBusy}
           >

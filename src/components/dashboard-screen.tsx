@@ -494,21 +494,25 @@ export function DashboardScreen({
         <div className="dashboard-hero-side">
           {primaryInsight && (
             <article className="dashboard-priority-card">
-              <span className="dashboard-priority-kicker">{primaryInsight.title}</span>
+              <div className="dashboard-priority-head">
+                <span className="dashboard-priority-kicker">{primaryInsight.title}</span>
+                <Sparkles aria-hidden />
+              </div>
               <strong>{primaryInsight.value}</strong>
               <p>{primaryInsight.detail}</p>
+              <span className="dashboard-priority-note">Decisão principal do cockpit para a próxima rodada da demo.</span>
             </article>
           )}
           <div className="dashboard-hero-highlights">
-            <div className="dashboard-highlight-card">
+            <div className="dashboard-highlight-card dashboard-highlight-card-focus">
               <small>Próxima leitura útil</small>
               <strong>{bottleneck ? `Priorizar ${bottleneck.stage.name}` : 'Crie leads para iniciar a leitura'}</strong>
             </div>
-            <div className="dashboard-highlight-card">
+            <div className="dashboard-highlight-card dashboard-highlight-card-contact">
               <small>Status do contato</small>
               <strong>{leadsInContact} lead(s) em tentativa ativa</strong>
             </div>
-            <div className="dashboard-highlight-card">
+            <div className="dashboard-highlight-card dashboard-highlight-card-timeline">
               <small>Último sinal de conversa</small>
               <strong>{mostRecentConversation ? formatDateTime(mostRecentConversation.created_at) : 'Sem conversa registrada'}</strong>
             </div>
@@ -578,7 +582,10 @@ export function DashboardScreen({
         </div>
         <div className="dashboard-shortcut-groups">
           {shortcutGroups.map((group) => (
-            <section key={group.id} className="dashboard-shortcut-group">
+            <section
+              key={group.id}
+              className={`dashboard-shortcut-group ${group.id === 'act-now' ? 'dashboard-shortcut-group-urgent' : 'dashboard-shortcut-group-pipeline'}`}
+            >
               <div className="dashboard-shortcut-group-heading">
                 <div>
                   <strong>{group.title}</strong>
@@ -666,7 +673,7 @@ export function DashboardScreen({
       </section>
 
       <div className="dashboard-grid">
-        <section className="panel dashboard-funnel-panel">
+        <section className="panel dashboard-funnel-panel dashboard-funnel-panel-primary">
           <div className="panel-heading">
             <div>
               <span className="section-kicker">Funil atual</span>
@@ -695,7 +702,7 @@ export function DashboardScreen({
           </div>
         </section>
 
-        <section className="panel activity-panel">
+        <section className="panel activity-panel dashboard-activity-panel">
           <div className="panel-heading">
             <div>
               <span className="section-kicker">Narrativa da operação</span>

@@ -1064,11 +1064,17 @@ h3 {
 .dashboard-hero {
   align-items: stretch;
   background:
-    linear-gradient(135deg, rgba(29, 95, 99, 0.1), rgba(29, 95, 99, 0.03)),
+    radial-gradient(circle at top left, rgba(243, 195, 95, 0.18), transparent 28%),
+    linear-gradient(135deg, rgba(29, 95, 99, 0.16), rgba(29, 95, 99, 0.04)),
     #ffffff;
+  border-color: rgba(29, 95, 99, 0.12);
+  border-radius: 24px;
+  box-shadow: 0 24px 70px rgba(20, 39, 37, 0.1);
   gap: 28px;
   grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr);
+  overflow: hidden;
   padding: 28px;
+  position: relative;
 }
 
 .dashboard-hero-strategic {
@@ -1081,8 +1087,8 @@ h3 {
 }
 
 .dashboard-hero-copy p {
-  color: #50605d;
-  font-size: 1.02rem;
+  color: #425351;
+  font-size: 1.06rem;
   max-width: 60ch;
 }
 
@@ -1093,10 +1099,11 @@ h3 {
 }
 
 .dashboard-context-chip {
-  background: rgba(29, 95, 99, 0.07);
-  border: 1px solid rgba(29, 95, 99, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(29, 95, 99, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
   border-radius: 999px;
-  color: #295356;
+  color: #214d51;
   font-size: 0.8rem;
   font-weight: 800;
   padding: 8px 12px;
@@ -1116,13 +1123,27 @@ h3 {
 
 .dashboard-priority-card {
   background: linear-gradient(145deg, #1d5f63, #163f41);
-  border: 1px solid rgba(16, 32, 30, 0.08);
-  border-radius: 18px;
-  box-shadow: 0 20px 52px rgba(20, 44, 43, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+  box-shadow: 0 24px 60px rgba(20, 44, 43, 0.24);
   color: #ffffff;
   display: grid;
   gap: 10px;
-  padding: 20px;
+  padding: 22px;
+  position: relative;
+}
+
+.dashboard-priority-head {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.dashboard-priority-head svg {
+  color: #f7d57a;
+  height: 18px;
+  width: 18px;
 }
 
 .dashboard-priority-kicker {
@@ -1143,6 +1164,12 @@ h3 {
   line-height: 1.5;
 }
 
+.dashboard-priority-note {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .dashboard-hero-highlights {
   display: grid;
   gap: 12px;
@@ -1153,7 +1180,7 @@ h3 {
 .chat-summary-card {
   background: #f8fbfa;
   border: 1px solid #e1e9e6;
-  border-radius: 14px;
+  border-radius: 18px;
   display: grid;
   gap: 6px;
   padding: 16px;
@@ -1174,6 +1201,25 @@ h3 {
 .overview-card,
 .chat-summary-card {
   min-height: 132px;
+}
+
+.dashboard-highlight-card {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.dashboard-highlight-card-focus {
+  background: linear-gradient(135deg, rgba(29, 95, 99, 0.1), rgba(255, 255, 255, 0.92));
+  border-color: rgba(29, 95, 99, 0.18);
+}
+
+.dashboard-highlight-card-contact {
+  background: linear-gradient(135deg, rgba(243, 195, 95, 0.16), rgba(255, 255, 255, 0.96));
+  border-color: rgba(212, 166, 70, 0.18);
+}
+
+.dashboard-highlight-card-timeline {
+  background: linear-gradient(135deg, rgba(57, 112, 163, 0.12), rgba(255, 255, 255, 0.96));
+  border-color: rgba(108, 147, 187, 0.2);
 }
 
 .overview-card:hover,
@@ -1240,8 +1286,20 @@ h3 {
 }
 
 .dashboard-shortcut-group {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 251, 250, 0.96));
+  border: 1px solid #dfe8e5;
+  border-radius: 20px;
   display: grid;
   gap: 12px;
+  padding: 18px;
+}
+
+.dashboard-shortcut-group-urgent {
+  background: linear-gradient(180deg, rgba(255, 250, 241, 0.95), rgba(255, 255, 255, 0.98));
+}
+
+.dashboard-shortcut-group-pipeline {
+  background: linear-gradient(180deg, rgba(244, 249, 255, 0.92), rgba(255, 255, 255, 0.98));
 }
 
 .dashboard-shortcut-group-heading {
@@ -1275,14 +1333,14 @@ h3 {
   align-items: start;
   background: #f8fbfa;
   border: 1px solid #dfe8e5;
-  border-radius: 16px;
+  border-radius: 18px;
   color: inherit;
   cursor: pointer;
   display: grid;
   gap: 12px;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  min-height: 156px;
-  padding: 18px;
+  min-height: 168px;
+  padding: 20px;
   position: relative;
   text-align: left;
   transition:
@@ -1429,6 +1487,7 @@ h3 {
 }
 
 .dashboard-control-panel {
+  background: linear-gradient(180deg, #ffffff, #fbfcfc);
   display: grid;
   gap: 16px;
 }
@@ -1444,7 +1503,7 @@ h3 {
 }
 
 .selected-stage-card-primary {
-  background: linear-gradient(180deg, #ffffff, #f8fbfa);
+  background: linear-gradient(180deg, rgba(29, 95, 99, 0.08), #ffffff 34%, #f8fbfa);
   border-color: rgba(29, 95, 99, 0.2);
 }
 
@@ -1478,11 +1537,21 @@ h3 {
 .dashboard-funnel-panel,
 .activity-panel {
   align-content: start;
-  border-radius: 18px;
+  border-radius: 22px;
 }
 
 .activity-panel {
   background: linear-gradient(180deg, #ffffff, #fbfcfc);
+}
+
+.dashboard-funnel-panel-primary {
+  background: linear-gradient(180deg, rgba(29, 95, 99, 0.06), #ffffff 18%, #fbfcfc);
+  border-color: rgba(29, 95, 99, 0.14);
+}
+
+.dashboard-activity-panel {
+  background: linear-gradient(180deg, rgba(255, 250, 241, 0.78), #ffffff 20%, #fbfcfc);
+  border-color: rgba(215, 188, 129, 0.18);
 }
 
 .panel-heading {
@@ -1732,7 +1801,7 @@ h3 {
   align-items: start;
   background: #f8fbfa;
   border: 1px solid #e1e9e6;
-  border-radius: 8px;
+  border-radius: 16px;
   display: grid;
   gap: 12px;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -1782,6 +1851,12 @@ h3 {
 }
 
 .message-workbench {
+  background:
+    radial-gradient(circle at top right, rgba(243, 195, 95, 0.12), transparent 22%),
+    linear-gradient(180deg, rgba(29, 95, 99, 0.05), #ffffff 18%);
+  border-color: rgba(29, 95, 99, 0.12);
+  border-radius: 24px;
+  box-shadow: 0 24px 70px rgba(20, 39, 37, 0.08);
   gap: 18px;
 }
 
@@ -2179,6 +2254,10 @@ h3 {
   grid-template-columns: minmax(0, 1.2fr) minmax(240px, 0.8fr) auto;
 }
 
+.message-primary-action {
+  min-width: 190px;
+}
+
 .autocomplete-field,
 .lead-selector-field {
   display: grid;
@@ -2308,7 +2387,7 @@ h3 {
   align-items: center;
   background: #f8fbfa;
   border: 1px solid #e1e9e6;
-  border-radius: 8px;
+  border-radius: 18px;
   display: grid;
   gap: 10px;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2330,6 +2409,38 @@ h3 {
   background: linear-gradient(145deg, rgba(29, 95, 99, 0.06), rgba(29, 95, 99, 0.01)), #f8fbfa;
 }
 
+.message-simulator-cta {
+  background: linear-gradient(145deg, #102a2d, #1a484c);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  box-shadow: 0 22px 52px rgba(11, 28, 30, 0.22);
+  color: #ffffff;
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+}
+
+.message-simulator-cta p {
+  color: rgba(235, 246, 243, 0.84);
+  line-height: 1.55;
+}
+
+.message-simulator-cta strong {
+  font-size: 1.1rem;
+  line-height: 1.25;
+}
+
+.message-simulator-cta-ready {
+  background:
+    radial-gradient(circle at top right, rgba(243, 195, 95, 0.18), transparent 22%),
+    linear-gradient(145deg, #113338, #1c5358);
+}
+
+.message-launch-button {
+  min-width: 0;
+  width: 100%;
+}
+
 .message-overview-grid {
   display: grid;
   gap: 14px;
@@ -2338,6 +2449,25 @@ h3 {
 
 .overview-card {
   gap: 10px;
+}
+
+.message-overview-card {
+  border-radius: 20px;
+  min-height: 156px;
+}
+
+.message-overview-card-lead {
+  background: linear-gradient(180deg, rgba(29, 95, 99, 0.06), #ffffff 26%);
+}
+
+.message-overview-card-campaign {
+  background: linear-gradient(180deg, rgba(57, 112, 163, 0.06), #ffffff 26%);
+}
+
+.message-overview-card-evaluation {
+  background:
+    linear-gradient(145deg, rgba(243, 195, 95, 0.12), rgba(29, 95, 99, 0.05)),
+    #f8fbfa;
 }
 
 .overview-card strong,
@@ -2769,14 +2899,18 @@ h3 {
 
 .message-grid {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
 }
 
 .message-card {
+  background: linear-gradient(180deg, #ffffff, #fbfcfc);
+  border-color: rgba(29, 95, 99, 0.12);
+  border-radius: 20px;
+  box-shadow: 0 18px 44px rgba(21, 36, 34, 0.08);
   display: grid;
   gap: 12px;
-  padding: 16px;
+  padding: 18px;
 }
 
 .message-card p {
@@ -2784,8 +2918,16 @@ h3 {
 }
 
 .conversation-preview-panel {
+  background: linear-gradient(180deg, rgba(16, 42, 45, 0.05), #ffffff 24%, #fbfcfc);
+  border-color: rgba(29, 95, 99, 0.12);
+  border-radius: 24px;
+  box-shadow: 0 24px 70px rgba(20, 39, 37, 0.08);
   display: grid;
   gap: 18px;
+}
+
+.message-launch-button-inline {
+  min-width: 168px;
 }
 
 .conversation-preview-layout {
@@ -2800,9 +2942,9 @@ h3 {
 }
 
 .conversation-preview-meta article {
-  background: #f4f8f6;
+  background: linear-gradient(180deg, #ffffff, #f4f8f6);
   border: 1px solid #dbe5e1;
-  border-radius: 8px;
+  border-radius: 16px;
   display: grid;
   gap: 7px;
   padding: 14px;
@@ -2817,7 +2959,7 @@ h3 {
 .conversation-preview-thread {
   background: linear-gradient(180deg, #edf4f1, #ffffff);
   border: 1px solid #d9e2de;
-  border-radius: 8px;
+  border-radius: 18px;
   display: grid;
   gap: 10px;
   max-height: 390px;
@@ -2837,7 +2979,7 @@ h3 {
 
 .conversation-preview-bubble {
   background: #155f61;
-  border-radius: 8px;
+  border-radius: 16px;
   color: #ffffff;
   display: grid;
   gap: 6px;
