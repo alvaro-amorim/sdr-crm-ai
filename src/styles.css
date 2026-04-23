@@ -296,11 +296,12 @@ h3 {
 }
 
 .auth-proof-grid {
+  align-self: start;
   display: grid;
   grid-area: proof;
   gap: 12px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: -18px;
+  margin-top: -44px;
   max-width: 960px;
 }
 
