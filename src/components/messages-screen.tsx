@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { resolveNextOutboundPurpose } from '../lib/conversation-verdict';
 import { supabase, supabaseEnv } from '../lib/supabase';
-import { moveLead } from '../services/crm';
+import { moveLead, runStageTriggerAutomation, type StageTriggerAutomationResult } from '../services/crm';
 import type {
   Campaign,
   ConversationMessage,
@@ -15,6 +15,7 @@ import type {
   SentMessageEvent,
 } from '../types/domain';
 import { findStageByName, formatDateTime, getLeadChannel, getLeadMetaLine } from '../utils/crm-ui';
+import { buildStageAutomationErrorWarning } from '../utils/stage-automation-feedback';
 
 function formatDeliveryStatus(status: SentMessageEvent['delivery_status']) {
   switch (status) {
@@ -269,6 +270,8 @@ export function MessagesScreen({
       return;
     }
 
+    setError(null);
+
     try {
       setSimulationBusy(true);
       const existingThread =
@@ -371,8 +374,47 @@ export function MessagesScreen({
       if (threadUpdateError) throw threadUpdateError;
 
       await moveLead(supabase, data.workspace.id, message.lead_id, targetStage.id);
+      let automation: StageTriggerAutomationResult = {
+        generatedCampaignNames: [],
+        skippedCampaignNames: [],
+        failedCampaigns: [],
+      };
+      let automationErrorWarning: string | null = null;
+
+      try {
+        automation = await runStageTriggerAutomation(supabase, {
+          workspaceId: data.workspace.id,
+          leadId: message.lead_id,
+          stageId: targetStage.id,
+          skipCampaignIds: [message.campaign_id],
+        });
+      } catch (automationError) {
+        automationErrorWarning = buildStageAutomationErrorWarning(
+          'Simulacao salva, mas o gatilho automatico nao pode ser concluido',
+          automationError,
+        );
+      }
+
+      if (automationErrorWarning) {
+        setError(automationErrorWarning);
+      }
+
       setSimulationMessage(null);
-      setNotice('Simulação registrada no chat. Lead movido para Tentando Contato.');
+      const noticeParts = ['Simulação registrada no chat. Lead movido para Tentando Contato.'];
+      if (automation.generatedCampaignNames.length === 1) {
+        noticeParts.push(`Mensagens geradas automaticamente para ${automation.generatedCampaignNames[0]}.`);
+      } else if (automation.generatedCampaignNames.length > 1) {
+        noticeParts.push(`${automation.generatedCampaignNames.length} campanhas geraram mensagens automaticamente.`);
+      }
+
+      setNotice(noticeParts.join(' '));
+
+      if (automation.failedCampaigns.length > 0) {
+        setError(
+          `Simulação salva, mas o gatilho automático falhou em: ${automation.failedCampaigns.map((item) => item.name).join(', ')}.`,
+        );
+      }
+
       await onReload();
     } catch (sendError) {
       setError(sendError instanceof Error ? sendError.message : 'Falha inesperada ao simular envio.');

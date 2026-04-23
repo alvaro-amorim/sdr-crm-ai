@@ -29,17 +29,20 @@ import {
 import { DashboardScreen } from './components/dashboard-screen';
 import { ClientSimulatorScreen } from './components/client-simulator-screen';
 import { MessagesScreen } from './components/messages-screen';
-import { envError, supabase, supabaseEnv } from './lib/supabase';
+import { envError, supabase } from './lib/supabase';
 import {
   createWorkspaceWithDefaults,
   getFirstWorkspace,
+  invokeAuthenticatedFunction as invokeEdgeFunction,
   loadCrmData,
   moveLead,
+  runStageTriggerAutomation,
   saveRequiredFields,
   upsertCampaign,
   upsertLead,
   type CampaignInput,
   type LeadInput,
+  type StageTriggerAutomationResult,
 } from './services/crm';
 import type {
   Campaign,
@@ -49,6 +52,7 @@ import type {
 } from './types/domain';
 import { getLeadMetaLine } from './utils/crm-ui';
 import { createFieldKey, findMissingRequiredFields, STANDARD_LEAD_FIELDS } from './utils/pipeline';
+import { buildStageAutomationErrorWarning, buildStageAutomationFeedback } from './utils/stage-automation-feedback';
 
 type Tab = 'dashboard' | 'leads' | 'fields' | 'campaigns' | 'messages';
 
@@ -115,6 +119,26 @@ function getSafeMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Falha inesperada. Tente novamente.';
 }
 
+function getWorkspaceMemberDisplayName(member: CrmData['workspaceMembers'][number], user?: User): string {
+  const profileName = member.profile_full_name?.trim();
+  if (profileName) return profileName;
+
+  const metadataName = typeof user?.user_metadata?.full_name === 'string' ? user.user_metadata.full_name.trim() : '';
+  if (user && member.user_id === user.id) {
+    return metadataName || user.email || 'Você';
+  }
+
+  return member.role === 'owner' ? 'Owner do workspace' : 'Membro do workspace';
+}
+
+function getAssignedWorkspaceOwnerLabel(lead: Lead, data: CrmData, user?: User): string | null {
+  if (!lead.assigned_user_id) return null;
+  const member = data.workspaceMembers.find((item) => item.user_id === lead.assigned_user_id);
+  if (!member) return 'Usuário do workspace';
+  return getWorkspaceMemberDisplayName(member, user);
+}
+
+/*
 async function invokeAuthenticatedFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
   if (!supabase || !supabaseEnv) {
     throw new Error('Supabase não configurado.');
@@ -144,6 +168,7 @@ async function invokeAuthenticatedFunction<T>(name: string, body: Record<string,
 
   return payload as T;
 }
+*/
 
 function getAuthRedirectTo(): string {
   return window.location.origin;
@@ -1006,6 +1031,7 @@ function LeadsView({
   const stageById = useMemo(() => new Map(data.stages.map((stage) => [stage.id, stage])), [data.stages]);
   const selectedLead = data.leads.find((lead) => lead.id === selectedLeadId) ?? null;
   const selectedLeadStage = selectedLead ? stageById.get(selectedLead.current_stage_id) ?? null : null;
+  const selectedLeadWorkspaceOwner = selectedLead ? getAssignedWorkspaceOwnerLabel(selectedLead, data, user) : null;
   const selectedLeadMissing = selectedLead && selectedLeadStage
     ? findMissingRequiredFields({
         lead: selectedLead,
@@ -1060,9 +1086,55 @@ function LeadsView({
       return;
     }
 
+    setError(null);
+
     try {
       await moveLead(supabase, data.workspace.id, lead.id, targetStage.id);
-      setNotice(`Lead movido para ${targetStage.name}.`);
+      const successMessage = `Lead movido para ${targetStage.name}`;
+      let automation: StageTriggerAutomationResult = {
+        generatedCampaignNames: [],
+        skippedCampaignNames: [],
+        failedCampaigns: [],
+      };
+      let feedback = {
+        notice: `${successMessage}.`,
+        warning: null as string | null,
+      };
+
+      try {
+        automation = await runStageTriggerAutomation(supabase, {
+          workspaceId: data.workspace.id,
+          leadId: lead.id,
+          stageId: targetStage.id,
+        });
+
+        feedback = buildStageAutomationFeedback({
+          successMessage,
+          failurePrefix: 'Lead movido, mas o gatilho automatico falhou em',
+          automation,
+        });
+      } catch (automationError) {
+        feedback = {
+          notice: `${successMessage}.`,
+          warning: buildStageAutomationErrorWarning(
+            'Lead movido, mas o gatilho automatico nao pode ser concluido',
+            automationError,
+          ),
+        };
+      }
+
+      setNotice(feedback.notice);
+
+      if (feedback.warning && automation.failedCampaigns.length > 0) {
+        setError(
+          `Lead movido, mas o gatilho automático falhou em: ${automation.failedCampaigns.map((item) => item.name).join(', ')}.`,
+        );
+      }
+
+      if (feedback.warning && automation.failedCampaigns.length === 0) {
+        setError(feedback.warning);
+      }
+
       await onReload();
     } catch (moveError) {
       setError(getSafeMessage(moveError));
@@ -1114,9 +1186,9 @@ function LeadsView({
           user={user}
           lead={editingLead}
           onCancel={() => setEditingLead(null)}
-          onSaved={() => {
+          onSaved={(noticeMessage) => {
             setEditingLead(null);
-            setNotice('Lead salvo.');
+            setNotice(noticeMessage ?? 'Lead salvo.');
             void onReload();
           }}
           setError={setError}
@@ -1149,6 +1221,11 @@ function LeadsView({
                   <strong>Contato principal</strong>
                   <p>{selectedLead.email ?? selectedLead.phone ?? 'Contato não informado'}</p>
                   <span>Origem: {selectedLead.lead_source || 'Não informada'}</span>
+                </article>
+                <article className="chat-summary-card">
+                  <strong>Responsáveis</strong>
+                  <p>{selectedLead.technical_owner_name || 'Sem responsável técnico'}</p>
+                  <span>{selectedLeadWorkspaceOwner ? `Workspace: ${selectedLeadWorkspaceOwner}` : 'Sem responsável do workspace'}</span>
                 </article>
                 <article className="chat-summary-card">
                   <strong>Checklist da etapa</strong>
@@ -1200,7 +1277,7 @@ function LeadForm({
   user: User;
   lead: Lead | null;
   onCancel: () => void;
-  onSaved: () => void;
+  onSaved: (noticeMessage?: string) => void;
   setError: (message: string | null) => void;
 }) {
   const initial = useMemo(() => {
@@ -1231,6 +1308,21 @@ function LeadForm({
   const [form, setForm] = useState<LeadInput>(initial);
   const [confirmUnassignedOpen, setConfirmUnassignedOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const workspaceMemberOptions = useMemo(
+    () =>
+      [...data.workspaceMembers]
+        .sort((left, right) =>
+          getWorkspaceMemberDisplayName(left, user).localeCompare(getWorkspaceMemberDisplayName(right, user), 'pt-BR', {
+            sensitivity: 'base',
+          }),
+        )
+        .map((member) => ({
+          value: member.user_id,
+          label: getWorkspaceMemberDisplayName(member, user),
+          role: member.role,
+        })),
+    [data.workspaceMembers, user],
+  );
 
   useEffect(() => setForm(initial), [initial]);
 
@@ -1239,9 +1331,53 @@ function LeadForm({
 
     try {
       setSaving(true);
-      await upsertLead(supabase, data.workspace, user, form);
+      setError(null);
+      const savedLead = await upsertLead(supabase, data.workspace, user, form);
       setConfirmUnassignedOpen(false);
-      onSaved();
+      const successMessage = lead ? 'Lead atualizado' : 'Lead cadastrado';
+      let automation: StageTriggerAutomationResult = {
+        generatedCampaignNames: [],
+        skippedCampaignNames: [],
+        failedCampaigns: [],
+      };
+      let feedback = {
+        notice: `${successMessage}.`,
+        warning: null as string | null,
+      };
+
+      try {
+        automation = await runStageTriggerAutomation(supabase, {
+          workspaceId: data.workspace.id,
+          leadId: savedLead.id,
+          stageId: savedLead.current_stage_id,
+        });
+
+        feedback = buildStageAutomationFeedback({
+          successMessage,
+          failurePrefix: 'Lead salvo, mas o gatilho automatico falhou em',
+          automation,
+        });
+      } catch (automationError) {
+        feedback = {
+          notice: `${successMessage}.`,
+          warning: buildStageAutomationErrorWarning(
+            'Lead salvo, mas o gatilho automatico nao pode ser concluido',
+            automationError,
+          ),
+        };
+      }
+
+      if (feedback.warning && automation.failedCampaigns.length > 0) {
+        setError(
+          `Lead salvo, mas o gatilho automático falhou em: ${automation.failedCampaigns.map((item) => item.name).join(', ')}.`,
+        );
+      }
+
+      if (feedback.warning && automation.failedCampaigns.length === 0) {
+        setError(feedback.warning);
+      }
+
+      onSaved(feedback.notice);
     } catch (saveError) {
       setError(getSafeMessage(saveError));
     } finally {
@@ -1364,6 +1500,25 @@ function LeadForm({
         />
         <span className="field-hint">
           Informe quem acompanha tecnicamente este lead. Ex.: Álvaro Martins ou Marina Costa. Se ficar em branco, o lead será salvo sem responsável técnico.
+        </span>
+      </label>
+      <label>
+        Responsável do workspace
+        <select
+          name="leadAssignedWorkspaceUser"
+          value={form.assigned_user_id ?? ''}
+          onChange={(event) => setForm({ ...form, assigned_user_id: event.target.value || null })}
+        >
+          <option value="">Sem responsável do workspace</option>
+          {workspaceMemberOptions.map((member) => (
+            <option key={member.value} value={member.value}>
+              {member.label}
+              {member.role === 'owner' ? ' (owner)' : ''}
+            </option>
+          ))}
+        </select>
+        <span className="field-hint">
+          Atribua o lead a um usuário do workspace quando fizer sentido operacional. Ex.: Você ou Owner do workspace.
         </span>
       </label>
       <label className="wide">
@@ -1500,6 +1655,7 @@ function LeadCard({
   onMove: (lead: Lead, stage: PipelineStage) => void;
 }) {
   const currentStage = data.stages.find((stage) => stage.id === lead.current_stage_id) ?? null;
+  const assignedWorkspaceOwner = getAssignedWorkspaceOwnerLabel(lead, data);
   const missing = currentStage
     ? findMissingRequiredFields({
         lead,
@@ -1543,6 +1699,9 @@ function LeadCard({
         <span className="lead-tag">{lead.lead_source || 'Origem não informada'}</span>
         <span className="lead-tag">
           {lead.technical_owner_name ? `Resp. técnico: ${lead.technical_owner_name}` : 'Sem responsável técnico'}
+        </span>
+        <span className="lead-tag">
+          {assignedWorkspaceOwner ? `Resp. workspace: ${assignedWorkspaceOwner}` : 'Sem responsável do workspace'}
         </span>
       </div>
 
@@ -2018,20 +2177,22 @@ function CampaignForm({
   }, [campaign]);
 
   async function generatePlan() {
+    if (!supabase) return;
     if (!form.name.trim() || !form.context_text.trim()) {
       setError('Nome e contexto são obrigatórios para montar o plano da campanha.');
       return;
     }
 
+    const supabaseClient = supabase;
     setPlanningBusy(true);
     setError(null);
 
     try {
-      const result = await invokeAuthenticatedFunction<{
+      const result = await invokeEdgeFunction<{
         success: boolean;
         error?: string;
         data?: CampaignStrategyPlan & { model: string };
-      }>('plan-campaign-strategy', {
+      }>(supabaseClient, 'plan-campaign-strategy', {
         workspace_id: data.workspace.id,
         name: form.name,
         context_text: form.context_text,
