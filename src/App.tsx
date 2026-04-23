@@ -693,7 +693,6 @@ function AuthScreen({ authError }: { authError?: string | null }) {
             </button>
           )}
         </div>
-        <p className="auth-form-note">Fluxo em português, pensado para demo técnica em desktop e mobile.</p>
       </form>
       <div className="auth-proof-grid">
         {authHighlights.map((item) => {

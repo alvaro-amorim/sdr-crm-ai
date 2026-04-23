@@ -244,7 +244,7 @@ h3 {
   background-position: center;
   background-size: cover;
   display: grid;
-  gap: 32px;
+  gap: 28px;
   grid-template-areas:
     "copy form"
     "proof form";
@@ -300,6 +300,7 @@ h3 {
   grid-area: proof;
   gap: 12px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: -18px;
   max-width: 960px;
 }
 
@@ -381,12 +382,6 @@ h3 {
   font-weight: 900;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-}
-
-.auth-form-note {
-  color: #6a7774;
-  font-size: 0.82rem;
-  line-height: 1.45;
 }
 
 .ghost {
@@ -3053,6 +3048,7 @@ h3 {
 
   .auth-proof-grid {
     grid-template-columns: 1fr;
+    margin-top: 0;
   }
 
   .auth-proof-card {
