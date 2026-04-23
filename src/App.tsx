@@ -108,13 +108,13 @@ function derivePlanFromCampaign(campaign: Campaign | null): CampaignStrategyPlan
   if (!campaign) return emptyCampaignStrategyPlan;
 
   return {
-    objective_summary: `Campanha ${campaign.name} pronta para geraÃ§Ã£o contextual.`,
-    icp_summary: campaign.trigger_stage_id ? 'Campanha conectada a uma etapa especÃ­fica do funil.' : 'Campanha sem gatilho automÃ¡tico definido.',
+    objective_summary: `Campanha ${campaign.name} pronta para geração contextual.`,
+    icp_summary: campaign.trigger_stage_id ? 'Campanha conectada a uma etapa específica do funil.' : 'Campanha sem gatilho automático definido.',
     pain_summary: campaign.context_text,
     tone_guidelines: 'Tom consultivo, objetivo e alinhado ao contexto comercial salvo.',
-    cta_strategy: 'CTA compatÃ­vel com o contexto e o estÃ¡gio de maturidade do lead.',
-    objection_handling: 'Responder objeÃ§Ãµes sem insistÃªncia excessiva e sem inventar informaÃ§Ãµes.',
-    sequence_strategy: 'Usar abertura, retomada amigÃ¡vel e avanÃ§o de qualificaÃ§Ã£o conforme a resposta do lead.',
+    cta_strategy: 'CTA compatível com o contexto e o estágio de maturidade do lead.',
+    objection_handling: 'Responder objeções sem insistência excessiva e sem inventar informações.',
+    sequence_strategy: 'Usar abertura, retomada amigável e avanço de qualificação conforme a resposta do lead.',
     final_prompt: campaign.generation_prompt,
   };
 }
@@ -129,7 +129,7 @@ function getWorkspaceMemberDisplayName(member: CrmData['workspaceMembers'][numbe
 
   const metadataName = typeof user?.user_metadata?.full_name === 'string' ? user.user_metadata.full_name.trim() : '';
   if (user && member.user_id === user.id) {
-    return metadataName || user.email || 'VocÃª';
+    return metadataName || user.email || 'Você';
   }
 
   return member.role === 'owner' ? 'Owner do workspace' : 'Membro do workspace';
@@ -138,20 +138,20 @@ function getWorkspaceMemberDisplayName(member: CrmData['workspaceMembers'][numbe
 function getAssignedWorkspaceOwnerLabel(lead: Lead, data: CrmData, user?: User): string | null {
   if (!lead.assigned_user_id) return null;
   const member = data.workspaceMembers.find((item) => item.user_id === lead.assigned_user_id);
-  if (!member) return 'UsuÃ¡rio do workspace';
+  if (!member) return 'Usuário do workspace';
   return getWorkspaceMemberDisplayName(member, user);
 }
 
 /*
 async function invokeAuthenticatedFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
   if (!supabase || !supabaseEnv) {
-    throw new Error('Supabase nÃ£o configurado.');
+    throw new Error('Supabase não configurado.');
   }
 
   const { data, error } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (error || !token) {
-    throw new Error('SessÃ£o expirada. Entre novamente.');
+    throw new Error('Sessão expirada. Entre novamente.');
   }
 
   const response = await fetch(`${supabaseEnv.VITE_SUPABASE_URL.replace(/\/$/, '')}/functions/v1/${name}`, {
@@ -313,7 +313,7 @@ export default function App() {
     try {
       const workspace = await createWorkspaceWithDefaults(supabase, session.user, name);
       setData(await loadCrmData(supabase, workspace));
-      setNotice('Workspace criado com funil padrÃ£o.');
+      setNotice('Workspace criado com funil padrão.');
     } catch (workspaceError) {
       setError(getSafeMessage(workspaceError, 'workspace'));
     } finally {
@@ -335,11 +335,11 @@ export default function App() {
   }
 
   if (envError || !supabase) {
-    return <SetupError message={envError ?? 'Supabase nÃ£o configurado.'} />;
+    return <SetupError message={envError ?? 'Supabase não configurado.'} />;
   }
 
   if (loading) {
-    return <FullPageState title="Carregando sessÃ£o" />;
+    return <FullPageState title="Carregando sessão" />;
   }
 
   if (isEvaluationRoute && !evaluationPanelEnabled) {
@@ -424,9 +424,9 @@ function SetupError({ message }: { message: string }) {
     <main className="setup-screen">
       <section className="setup-panel">
         <ShieldAlert aria-hidden />
-        <h1>Ambiente nÃ£o configurado</h1>
+        <h1>Ambiente não configurado</h1>
         <p>{message}</p>
-        <p>Crie um arquivo .env.local com as variÃ¡veis de .env.example e reinicie o servidor.</p>
+        <p>Crie um arquivo .env.local com as variáveis de .env.example e reinicie o servidor.</p>
       </section>
     </main>
   );
@@ -524,17 +524,17 @@ function AuthScreen({ authError }: { authError?: string | null }) {
   const authHighlights = [
     {
       title: 'Workspace isolado',
-      description: 'Leads, campanhas e mensagens separados por operaÃ§Ã£o para demonstrar controle real do CRM.',
+      description: 'Leads, campanhas e mensagens separados por operação para demonstrar controle real do CRM.',
       icon: Building2,
     },
     {
-      title: 'Funil orientado Ã  aÃ§Ã£o',
-      description: 'Qualifique leads, mova etapas com regra e acompanhe a cadÃªncia comercial em um sÃ³ lugar.',
+      title: 'Funil orientado à ação',
+      description: 'Qualifique leads, mova etapas com regra e acompanhe a cadência comercial em um só lugar.',
       icon: Workflow,
     },
     {
       title: 'Mensagens e simulador',
-      description: 'Gere mensagens com IA, simule o cliente e mostre o fluxo completo da prova tÃ©cnica.',
+      description: 'Gere mensagens com IA, simule o cliente e mostre o fluxo completo da prova técnica.',
       icon: Bot,
     },
   ] as const;
@@ -545,11 +545,11 @@ function AuthScreen({ authError }: { authError?: string | null }) {
     },
     {
       value: 'Simulador real',
-      label: 'Cliente, IA e histÃ³rico aparecem em tempo real na avaliaÃ§Ã£o.',
+      label: 'Cliente, IA e histórico aparecem em tempo real na avaliação.',
     },
     {
       value: 'Setup seguro',
-      label: 'Entrar, criar conta e recuperar senha jÃ¡ ficam prontos para demo.',
+      label: 'Entrar, criar conta e recuperar senha já ficam prontos para demo.',
     },
   ] as const;
 
@@ -596,7 +596,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
         if (result.error) throw result.error;
         setSuccess(
           result.data.session
-            ? 'Cadastro criado. VocÃª jÃ¡ estÃ¡ autenticado.'
+            ? 'Cadastro criado. Você já está autenticado.'
             : 'Cadastro criado. Verifique seu e-mail para confirmar a conta antes de entrar.',
         );
       } else {
@@ -640,9 +640,9 @@ function AuthScreen({ authError }: { authError?: string | null }) {
         <div className="auth-chip-row" aria-label="Destaques do produto">
           <span className="auth-chip">CRM operacional</span>
           <span className="auth-chip">Workspace isolado</span>
-          <span className="auth-chip">IA aplicada Ã  prova</span>
+          <span className="auth-chip">IA aplicada à prova</span>
         </div>
-        <div className="auth-signal-grid" aria-label="Leitura rÃ¡pida da experiÃªncia">
+        <div className="auth-signal-grid" aria-label="Leitura rápida da experiência">
           {authSignals.map((item) => (
             <article key={item.value} className="auth-signal-card">
               <strong>{item.value}</strong>
@@ -654,7 +654,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
       <form className={`auth-form auth-form-${mode}`} onSubmit={submit}>
         <div className="auth-form-heading">
           <span className="auth-form-kicker">
-            {mode === 'login' ? 'Acesso ao workspace' : mode === 'signup' ? 'Cadastro inicial' : 'RecuperaÃ§Ã£o segura'}
+            {mode === 'login' ? 'Acesso ao workspace' : mode === 'signup' ? 'Cadastro inicial' : 'Recuperação segura'}
           </span>
           <h2>{mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Criar conta' : 'Recuperar senha'}</h2>
           <p>
@@ -662,7 +662,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
               ? 'Acesse seu workspace.'
               : mode === 'signup'
                 ? 'Crie uma conta para iniciar o CRM.'
-                : 'Informe seu e-mail para receber o link de redefiniÃ§Ã£o.'}
+                : 'Informe seu e-mail para receber o link de redefinição.'}
           </p>
         </div>
         {mode === 'signup' && (
@@ -674,9 +674,9 @@ function AuthScreen({ authError }: { authError?: string | null }) {
               autoComplete="name"
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
-              placeholder="Ex.: ResponsÃ¡vel comercial"
+              placeholder="Ex.: Responsável comercial"
             />
-            <span className="field-hint">Use o nome que deve aparecer no perfil. Ex.: ResponsÃ¡vel comercial.</span>
+            <span className="field-hint">Use o nome que deve aparecer no perfil. Ex.: Responsável comercial.</span>
           </label>
         )}
         <label htmlFor="email">
@@ -691,7 +691,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
             placeholder="Ex.: contato@empresa.com.br"
             required
           />
-          <span className="field-hint">Informe um e-mail vÃ¡lido. Ex.: contato@empresa.com.br.</span>
+          <span className="field-hint">Informe um e-mail válido. Ex.: contato@empresa.com.br.</span>
         </label>
         {mode !== 'forgot' && (
           <PasswordField
@@ -730,14 +730,14 @@ function AuthScreen({ authError }: { authError?: string | null }) {
         )}
         <p className="auth-form-note">
           {mode === 'login'
-            ? 'Entre por e-mail ou Google e continue exatamente do ponto em que a operaÃ§Ã£o parou.'
+            ? 'Entre por e-mail ou Google e continue exatamente do ponto em que a operação parou.'
             : mode === 'signup'
-              ? 'Depois do cadastro, vocÃª jÃ¡ pode criar o workspace e iniciar a demonstraÃ§Ã£o do funil.'
-              : 'O link de redefiniÃ§Ã£o leva de volta ao app para atualizar a senha sem fluxo paralelo.'}
+              ? 'Depois do cadastro, você já pode criar o workspace e iniciar a demonstração do funil.'
+              : 'O link de redefinição leva de volta ao app para atualizar a senha sem fluxo paralelo.'}
         </p>
         <div className="auth-links">
           <button type="button" className="ghost" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} disabled={busy}>
-            {mode === 'login' ? 'Criar conta' : 'JÃ¡ tenho conta'}
+            {mode === 'login' ? 'Criar conta' : 'Já tenho conta'}
           </button>
           {mode !== 'signup' && (
             <button type="button" className="ghost" onClick={() => setMode(mode === 'forgot' ? 'login' : 'forgot')} disabled={busy}>
@@ -785,7 +785,7 @@ function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
     }
 
     if (password !== confirmPassword) {
-      setError('As senhas nÃ£o conferem.');
+      setError('As senhas não conferem.');
       return;
     }
 
@@ -809,8 +809,8 @@ function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
         <h1>Definir nova senha</h1>
         <p>Crie uma nova senha para continuar acessando o SDR Expert.</p>
         <div className="setup-panel-note">
-          <strong>RecuperaÃ§Ã£o segura</strong>
-          <p>Assim que a nova senha for salva, o acesso volta ao fluxo normal do CRM sem perder a sessÃ£o de redefiniÃ§Ã£o.</p>
+          <strong>Recuperação segura</strong>
+          <p>Assim que a nova senha for salva, o acesso volta ao fluxo normal do CRM sem perder a sessão de redefinição.</p>
         </div>
         <PasswordField
           id="newPassword"
@@ -925,7 +925,7 @@ function Shell({
           </div>
           <div className="workspace-badge">
             <small>Workspace ativo</small>
-            <strong>{workspaceName ?? 'ConfiguraÃ§Ã£o inicial'}</strong>
+            <strong>{workspaceName ?? 'Configuração inicial'}</strong>
           </div>
           <div className="sidebar-actions">
             <button type="button" className="ghost" onClick={handleRefreshClick} disabled={busy}>
@@ -964,7 +964,7 @@ function Shell({
           </button>
           <div className="mobile-shell-copy">
             <strong>SDR Expert</strong>
-            <span>{workspaceName ?? 'ConfiguraÃ§Ã£o inicial'}</span>
+            <span>{workspaceName ?? 'Configuração inicial'}</span>
           </div>
         </div>
         <div className="content-shell">{children}</div>
@@ -987,18 +987,18 @@ function WorkspaceOnboarding({
   const [name, setName] = useState(`Workspace ${user.email?.split('@')[0] ?? 'SDR'}`);
   const onboardingHighlights = [
     {
-      title: 'Funil padrÃ£o pronto',
-      description: 'Etapas iniciais jÃ¡ configuradas para vocÃª sair do zero rapidamente.',
+      title: 'Funil padrão pronto',
+      description: 'Etapas iniciais já configuradas para você sair do zero rapidamente.',
       icon: Route,
     },
     {
-      title: 'Base de operaÃ§Ã£o organizada',
+      title: 'Base de operação organizada',
       description: 'Leads, campos, campanhas e mensagens passam a operar com isolamento por workspace.',
       icon: Workflow,
     },
     {
       title: 'Demo mais forte',
-      description: 'VocÃª consegue mostrar o fluxo completo do CRM sem setup manual disperso.',
+      description: 'Você consegue mostrar o fluxo completo do CRM sem setup manual disperso.',
       icon: BookOpen,
     },
   ] as const;
@@ -1009,7 +1009,7 @@ function WorkspaceOnboarding({
     },
     {
       title: 'Base pronta para demo',
-      description: 'Funil, mensagens e operaÃ§Ã£o jÃ¡ nascem com narrativa consistente.',
+      description: 'Funil, mensagens e operação já nascem com narrativa consistente.',
     },
     {
       title: 'Clareza para o avaliador',
@@ -1021,13 +1021,13 @@ function WorkspaceOnboarding({
     <section className="workspace-onboarding">
       <div className="workspace-onboarding-hero">
         <div className="workspace-onboarding-copy">
-          <span className="eyebrow">Primeira configuraÃ§Ã£o</span>
+          <span className="eyebrow">Primeira configuração</span>
           <h1>Criar workspace</h1>
-          <p>O workspace isola funil, leads, campos, campanhas e mensagens para manter a operaÃ§Ã£o organizada desde a primeira demonstraÃ§Ã£o.</p>
+          <p>O workspace isola funil, leads, campos, campanhas e mensagens para manter a operação organizada desde a primeira demonstração.</p>
           <div className="workspace-onboarding-chip-row">
-            <span className="workspace-onboarding-chip">Funil padrÃ£o</span>
+            <span className="workspace-onboarding-chip">Funil padrão</span>
             <span className="workspace-onboarding-chip">Estrutura pronta para demo</span>
-            <span className="workspace-onboarding-chip">Setup rÃ¡pido</span>
+            <span className="workspace-onboarding-chip">Setup rápido</span>
           </div>
           <div className="workspace-onboarding-proof-grid">
             {onboardingSignals.map((item) => (
@@ -1061,7 +1061,7 @@ function WorkspaceOnboarding({
           <div className="workspace-onboarding-form-copy">
             <span className="section-kicker">Dados do ambiente</span>
             <h2>Nome do workspace</h2>
-            <p>DÃª um nome operacional claro para o ambiente que serÃ¡ usado na avaliaÃ§Ã£o e nos fluxos internos.</p>
+            <p>Dê um nome operacional claro para o ambiente que será usado na avaliação e nos fluxos internos.</p>
           </div>
           <label>
             Nome do workspace
@@ -1069,39 +1069,39 @@ function WorkspaceOnboarding({
               name="workspaceName"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Ex.: OperaÃ§Ã£o SDR Brasil"
+              placeholder="Ex.: Operação SDR Brasil"
             />
-            <span className="field-hint">DÃª um nome operacional ao ambiente. Ex.: OperaÃ§Ã£o SDR Brasil.</span>
+            <span className="field-hint">Dê um nome operacional ao ambiente. Ex.: Operação SDR Brasil.</span>
           </label>
           <div className="workspace-onboarding-form-note">
             <strong>Leitura premium da demo</strong>
-            <p>Use um nome que soe como operaÃ§Ã£o real. Isso melhora a percepÃ§Ã£o do dashboard, da navegaÃ§Ã£o e do simulador desde a primeira tela.</p>
+            <p>Use um nome que soe como operação real. Isso melhora a percepção do dashboard, da navegação e do simulador desde a primeira tela.</p>
           </div>
           {error && <p className="error">{error}</p>}
           <button type="button" onClick={() => onCreate(name)} disabled={busy || name.trim().length < 2}>
             <Plus aria-hidden />
-            {busy ? 'Criando workspace...' : 'Criar workspace e funil padrÃ£o'}
+            {busy ? 'Criando workspace...' : 'Criar workspace e funil padrão'}
           </button>
         </section>
 
         <aside className="workspace-onboarding-side">
           <article className="workspace-onboarding-side-card">
             <span className="section-kicker">Ao criar agora</span>
-            <strong>VocÃª ativa a base do CRM</strong>
+            <strong>Você ativa a base do CRM</strong>
             <ul>
               <li>Funil inicial pronto para cadastrar e mover leads</li>
               <li>Estrutura preparada para campanhas e Mensagens IA</li>
-              <li>Ambiente separado para demonstraÃ§Ã£o sem mistura de dados</li>
+              <li>Ambiente separado para demonstração sem mistura de dados</li>
             </ul>
           </article>
           <article className="workspace-onboarding-side-card workspace-onboarding-side-card-accent">
-            <span className="section-kicker">Leitura rÃ¡pida</span>
-            <strong>Nomeie como uma operaÃ§Ã£o real</strong>
-            <p>Um bom nome melhora a clareza da demo, do dashboard e da navegaÃ§Ã£o desde o primeiro acesso.</p>
+            <span className="section-kicker">Leitura rápida</span>
+            <strong>Nomeie como uma operação real</strong>
+            <p>Um bom nome melhora a clareza da demo, do dashboard e da navegação desde o primeiro acesso.</p>
             <ul>
               <li>Facilita a leitura do cockpit comercial</li>
-              <li>Deixa o simulador parecer parte de uma operaÃ§Ã£o viva</li>
-              <li>Evita sensaÃ§Ã£o de ambiente genÃ©rico ou improvisado</li>
+              <li>Deixa o simulador parecer parte de uma operação viva</li>
+              <li>Evita sensação de ambiente genérico ou improvisado</li>
             </ul>
           </article>
         </aside>
@@ -1118,7 +1118,7 @@ function StatusBar({ notice, error, onClear }: { notice: string | null; error: s
       <div className="status-copy">
         {isError ? <ShieldAlert aria-hidden /> : <CheckCircle2 aria-hidden />}
         <div>
-          <strong className="status-title">{isError ? 'AtenÃ§Ã£o na operaÃ§Ã£o' : 'AÃ§Ã£o concluÃ­da'}</strong>
+          <strong className="status-title">{isError ? 'Atenção na operação' : 'Ação concluída'}</strong>
           <span>{error ?? notice}</span>
         </div>
       </div>
@@ -1136,18 +1136,18 @@ function OperationGuide({ tab, userId }: { tab: AppTab; userId: string }) {
   const steps: Array<{ id: AppTab; title: string; description: string }> = [
     {
       id: 'dashboard',
-      title: 'Ler a operaÃ§Ã£o',
-      description: 'Veja volume, gargalos, respostas e prÃ³ximos movimentos antes de operar.',
+      title: 'Ler a operação',
+      description: 'Veja volume, gargalos, respostas e próximos movimentos antes de operar.',
     },
     {
       id: 'leads',
       title: 'Qualificar leads',
-      description: 'Cadastre contexto, selecione o lead em foco e mova pelo funil com validaÃ§Ã£o.',
+      description: 'Cadastre contexto, selecione o lead em foco e mova pelo funil com validação.',
     },
     {
       id: 'fields',
       title: 'Controlar qualidade',
-      description: 'Defina campos obrigatÃ³rios por etapa para impedir avanÃ§o com dados frÃ¡geis.',
+      description: 'Defina campos obrigatórios por etapa para impedir avanço com dados frágeis.',
     },
     {
       id: 'campaigns',
@@ -1191,7 +1191,7 @@ function OperationGuide({ tab, userId }: { tab: AppTab; userId: string }) {
             <Route />
           </span>
           <div>
-            <span className="section-kicker">Guia rÃ¡pido do fluxo</span>
+            <span className="section-kicker">Guia rápido do fluxo</span>
             <strong>{activeStep.title}</strong>
             {!collapsed && <p>{activeStep.description}</p>}
           </div>
@@ -1208,7 +1208,7 @@ function OperationGuide({ tab, userId }: { tab: AppTab; userId: string }) {
         <div className="operation-guide-actions">
           <button type="button" className="ghost compact" onClick={openFlowGuide}>
             <BookOpen aria-hidden />
-            Ver lÃ³gica
+            Ver lógica
           </button>
           <button
             type="button"
@@ -1226,9 +1226,9 @@ function OperationGuide({ tab, userId }: { tab: AppTab; userId: string }) {
           <section className="chat-modal flow-guide-modal">
             <div className="chat-modal-header">
               <div>
-                <span className="section-kicker">LÃ³gica operacional</span>
+                <span className="section-kicker">Lógica operacional</span>
                 <h2 id="flow-guide-title">Como o SDR Expert deve ser avaliado</h2>
-                <p>O app simula uma operaÃ§Ã£o de prÃ©-vendas com dados isolados por workspace, funil, playbooks e IA.</p>
+                <p>O app simula uma operação de pré-vendas com dados isolados por workspace, funil, playbooks e IA.</p>
               </div>
               <button type="button" className="ghost compact icon-only" onClick={() => setModalOpen(false)} aria-label="Fechar guia">
                 <X aria-hidden />
@@ -1248,7 +1248,7 @@ function OperationGuide({ tab, userId }: { tab: AppTab; userId: string }) {
             <div className="flow-guide-note">
               <strong>Fluxo principal:</strong>
               <span>
-                dashboard identifica prioridade, leads guardam contexto, campos protegem a qualidade, campanhas definem a estratÃ©gia e
+                dashboard identifica prioridade, leads guardam contexto, campos protegem a qualidade, campanhas definem a estratégia e
                 mensagens IA demonstram a abordagem com simulador de cliente.
               </span>
             </div>
@@ -1316,8 +1316,8 @@ function LeadsView({
   const selectedLeadReadinessLabel = !selectedLead
     ? 'Selecione um lead no funil'
     : selectedLeadMissing.length > 0
-      ? `${selectedLeadMissing.length} pendÃªncia(s) antes do prÃ³ximo movimento`
-      : 'Lead pronto para avanÃ§ar';
+      ? `${selectedLeadMissing.length} pendência(s) antes do próximo movimento`
+      : 'Lead pronto para avançar';
 
   useEffect(() => {
     if (!data.leads.length) {
@@ -1345,7 +1345,7 @@ function LeadsView({
     });
 
     if (missing.length > 0) {
-      setError(`Movimento bloqueado. Campos obrigatÃ³rios ausentes: ${missing.join(', ')}.`);
+      setError(`Movimento bloqueado. Campos obrigatórios ausentes: ${missing.join(', ')}.`);
       return;
     }
 
@@ -1391,7 +1391,7 @@ function LeadsView({
 
       if (feedback.warning && automation.failedCampaigns.length > 0) {
         setError(
-          `Lead movido, mas o gatilho automÃ¡tico falhou em: ${automation.failedCampaigns.map((item) => item.name).join(', ')}.`,
+          `Lead movido, mas o gatilho automático falhou em: ${automation.failedCampaigns.map((item) => item.name).join(', ')}.`,
         );
       }
 
@@ -1409,19 +1409,19 @@ function LeadsView({
 
   return (
     <section className="stack">
-      <Header title="Leads e funil" subtitle="Cadastro, ediÃ§Ã£o e movimentaÃ§Ã£o por etapa." />
+      <Header title="Leads e funil" subtitle="Cadastro, edição e movimentação por etapa." />
 
       <section className="panel page-command-panel page-command-panel-leads">
         <div className="page-command-copy">
-          <span className="section-kicker">Cockpit de qualificaÃ§Ã£o</span>
-          <h2>{selectedLead ? `${selectedLead.name} estÃ¡ no foco da operaÃ§Ã£o` : 'Monte contexto, destaque um lead e conduza o funil com clareza'}</h2>
+          <span className="section-kicker">Cockpit de qualificação</span>
+          <h2>{selectedLead ? `${selectedLead.name} está no foco da operação` : 'Monte contexto, destaque um lead e conduza o funil com clareza'}</h2>
           <p>
-            Use o formulÃ¡rio para registrar o essencial, traga um lead para o foco do time e mova a operaÃ§Ã£o sem perder consistÃªncia
+            Use o formulário para registrar o essencial, traga um lead para o foco do time e mova a operação sem perder consistência
             dos dados nem a narrativa da prova.
           </p>
           <div className="page-command-chip-row">
             <span className="page-command-chip">{data.leads.length} lead(s) ativos</span>
-            <span className="page-command-chip">{leadsWithPendingFields} com revisÃ£o obrigatÃ³ria</span>
+            <span className="page-command-chip">{leadsWithPendingFields} com revisão obrigatória</span>
             <span className="page-command-chip">{leadsInContact} em contato</span>
           </div>
         </div>
@@ -1434,7 +1434,7 @@ function LeadsView({
             <strong>{selectedLead ? selectedLead.name : 'Nenhum lead selecionado'}</strong>
             <p>
               {selectedLead
-                ? `${getLeadMetaLine(selectedLead)} â€¢ Etapa atual: ${selectedLeadStage?.name ?? 'Sem etapa definida'}`
+                ? `${getLeadMetaLine(selectedLead)} • Etapa atual: ${selectedLeadStage?.name ?? 'Sem etapa definida'}`
                 : 'Clique em um card do kanban para trazer um lead para a leitura principal da tela.'}
             </p>
             <span className="page-command-note">
@@ -1442,19 +1442,19 @@ function LeadsView({
                 ? selectedLeadMissing.length > 0
                   ? `Bloqueios ativos: ${selectedLeadMissing.join(', ')}.`
                   : 'Sem bloqueios ativos para a etapa atual.'
-                : 'O kanban vira a cena principal quando um lead Ã© escolhido explicitamente.'}
+                : 'O kanban vira a cena principal quando um lead é escolhido explicitamente.'}
             </span>
           </article>
           <div className="page-command-mini-grid">
             <article className="page-command-card">
-              <span className="section-kicker">ProntidÃ£o</span>
+              <span className="section-kicker">Prontidão</span>
               <strong>{selectedLeadReadinessLabel}</strong>
               <p>Use essa leitura para decidir se vale editar dados antes de mover a etapa.</p>
             </article>
             <article className="page-command-card">
-              <span className="section-kicker">ResponsÃ¡vel do workspace</span>
+              <span className="section-kicker">Responsável do workspace</span>
               <strong>{selectedLeadWorkspaceOwner ?? 'A definir'}</strong>
-              <p>Quando existir dono claro, a demonstraÃ§Ã£o fica mais crÃ­vel e operacional.</p>
+              <p>Quando existir dono claro, a demonstração fica mais crível e operacional.</p>
             </article>
           </div>
         </div>
@@ -1471,19 +1471,19 @@ function LeadsView({
         </article>
         <article className="overview-card lead-summary-card lead-summary-card-contact">
           <div className="overview-card-topline">
-            <span className="section-kicker">Com contato vÃ¡lido</span>
+            <span className="section-kicker">Com contato válido</span>
             <Mail aria-hidden />
           </div>
           <strong>{leadsWithContact}</strong>
-          <p>Leads com e-mail ou telefone jÃ¡ prontos para abordagem.</p>
+          <p>Leads com e-mail ou telefone já prontos para abordagem.</p>
         </article>
         <article className="overview-card overview-card-accent lead-summary-card lead-summary-card-warning">
           <div className="overview-card-topline">
-            <span className="section-kicker">Precisam de revisÃ£o</span>
+            <span className="section-kicker">Precisam de revisão</span>
             <CircleAlert aria-hidden />
           </div>
           <strong>{leadsWithPendingFields}</strong>
-          <p>Leads com campos obrigatÃ³rios faltando na etapa atual.</p>
+          <p>Leads com campos obrigatórios faltando na etapa atual.</p>
         </article>
         <article className="overview-card lead-summary-card lead-summary-card-progress">
           <div className="overview-card-topline">
@@ -1491,7 +1491,7 @@ function LeadsView({
             <CheckCircle2 aria-hidden />
           </div>
           <strong>{leadsInContact}</strong>
-          <p>Leads jÃ¡ movidos para a etapa Tentando Contato.</p>
+          <p>Leads já movidos para a etapa Tentando Contato.</p>
         </article>
       </div>
 
@@ -1518,13 +1518,13 @@ function LeadsView({
               </div>
               {selectedLead && (
                 <span className={`lead-pill ${selectedLeadMissing.length > 0 ? 'lead-pill-warning' : 'lead-pill-ready'}`}>
-                  {selectedLeadMissing.length > 0 ? `${selectedLeadMissing.length} pendÃªncia(s)` : 'Pronto para avanÃ§ar'}
+                  {selectedLeadMissing.length > 0 ? `${selectedLeadMissing.length} pendência(s)` : 'Pronto para avançar'}
                 </span>
               )}
             </div>
 
             {!selectedLead ? (
-              <p className="empty">Crie o primeiro lead para comeÃ§ar a operar o funil.</p>
+              <p className="empty">Crie o primeiro lead para começar a operar o funil.</p>
             ) : (
               <div className="lead-spotlight-grid">
                 <article className="chat-summary-card">
@@ -1534,20 +1534,20 @@ function LeadsView({
                 </article>
                 <article className="chat-summary-card">
                   <strong>Contato principal</strong>
-                  <p>{selectedLead.email ?? selectedLead.phone ?? 'Contato nÃ£o informado'}</p>
-                  <span>Origem: {selectedLead.lead_source || 'NÃ£o informada'}</span>
+                  <p>{selectedLead.email ?? selectedLead.phone ?? 'Contato não informado'}</p>
+                  <span>Origem: {selectedLead.lead_source || 'Não informada'}</span>
                 </article>
                 <article className="chat-summary-card">
-                  <strong>ResponsÃ¡veis</strong>
-                  <p>{selectedLead.technical_owner_name || 'Sem responsÃ¡vel tÃ©cnico'}</p>
-                  <span>{selectedLeadWorkspaceOwner ? `Workspace: ${selectedLeadWorkspaceOwner}` : 'Sem responsÃ¡vel do workspace'}</span>
+                  <strong>Responsáveis</strong>
+                  <p>{selectedLead.technical_owner_name || 'Sem responsável técnico'}</p>
+                  <span>{selectedLeadWorkspaceOwner ? `Workspace: ${selectedLeadWorkspaceOwner}` : 'Sem responsável do workspace'}</span>
                 </article>
                 <article className="chat-summary-card">
                   <strong>Checklist da etapa</strong>
                   <p>
                     {selectedLeadMissing.length > 0
-                      ? `Faltam ${selectedLeadMissing.length} campo(s) obrigatÃ³rio(s) para movimentar com seguranÃ§a.`
-                      : 'O lead jÃ¡ atende os requisitos da etapa atual.'}
+                      ? `Faltam ${selectedLeadMissing.length} campo(s) obrigatório(s) para movimentar com segurança.`
+                      : 'O lead já atende os requisitos da etapa atual.'}
                   </p>
                   <span>{selectedLeadMissing.length > 0 ? selectedLeadMissing.join(', ') : 'Sem bloqueios ativos'}</span>
                 </article>
@@ -1685,7 +1685,7 @@ function LeadForm({
 
       if (feedback.warning && automation.failedCampaigns.length > 0) {
         setError(
-          `Lead salvo, mas o gatilho automÃ¡tico falhou em: ${automation.failedCampaigns.map((item) => item.name).join(', ')}.`,
+          `Lead salvo, mas o gatilho automático falhou em: ${automation.failedCampaigns.map((item) => item.name).join(', ')}.`,
         );
       }
 
@@ -1707,7 +1707,7 @@ function LeadForm({
     setError(null);
 
     if (!form.name.trim() || !form.current_stage_id) {
-      setError('Nome e etapa sÃ£o obrigatÃ³rios.');
+      setError('Nome e etapa são obrigatórios.');
       return;
     }
 
@@ -1726,11 +1726,11 @@ function LeadForm({
         <div className="lead-form-heading">
           <span className="section-kicker">{lead ? 'Atualizando oportunidade' : 'Novo lead'}</span>
           <h2>{lead ? 'Editar lead' : 'Novo lead'}</h2>
-          <p>Cadastre contexto suficiente para mover o lead pelo funil sem travas de campos obrigatÃ³rios.</p>
+          <p>Cadastre contexto suficiente para mover o lead pelo funil sem travas de campos obrigatórios.</p>
         </div>
         {lead && (
           <button type="button" className="ghost compact" onClick={onCancel}>
-            Cancelar ediÃ§Ã£o
+            Cancelar edição
           </button>
         )}
       </div>
@@ -1807,25 +1807,25 @@ function LeadForm({
         </select>
       </label>
       <label>
-        ResponsÃ¡vel tÃ©cnico
+        Responsável técnico
         <input
           name="leadTechnicalOwner"
           value={form.technical_owner_name}
           onChange={(event) => setForm({ ...form, technical_owner_name: event.target.value })}
-          placeholder="Ex.: Especialista tÃ©cnico"
+          placeholder="Ex.: Especialista técnico"
         />
         <span className="field-hint">
-          Informe quem acompanha tecnicamente este lead. Ex.: Especialista tÃ©cnico. Se ficar em branco, o lead serÃ¡ salvo sem responsÃ¡vel tÃ©cnico.
+          Informe quem acompanha tecnicamente este lead. Ex.: Especialista técnico. Se ficar em branco, o lead será salvo sem responsável técnico.
         </span>
       </label>
       <label>
-        ResponsÃ¡vel do workspace
+        Responsável do workspace
         <select
           name="leadAssignedWorkspaceUser"
           value={form.assigned_user_id ?? ''}
           onChange={(event) => setForm({ ...form, assigned_user_id: event.target.value || null })}
         >
-          <option value="">Sem responsÃ¡vel do workspace</option>
+          <option value="">Sem responsável do workspace</option>
           {workspaceMemberOptions.map((member) => (
             <option key={member.value} value={member.value}>
               {member.label}
@@ -1834,18 +1834,18 @@ function LeadForm({
           ))}
         </select>
         <span className="field-hint">
-          Atribua o lead a um usuÃ¡rio do workspace quando fizer sentido operacional. Ex.: Owner do workspace.
+          Atribua o lead a um usuário do workspace quando fizer sentido operacional. Ex.: Owner do workspace.
         </span>
       </label>
       <label className="wide">
-        ObservaÃ§Ãµes
+        Observações
         <textarea
           name="leadNotes"
           value={form.notes}
           onChange={(event) => setForm({ ...form, notes: event.target.value })}
           placeholder="Ex.: Quer reduzir tempo de resposta do time."
         />
-        <span className="field-hint">Anote contexto Ãºtil para a prÃ³xima abordagem. Ex.: quer reduzir tempo de resposta do time.</span>
+        <span className="field-hint">Anote contexto útil para a próxima abordagem. Ex.: quer reduzir tempo de resposta do time.</span>
       </label>
       {data.customFields.map((field) => (
         <label key={field.id}>
@@ -1854,7 +1854,7 @@ function LeadForm({
             name={`customField-${field.id}`}
             type={field.field_type === 'number' ? 'number' : 'text'}
             value={form.customValues[field.id] ?? ''}
-            placeholder={field.field_type === 'number' ? 'Ex.: 12' : 'Ex.: OperaÃ§Ã£o outbound'}
+            placeholder={field.field_type === 'number' ? 'Ex.: 12' : 'Ex.: Operação outbound'}
             onChange={(event) =>
               setForm({
                 ...form,
@@ -1865,7 +1865,7 @@ function LeadForm({
           <span className="field-hint">
             {field.field_type === 'number'
               ? 'Preencha com valor quantitativo. Ex.: 12.'
-              : 'Preencha com um contexto objetivo. Ex.: OperaÃ§Ã£o outbound.'}
+              : 'Preencha com um contexto objetivo. Ex.: Operação outbound.'}
           </span>
         </label>
       ))}
@@ -1878,14 +1878,14 @@ function LeadForm({
         <section className="chat-modal lead-confirm-modal">
           <div className="chat-modal-header">
             <div>
-              <span className="section-kicker">ConfirmaÃ§Ã£o</span>
-              <h2 id="lead-unassigned-title">Salvar sem responsÃ¡vel tÃ©cnico?</h2>
-              <p>Este lead ficarÃ¡ sem responsÃ¡vel tÃ©cnico definido. VocÃª poderÃ¡ preencher esse campo depois ao editar o lead.</p>
+              <span className="section-kicker">Confirmação</span>
+              <h2 id="lead-unassigned-title">Salvar sem responsável técnico?</h2>
+              <p>Este lead ficará sem responsável técnico definido. Você poderá preencher esse campo depois ao editar o lead.</p>
             </div>
             <button
               type="button"
               className="ghost icon-button"
-              aria-label="Fechar confirmaÃ§Ã£o"
+              aria-label="Fechar confirmação"
               onClick={() => setConfirmUnassignedOpen(false)}
               disabled={saving}
             >
@@ -1893,13 +1893,13 @@ function LeadForm({
             </button>
           </div>
           <div className="chat-modal-footer">
-            <p>VocÃª quer mesmo cadastrar esse lead sem um responsÃ¡vel tÃ©cnico?</p>
+            <p>Você quer mesmo cadastrar esse lead sem um responsável técnico?</p>
             <div className="chat-modal-actions">
               <button type="button" className="secondary" onClick={() => setConfirmUnassignedOpen(false)} disabled={saving}>
                 Voltar e preencher
               </button>
               <button type="button" onClick={saveLead} disabled={saving}>
-                {saving ? 'Salvando...' : 'Salvar sem responsÃ¡vel'}
+                {saving ? 'Salvando...' : 'Salvar sem responsável'}
               </button>
             </div>
           </div>
@@ -1995,7 +1995,7 @@ function LeadCard({
       <div className="lead-card-topline">
         <strong>{lead.name}</strong>
         <span className={`lead-pill ${missing.length > 0 ? 'lead-pill-warning' : 'lead-pill-ready'}`}>
-          {missing.length > 0 ? `${missing.length} pendÃªncia(s)` : 'Pronto'}
+          {missing.length > 0 ? `${missing.length} pendência(s)` : 'Pronto'}
         </span>
       </div>
 
@@ -2004,7 +2004,7 @@ function LeadCard({
       <div className="lead-detail-list">
         <div>
           <Building2 aria-hidden />
-          <span>{lead.company || 'Empresa nÃ£o informada'}</span>
+          <span>{lead.company || 'Empresa não informada'}</span>
         </div>
         <div>
           <Mail aria-hidden />
@@ -2018,12 +2018,12 @@ function LeadCard({
 
       <div className="lead-tag-row">
         {moving && <span className="lead-tag lead-tag-busy">Movendo etapa...</span>}
-        <span className="lead-tag">{lead.lead_source || 'Origem nÃ£o informada'}</span>
+        <span className="lead-tag">{lead.lead_source || 'Origem não informada'}</span>
         <span className="lead-tag">
-          {lead.technical_owner_name ? `Resp. tÃ©cnico: ${lead.technical_owner_name}` : 'Sem responsÃ¡vel tÃ©cnico'}
+          {lead.technical_owner_name ? `Resp. técnico: ${lead.technical_owner_name}` : 'Sem responsável técnico'}
         </span>
         <span className="lead-tag">
-          {assignedWorkspaceOwner ? `Resp. workspace: ${assignedWorkspaceOwner}` : 'Sem responsÃ¡vel do workspace'}
+          {assignedWorkspaceOwner ? `Resp. workspace: ${assignedWorkspaceOwner}` : 'Sem responsável do workspace'}
         </span>
       </div>
 
@@ -2094,7 +2094,7 @@ function FieldsView({
     if (creatingField) return;
     const fieldKey = createFieldKey(name);
     if (!fieldKey) {
-      setError('Nome de campo invÃ¡lido.');
+      setError('Nome de campo inválido.');
       return;
     }
     setCreatingField(true);
@@ -2123,11 +2123,11 @@ function FieldsView({
 
       <section className="panel page-command-panel page-command-panel-fields">
         <div className="page-command-copy">
-          <span className="section-kicker">GovernanÃ§a de qualidade</span>
-          <h2>Defina sÃ³ o que protege a operaÃ§Ã£o e deixe o restante fora do caminho</h2>
+          <span className="section-kicker">Governança de qualidade</span>
+          <h2>Defina só o que protege a operação e deixe o restante fora do caminho</h2>
           <p>
-            Campos extras e bloqueios por etapa devem reforÃ§ar a leitura comercial, nÃ£o transformar o CRM em um cadastro pesado.
-            A ideia aqui Ã© parecer criterioso, rÃ¡pido e seguro.
+            Campos extras e bloqueios por etapa devem reforçar a leitura comercial, não transformar o CRM em um cadastro pesado.
+            A ideia aqui é parecer criterioso, rápido e seguro.
           </p>
           <div className="page-command-chip-row">
             <span className="page-command-chip">{data.customFields.length} campo(s) extras</span>
@@ -2144,21 +2144,21 @@ function FieldsView({
             <strong>{mostProtectedStage && mostProtectedStage.rules > 0 ? mostProtectedStage.name : 'Base livre para primeira leitura'}</strong>
             <p>
               {mostProtectedStage && mostProtectedStage.rules > 0
-                ? `${mostProtectedStage.rules} regra(s) fazem essa etapa exigir mais consistÃªncia antes do avanÃ§o.`
-                : 'Ainda nÃ£o existe uma etapa com volume relevante de validaÃ§Ãµes obrigatÃ³rias.'}
+                ? `${mostProtectedStage.rules} regra(s) fazem essa etapa exigir mais consistência antes do avanço.`
+                : 'Ainda não existe uma etapa com volume relevante de validações obrigatórias.'}
             </p>
-            <span className="page-command-note">Use isso para mostrar critÃ©rio sem travar a operaÃ§Ã£o cedo demais.</span>
+            <span className="page-command-note">Use isso para mostrar critério sem travar a operação cedo demais.</span>
           </article>
           <div className="page-command-mini-grid">
             <article className="page-command-card">
-              <span className="section-kicker">Regras padrÃ£o</span>
+              <span className="section-kicker">Regras padrão</span>
               <strong>{standardRules}</strong>
-              <p>Dados base do lead que garantem leitura mÃ­nima antes de qualquer avanÃ§o importante.</p>
+              <p>Dados base do lead que garantem leitura mínima antes de qualquer avanço importante.</p>
             </article>
             <article className="page-command-card">
               <span className="section-kicker">Regras personalizadas</span>
               <strong>{customRules}</strong>
-              <p>CritÃ©rios especÃ­ficos do workspace para qualificaÃ§Ã£o mais precisa da abordagem.</p>
+              <p>Critérios específicos do workspace para qualificação mais precisa da abordagem.</p>
             </article>
           </div>
         </div>
@@ -2179,15 +2179,15 @@ function FieldsView({
             <Workflow aria-hidden />
           </div>
           <strong>{stagesWithRules}</strong>
-          <p>Etapas do funil que jÃ¡ tÃªm bloqueios explÃ­citos para manter integridade operacional.</p>
+          <p>Etapas do funil que já têm bloqueios explícitos para manter integridade operacional.</p>
         </article>
         <article className="overview-card overview-card-accent field-summary-card field-summary-card-coverage">
           <div className="overview-card-topline">
-            <span className="section-kicker">Cobertura de validaÃ§Ã£o</span>
+            <span className="section-kicker">Cobertura de validação</span>
             <CircleAlert aria-hidden />
           </div>
           <strong>{data.requiredFields.length}</strong>
-          <p>{standardRules} regra(s) padrÃ£o e {customRules} regra(s) baseadas em campos personalizados.</p>
+          <p>{standardRules} regra(s) padrão e {customRules} regra(s) baseadas em campos personalizados.</p>
         </article>
       </div>
 
@@ -2216,9 +2216,9 @@ function FieldsView({
               Tipo
               <select name="customFieldType" value={type} onChange={(event) => setType(event.target.value as 'text' | 'number')}>
                 <option value="text">Texto</option>
-                <option value="number">NÃºmero</option>
+                <option value="number">Número</option>
               </select>
-              <span className="field-hint">Escolha nÃºmero apenas quando o valor precisar ser estritamente quantitativo.</span>
+              <span className="field-hint">Escolha número apenas quando o valor precisar ser estritamente quantitativo.</span>
             </label>
             <div className="wide field-form-actions">
               <button type="submit" disabled={creatingField}>
@@ -2234,14 +2234,14 @@ function FieldsView({
                 <span className="section-kicker">Biblioteca de campos</span>
                 <h2>Campos personalizados</h2>
               </div>
-              <span className="panel-meta">Use esta Ã¡rea para revisar rapidamente a estrutura adicional do workspace.</span>
+              <span className="panel-meta">Use esta área para revisar rapidamente a estrutura adicional do workspace.</span>
             </div>
             {data.customFields.length === 0 ? (
               <div className="empty-panel">
                 <CircleAlert aria-hidden />
                 <div>
                   <h2>Nenhum campo extra criado</h2>
-                  <p className="empty">Comece pelos dados que fazem diferenÃ§a na qualificaÃ§Ã£o, nÃ£o por cadastro excessivo.</p>
+                  <p className="empty">Comece pelos dados que fazem diferença na qualificação, não por cadastro excessivo.</p>
                 </div>
               </div>
             ) : (
@@ -2251,7 +2251,7 @@ function FieldsView({
                     <div className="field-card-header">
                       <strong>{field.name}</strong>
                       <span className={`campaign-chip ${field.field_type === 'number' ? 'campaign-chip-trigger' : 'campaign-chip-idle'}`}>
-                        {field.field_type === 'number' ? 'NÃºmero' : 'Texto'}
+                        {field.field_type === 'number' ? 'Número' : 'Texto'}
                       </span>
                     </div>
                     <p>{field.field_key}</p>
@@ -2315,7 +2315,7 @@ function RequiredFieldsPanel({
       <div className="panel-heading">
         <div>
           <span className="section-kicker">Regras do funil</span>
-          <h2>Campos obrigatÃ³rios por etapa</h2>
+          <h2>Campos obrigatórios por etapa</h2>
         </div>
         <span className="panel-meta">{currentRules.length} regra(s) ativa(s) nesta etapa</span>
       </div>
@@ -2333,17 +2333,17 @@ function RequiredFieldsPanel({
       <div className="required-stage-summary">
         <article className="chat-summary-card">
           <strong>Leitura da etapa</strong>
-          <p>Defina sÃ³ o que Ã© realmente bloqueante para manter o lead avanÃ§ando com dados consistentes.</p>
+          <p>Defina só o que é realmente bloqueante para manter o lead avançando com dados consistentes.</p>
           <span>{standardKeys.length + customIds.length} item(ns) marcados</span>
         </article>
         <article className="chat-summary-card">
-          <strong>Campos padrÃ£o</strong>
+          <strong>Campos padrão</strong>
           <p>Nome, contato, origem, cargo e demais dados base do lead.</p>
-          <span>{standardKeys.length} regra(s) padrÃ£o ativas</span>
+          <span>{standardKeys.length} regra(s) padrão ativas</span>
         </article>
         <article className="chat-summary-card">
           <strong>Campos extras</strong>
-          <p>Campos personalizados do workspace que reforÃ§am segmentaÃ§Ã£o e qualificaÃ§Ã£o.</p>
+          <p>Campos personalizados do workspace que reforçam segmentação e qualificação.</p>
           <span>{customIds.length} regra(s) personalizada(s)</span>
         </article>
       </div>
@@ -2351,7 +2351,7 @@ function RequiredFieldsPanel({
       <div className="required-fields-sections">
         <section className="required-fields-section">
           <div className="required-fields-section-heading">
-            <h3>Campos padrÃ£o</h3>
+            <h3>Campos padrão</h3>
             <p>Regras universais do lead antes de mover a etapa.</p>
           </div>
           <div className="checkbox-grid">
@@ -2372,10 +2372,10 @@ function RequiredFieldsPanel({
         <section className="required-fields-section">
           <div className="required-fields-section-heading">
             <h3>Campos personalizados</h3>
-            <p>Complementos do workspace para tornar a abordagem e a qualificaÃ§Ã£o mais precisas.</p>
+            <p>Complementos do workspace para tornar a abordagem e a qualificação mais precisas.</p>
           </div>
           {data.customFields.length === 0 ? (
-            <p className="empty">Nenhum campo personalizado disponÃ­vel nesta etapa.</p>
+            <p className="empty">Nenhum campo personalizado disponível nesta etapa.</p>
           ) : (
             <div className="checkbox-grid">
               {data.customFields.map((field) => (
@@ -2426,15 +2426,15 @@ function CampaignsView({
 
       <section className="panel page-command-panel page-command-panel-campaigns">
         <div className="page-command-copy">
-          <span className="section-kicker">OrquestraÃ§Ã£o da IA</span>
+          <span className="section-kicker">Orquestração da IA</span>
           <h2>{editing ? `Refinando o playbook ${editing.name}` : 'Transforme contexto comercial em um playbook convincente para a demo'}</h2>
           <p>
-            Conecte campanha, etapa gatilho e comportamento de atendimento para que a IA pareÃ§a parte do processo, nÃ£o um bloco isolado
-            de geraÃ§Ã£o de texto.
+            Conecte campanha, etapa gatilho e comportamento de atendimento para que a IA pareça parte do processo, não um bloco isolado
+            de geração de texto.
           </p>
           <div className="page-command-chip-row">
             <span className="page-command-chip">{activeCampaigns} campanha(s) ativa(s)</span>
-            <span className="page-command-chip">{campaignsWithTrigger} gatilho(s) automÃ¡ticos</span>
+            <span className="page-command-chip">{campaignsWithTrigger} gatilho(s) automáticos</span>
             <span className="page-command-chip">{alwaysOnCampaigns} playbook(s) em resposta 24h</span>
           </div>
         </div>
@@ -2449,21 +2449,21 @@ function CampaignsView({
             </strong>
             <p>
               {editing
-                ? 'VocÃª estÃ¡ em uma ediÃ§Ã£o ativa. Revise contexto, plano e prompt final antes de salvar.'
-                : 'Campanhas bem configuradas fazem o fluxo parecer guiado, previsÃ­vel e operacional.'}
+                ? 'Você está em uma edição ativa. Revise contexto, plano e prompt final antes de salvar.'
+                : 'Campanhas bem configuradas fazem o fluxo parecer guiado, previsível e operacional.'}
             </p>
-            <span className="page-command-note">A janela do cliente fica mais crÃ­vel quando o playbook jÃ¡ nasce com objetivo e timing claros.</span>
+            <span className="page-command-note">A janela do cliente fica mais crível quando o playbook já nasce com objetivo e timing claros.</span>
           </article>
           <div className="page-command-mini-grid">
             <article className="page-command-card">
               <span className="section-kicker">Resposta 24h</span>
               <strong>{alwaysOnCampaigns}</strong>
-              <p>Playbooks com resposta contÃ­nua, ideais para demo fluida sem depender de horÃ¡rio comercial.</p>
+              <p>Playbooks com resposta contínua, ideais para demo fluida sem depender de horário comercial.</p>
             </article>
             <article className="page-command-card">
-              <span className="section-kicker">HorÃ¡rio de atendimento</span>
+              <span className="section-kicker">Horário de atendimento</span>
               <strong>{businessHoursCampaigns}</strong>
-              <p>Playbooks com janela controlada para simular operaÃ§Ã£o mais realista quando necessÃ¡rio.</p>
+              <p>Playbooks com janela controlada para simular operação mais realista quando necessário.</p>
             </article>
           </div>
         </div>
@@ -2476,7 +2476,7 @@ function CampaignsView({
             <Megaphone aria-hidden />
           </div>
           <strong>{data.campaigns.length}</strong>
-          <p>Campanhas disponÃ­veis para orientar a abordagem comercial do avaliador.</p>
+          <p>Campanhas disponíveis para orientar a abordagem comercial do avaliador.</p>
         </article>
         <article className="overview-card campaign-summary-card campaign-summary-card-active">
           <div className="overview-card-topline">
@@ -2484,15 +2484,15 @@ function CampaignsView({
             <CheckCircle2 aria-hidden />
           </div>
           <strong>{activeCampaigns}</strong>
-          <p>Playbooks jÃ¡ prontos para geraÃ§Ã£o imediata de mensagens pela IA.</p>
+          <p>Playbooks já prontos para geração imediata de mensagens pela IA.</p>
         </article>
         <article className="overview-card overview-card-accent campaign-summary-card campaign-summary-card-trigger">
           <div className="overview-card-topline">
-            <span className="section-kicker">Gatilhos automÃ¡ticos</span>
+            <span className="section-kicker">Gatilhos automáticos</span>
             <Workflow aria-hidden />
           </div>
           <strong>{campaignsWithTrigger}</strong>
-          <p>Campanhas ligadas a etapas do funil, Ãºteis para demonstrar automaÃ§Ã£o orientada a processo.</p>
+          <p>Campanhas ligadas a etapas do funil, úteis para demonstrar automação orientada a processo.</p>
         </article>
       </div>
 
@@ -2533,7 +2533,7 @@ function CampaignsView({
                     <div className="campaign-card-header">
                       <div>
                         <strong>{campaign.name}</strong>
-                        <p>{triggerStageName ? `Gatilho em ${triggerStageName}` : 'Sem gatilho automÃ¡tico configurado.'}</p>
+                        <p>{triggerStageName ? `Gatilho em ${triggerStageName}` : 'Sem gatilho automático configurado.'}</p>
                       </div>
                       <div className="campaign-chip-row">
                         <span className={`campaign-chip ${campaign.is_active ? 'campaign-chip-active' : 'campaign-chip-inactive'}`}>
@@ -2551,7 +2551,7 @@ function CampaignsView({
                     </div>
 
                     <div className="campaign-card-section">
-                      <span className="section-kicker">Prompt de geraÃ§Ã£o</span>
+                      <span className="section-kicker">Prompt de geração</span>
                       <p>{summarize(campaign.generation_prompt)}</p>
                     </div>
 
@@ -2559,7 +2559,7 @@ function CampaignsView({
                       <span className="section-kicker">Atendimento IA</span>
                       <p>
                         {campaign.ai_response_mode === 'business_hours'
-                          ? `Responde das ${campaign.ai_response_window_start.slice(0, 5)} Ã s ${campaign.ai_response_window_end.slice(0, 5)} no horÃ¡rio de SÃ£o Paulo.`
+                          ? `Responde das ${campaign.ai_response_window_start.slice(0, 5)} às ${campaign.ai_response_window_end.slice(0, 5)} no horário de São Paulo.`
                           : 'Responde automaticamente 24h no simulador.'}
                       </p>
                     </div>
@@ -2624,7 +2624,7 @@ function CampaignForm({
     if (!supabase) return;
     if (planningBusy || savingCampaign) return;
     if (!form.name.trim() || !form.context_text.trim()) {
-      setError('Nome e contexto sÃ£o obrigatÃ³rios para montar o plano da campanha.');
+      setError('Nome e contexto são obrigatórios para montar o plano da campanha.');
       return;
     }
 
@@ -2671,7 +2671,7 @@ function CampaignForm({
     if (!supabase) return;
     if (savingCampaign) return;
     if (!form.name.trim() || !form.context_text.trim()) {
-      setError('Nome e contexto sÃ£o obrigatÃ³rios.');
+      setError('Nome e contexto são obrigatórios.');
       return;
     }
     if (!plan.final_prompt.trim()) {
@@ -2679,7 +2679,7 @@ function CampaignForm({
       return;
     }
     if (form.ai_response_mode === 'business_hours' && form.ai_response_window_start === form.ai_response_window_end) {
-      setError('Defina horÃ¡rios diferentes para inÃ­cio e fim do atendimento da IA.');
+      setError('Defina horários diferentes para início e fim do atendimento da IA.');
       return;
     }
     setSavingCampaign(true);
@@ -2706,7 +2706,7 @@ function CampaignForm({
         </div>
         {campaign && (
           <button type="button" className="ghost compact" onClick={onCancel} disabled={savingCampaign}>
-            Cancelar ediÃ§Ã£o
+            Cancelar edição
           </button>
         )}
       </div>
@@ -2716,10 +2716,10 @@ function CampaignForm({
           name="campaignName"
           value={form.name}
           onChange={(event) => setForm({ ...form, name: event.target.value })}
-          placeholder="Ex.: Outbound ICP OperaÃ§Ãµes"
+          placeholder="Ex.: Outbound ICP Operações"
           required
         />
-        <span className="field-hint">Use um nome claro. Ex.: Outbound ICP OperaÃ§Ãµes.</span>
+        <span className="field-hint">Use um nome claro. Ex.: Outbound ICP Operações.</span>
       </label>
       <label>
         Etapa gatilho
@@ -2759,13 +2759,13 @@ function CampaignForm({
           }
         >
           <option value="always">Responder 24h</option>
-          <option value="business_hours">Responder apenas em horÃ¡rio de atendimento</option>
+          <option value="business_hours">Responder apenas em horário de atendimento</option>
         </select>
-        <span className="field-hint">O fuso usado no simulador Ã© sempre SÃ£o Paulo.</span>
+        <span className="field-hint">O fuso usado no simulador é sempre São Paulo.</span>
       </label>
       <div className="campaign-hours-row">
         <label>
-          InÃ­cio do atendimento
+          Início do atendimento
           <input
             name="campaignAiResponseWindowStart"
             type="time"
@@ -2791,27 +2791,27 @@ function CampaignForm({
           name="campaignContext"
           value={form.context_text}
           onChange={(event) => setForm({ ...form, context_text: event.target.value })}
-          placeholder="Ex.: SaaS B2B com time SDR travado por baixa cadÃªncia."
+          placeholder="Ex.: SaaS B2B com time SDR travado por baixa cadência."
           required
         />
-        <span className="field-hint">Ex.: SaaS B2B com time SDR travado por baixa cadÃªncia.</span>
-        <span className="field-hint">Descreva rapidamente o cenÃ¡rio, produto e dor comercial que a IA deve considerar.</span>
+        <span className="field-hint">Ex.: SaaS B2B com time SDR travado por baixa cadência.</span>
+        <span className="field-hint">Descreva rapidamente o cenário, produto e dor comercial que a IA deve considerar.</span>
       </label>
       <div className="wide campaign-plan-actions">
         <button type="button" className="secondary" onClick={generatePlan} disabled={planningBusy || savingCampaign}>
           {planningBusy ? 'Montando plano com IA...' : plan.final_prompt.trim() ? 'Gerar novo plano com IA' : 'Gerar plano com IA'}
         </button>
-        <span className="field-hint">A IA monta o plano da campanha e o prompt final. VocÃª pode aprovar, editar ou gerar novamente antes de salvar.</span>
+        <span className="field-hint">A IA monta o plano da campanha e o prompt final. Você pode aprovar, editar ou gerar novamente antes de salvar.</span>
       </div>
-      <section className="wide campaign-plan-panel" aria-label="Plano de aÃ§Ã£o da campanha">
+      <section className="wide campaign-plan-panel" aria-label="Plano de ação da campanha">
         <div className="campaign-card-header">
           <div>
-            <span className="section-kicker">RevisÃ£o antes do salvamento</span>
-            <h3>Plano de aÃ§Ã£o da campanha</h3>
-            <p>Revise o racional sugerido pela IA, ajuste o que precisar e sÃ³ entÃ£o salve a campanha.</p>
+            <span className="section-kicker">Revisão antes do salvamento</span>
+            <h3>Plano de ação da campanha</h3>
+            <p>Revise o racional sugerido pela IA, ajuste o que precisar e só então salve a campanha.</p>
           </div>
           <div className="campaign-chip-row">
-            <span className="campaign-chip campaign-chip-stage">{planMeta ? `Gerado por ${planMeta.model}` : 'Ainda nÃ£o gerado'}</span>
+            <span className="campaign-chip campaign-chip-stage">{planMeta ? `Gerado por ${planMeta.model}` : 'Ainda não gerado'}</span>
           </div>
         </div>
         <div className="campaign-plan-grid">
@@ -2821,7 +2821,7 @@ function CampaignForm({
               name="campaignPlanObjective"
               value={plan.objective_summary}
               onChange={(event) => setPlan((current) => ({ ...current, objective_summary: event.target.value }))}
-              placeholder="Ex.: Abrir diagnÃ³stico com lÃ­deres comerciais que ainda operam o pipeline manualmente."
+              placeholder="Ex.: Abrir diagnóstico com líderes comerciais que ainda operam o pipeline manualmente."
             />
           </label>
           <label>
@@ -2830,7 +2830,7 @@ function CampaignForm({
               name="campaignPlanIcp"
               value={plan.icp_summary}
               onChange={(event) => setPlan((current) => ({ ...current, icp_summary: event.target.value }))}
-              placeholder="Ex.: Heads de vendas, operaÃ§Ãµes e revenue em empresas B2B com time SDR ativo."
+              placeholder="Ex.: Heads de vendas, operações e revenue em empresas B2B com time SDR ativo."
             />
           </label>
           <label>
@@ -2839,7 +2839,7 @@ function CampaignForm({
               name="campaignPlanPain"
               value={plan.pain_summary}
               onChange={(event) => setPlan((current) => ({ ...current, pain_summary: event.target.value }))}
-              placeholder="Ex.: Baixa cadÃªncia, dificuldade de qualificaÃ§Ã£o e pouca visibilidade do funil."
+              placeholder="Ex.: Baixa cadência, dificuldade de qualificação e pouca visibilidade do funil."
             />
           </label>
           <label>
@@ -2857,25 +2857,25 @@ function CampaignForm({
               name="campaignPlanCta"
               value={plan.cta_strategy}
               onChange={(event) => setPlan((current) => ({ ...current, cta_strategy: event.target.value }))}
-              placeholder="Ex.: Convidar para uma conversa curta de diagnÃ³stico ou pedir contexto do processo atual."
+              placeholder="Ex.: Convidar para uma conversa curta de diagnóstico ou pedir contexto do processo atual."
             />
           </label>
           <label>
-            Tratamento de objeÃ§Ãµes
+            Tratamento de objeções
             <textarea
               name="campaignPlanObjections"
               value={plan.objection_handling}
               onChange={(event) => setPlan((current) => ({ ...current, objection_handling: event.target.value }))}
-              placeholder="Ex.: Responder timing, prioridade, ferramenta atual e falta de tempo sem insistÃªncia agressiva."
+              placeholder="Ex.: Responder timing, prioridade, ferramenta atual e falta de tempo sem insistência agressiva."
             />
           </label>
           <label className="wide">
-            SequÃªncia sugerida
+            Sequência sugerida
             <textarea
               name="campaignPlanSequence"
               value={plan.sequence_strategy}
               onChange={(event) => setPlan((current) => ({ ...current, sequence_strategy: event.target.value }))}
-              placeholder="Ex.: Abertura consultiva, retomada amigÃ¡vel sem resposta e avanÃ§o para qualificaÃ§Ã£o quando houver interesse."
+              placeholder="Ex.: Abertura consultiva, retomada amigável sem resposta e avanço para qualificação quando houver interesse."
             />
           </label>
           <label className="wide">
@@ -2886,7 +2886,7 @@ function CampaignForm({
               onChange={(event) => setPlan((current) => ({ ...current, final_prompt: event.target.value }))}
               placeholder="Ex.: Gere 3 mensagens curtas, consultivas, personalizadas e sem inventar dados, usando o contexto do lead e CTA leve."
             />
-            <span className="field-hint">Esse Ã© o prompt que serÃ¡ salvo e usado pela Edge Function de geraÃ§Ã£o.</span>
+            <span className="field-hint">Esse é o prompt que será salvo e usado pela Edge Function de geração.</span>
           </label>
         </div>
       </section>
