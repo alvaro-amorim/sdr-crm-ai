@@ -2969,6 +2969,13 @@ h3 {
   overflow: auto;
 }
 
+.chat-modal.flow-guide-modal {
+  background:
+    radial-gradient(circle at top center, rgba(29, 95, 99, 0.18), transparent 40%),
+    linear-gradient(180deg, rgba(29, 95, 99, 0.12), rgba(255, 255, 255, 0.98) 22%),
+    #ffffff;
+}
+
 .chat-modal.lead-confirm-modal {
   max-width: 560px;
   width: min(100%, 560px);
@@ -3911,6 +3918,10 @@ h3 {
 @media (max-width: 560px) {
   h1 {
     font-size: 1.55rem;
+  }
+
+  .auth-signal-grid {
+    display: none;
   }
 
   .setup-screen,
