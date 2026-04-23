@@ -357,7 +357,7 @@ export default function App() {
   }
 
   if (isEvaluationRoute) {
-    return <EvaluationPanelScreen user={session.user} />;
+    return <EvaluationPanelScreen user={session.user} preferredWorkspaceId={navigation.workspaceId} />;
   }
 
   if (!data) {

@@ -1,9 +1,9 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import type { Campaign, Lead, PipelineStage, Workspace, WorkspaceCustomField } from '../types/domain';
-import { createWorkspaceWithDefaults } from './crm';
+import { getAccessibleWorkspace } from './crm';
 
-const EVALUATION_WORKSPACE_NAME = 'Avaliacao Tecnica SDR Expert';
 const EVALUATION_MARKER = '[evaluation-seed-v1]';
+const EVALUATION_CAMPAIGN_NAME = 'Campanha de exemplo para avaliacao tecnica';
 
 type EvaluationLeadSeed = {
   name: string;
@@ -49,8 +49,8 @@ const evaluationStageRules: Array<{
 }> = [
   { stageName: 'Lead Mapeado', fieldKey: 'company', customFieldKey: null },
   { stageName: 'Lead Mapeado', fieldKey: null, customFieldKey: 'segmento' },
-  { stageName: 'Conexão Iniciada', fieldKey: 'email', customFieldKey: null },
-  { stageName: 'Conexão Iniciada', fieldKey: null, customFieldKey: 'canal_preferencial' },
+  { stageName: 'Conexao Iniciada', fieldKey: 'email', customFieldKey: null },
+  { stageName: 'Conexao Iniciada', fieldKey: null, customFieldKey: 'canal_preferencial' },
   { stageName: 'Qualificado', fieldKey: 'assigned_user_id', customFieldKey: null },
   { stageName: 'Qualificado', fieldKey: null, customFieldKey: 'maturidade_sdr' },
 ];
@@ -111,7 +111,7 @@ const evaluationLeads: EvaluationLeadSeed[] = [
     phone: '11981234567',
     jobTitle: 'Head de Vendas',
     leadSource: 'Indicacao de cliente',
-    stageName: 'Conexão Iniciada',
+    stageName: 'Conexao Iniciada',
     technicalOwnerName: 'Fernanda Lima',
     customValues: {
       segmento: 'Saude e educacao',
@@ -143,7 +143,7 @@ const evaluationLeads: EvaluationLeadSeed[] = [
     phone: '11979998877',
     jobTitle: 'Sales Ops Manager',
     leadSource: 'Inbound organico',
-    stageName: 'Reunião Agendada',
+    stageName: 'Reuniao Agendada',
     technicalOwnerName: 'Caio Torres',
     customValues: {
       segmento: 'Saude e educacao',
@@ -155,7 +155,7 @@ const evaluationLeads: EvaluationLeadSeed[] = [
 ];
 
 const evaluationCampaign: EvaluationCampaignSeed = {
-  name: 'Campanha de exemplo para avaliacao tecnica',
+  name: EVALUATION_CAMPAIGN_NAME,
   contextText:
     'Campanha fixa, deterministica e sem IA para deixar o avaliador navegando pelo fluxo principal com rapidez.',
   generationPrompt:
@@ -175,13 +175,13 @@ function normalizeStageName(name: string): string {
 function stageIdByName(stageMap: Map<string, PipelineStage>, stageName: string): string {
   const stage = stageMap.get(normalizeStageName(stageName));
   if (!stage) {
-    throw new Error(`Etapa de avaliação não encontrada: ${stageName}.`);
+    throw new Error(`Etapa de avaliacao nao encontrada: ${stageName}.`);
   }
   return stage.id;
 }
 
 function getEvaluationLeadNote(company: string): string {
-  return `${EVALUATION_MARKER} Lead determinístico para avaliação técnica do workspace ${company}.`;
+  return `${EVALUATION_MARKER} Lead deterministico para avaliacao tecnica do workspace ${company}.`;
 }
 
 function createToken(): string {
@@ -196,23 +196,16 @@ async function hashToken(token: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function getEvaluationWorkspace(client: SupabaseClient): Promise<Workspace | null> {
-  const { data, error } = await client
-    .from('workspaces')
-    .select('*')
-    .eq('name', EVALUATION_WORKSPACE_NAME)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) throw new Error(error.message);
-  return (data as Workspace | null) ?? null;
+async function getEvaluationWorkspace(client: SupabaseClient, preferredWorkspaceId?: string | null): Promise<Workspace | null> {
+  return getAccessibleWorkspace(client, preferredWorkspaceId);
 }
 
-async function ensureEvaluationWorkspace(client: SupabaseClient, user: User): Promise<Workspace> {
-  const existing = await getEvaluationWorkspace(client);
-  if (existing) return existing;
-  return createWorkspaceWithDefaults(client, user, EVALUATION_WORKSPACE_NAME);
+async function ensureEvaluationWorkspace(client: SupabaseClient, preferredWorkspaceId?: string | null): Promise<Workspace> {
+  const workspace = await getEvaluationWorkspace(client, preferredWorkspaceId);
+  if (!workspace) {
+    throw new Error('Crie ou selecione um workspace antes de usar o painel de avaliacao.');
+  }
+  return workspace;
 }
 
 async function loadStages(client: SupabaseClient, workspaceId: string): Promise<Map<string, PipelineStage>> {
@@ -223,7 +216,7 @@ async function loadStages(client: SupabaseClient, workspaceId: string): Promise<
     .order('position', { ascending: true });
 
   if (error) throw new Error(error.message);
-  if (!data?.length) throw new Error('Nenhuma etapa foi encontrada no workspace de avaliação.');
+  if (!data?.length) throw new Error('Nenhuma etapa foi encontrada no workspace atual.');
 
   return new Map((data as PipelineStage[]).map((stage) => [normalizeStageName(stage.name), stage]));
 }
@@ -233,108 +226,258 @@ async function syncEvaluationSchema(
   workspaceId: string,
   stageMap: Map<string, PipelineStage>,
 ): Promise<Map<string, WorkspaceCustomField>> {
-  const { error: deleteRulesError } = await client.from('stage_required_fields').delete().eq('workspace_id', workspaceId);
-  if (deleteRulesError) throw new Error(deleteRulesError.message);
-
-  const { error: deleteFieldsError } = await client.from('workspace_custom_fields').delete().eq('workspace_id', workspaceId);
-  if (deleteFieldsError) throw new Error(deleteFieldsError.message);
-
-  const { data: fields, error: insertFieldsError } = await client
+  const { data: existingFields, error: fieldsError } = await client
     .from('workspace_custom_fields')
-    .insert(evaluationCustomFields.map((field) => ({ workspace_id: workspaceId, ...field })))
-    .select();
+    .select('*')
+    .eq('workspace_id', workspaceId);
 
-  if (insertFieldsError || !fields) {
-    throw new Error(insertFieldsError?.message ?? 'Falha ao criar campos auxiliares de avaliação.');
+  if (fieldsError) throw new Error(fieldsError.message);
+
+  const fieldMap = new Map((existingFields as WorkspaceCustomField[]).map((field) => [field.field_key, field]));
+  const missingFields = evaluationCustomFields.filter((field) => !fieldMap.has(field.field_key));
+
+  if (missingFields.length > 0) {
+    const { data: insertedFields, error: insertFieldsError } = await client
+      .from('workspace_custom_fields')
+      .insert(missingFields.map((field) => ({ workspace_id: workspaceId, ...field })))
+      .select();
+
+    if (insertFieldsError || !insertedFields) {
+      throw new Error(insertFieldsError?.message ?? 'Falha ao criar campos auxiliares de avaliacao.');
+    }
+
+    for (const field of insertedFields as WorkspaceCustomField[]) {
+      fieldMap.set(field.field_key, field);
+    }
   }
 
-  const fieldMap = new Map((fields as WorkspaceCustomField[]).map((field) => [field.field_key, field]));
-  const ruleRows = evaluationStageRules.map((rule) => ({
-    workspace_id: workspaceId,
-    stage_id: stageIdByName(stageMap, rule.stageName),
-    field_key: rule.fieldKey,
-    custom_field_id: rule.customFieldKey ? fieldMap.get(rule.customFieldKey)?.id ?? null : null,
-  }));
+  const { data: existingRules, error: rulesError } = await client
+    .from('stage_required_fields')
+    .select('stage_id, field_key, custom_field_id')
+    .eq('workspace_id', workspaceId);
 
-  const { error: insertRulesError } = await client.from('stage_required_fields').insert(ruleRows);
-  if (insertRulesError) throw new Error(insertRulesError.message);
+  if (rulesError) throw new Error(rulesError.message);
+
+  const existingRuleSet = new Set(
+    ((existingRules as Array<{ stage_id: string; field_key: string | null; custom_field_id: string | null }>) ?? []).map(
+      (rule) => `${rule.stage_id}:${rule.field_key ?? ''}:${rule.custom_field_id ?? ''}`,
+    ),
+  );
+
+  const missingRules = evaluationStageRules
+    .map((rule) => ({
+      workspace_id: workspaceId,
+      stage_id: stageIdByName(stageMap, rule.stageName),
+      field_key: rule.fieldKey,
+      custom_field_id: rule.customFieldKey ? fieldMap.get(rule.customFieldKey)?.id ?? null : null,
+    }))
+    .filter((rule) => !existingRuleSet.has(`${rule.stage_id}:${rule.field_key ?? ''}:${rule.custom_field_id ?? ''}`));
+
+  if (missingRules.length > 0) {
+    const { error: insertRulesError } = await client.from('stage_required_fields').insert(missingRules);
+    if (insertRulesError) throw new Error(insertRulesError.message);
+  }
 
   return fieldMap;
 }
 
-async function resetWorkspaceData(client: SupabaseClient, workspaceId: string): Promise<void> {
-  const tables = [
-    'conversation_simulation_tokens',
-    'conversation_messages',
-    'conversation_threads',
-    'sent_message_events',
-    'generated_messages',
-    'lead_custom_field_values',
-    'stage_required_fields',
-    'campaigns',
-    'leads',
-    'workspace_custom_fields',
-  ];
+async function getSeededLeads(client: SupabaseClient, workspaceId: string): Promise<Lead[]> {
+  const { data, error } = await client
+    .from('leads')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .ilike('notes', `%${EVALUATION_MARKER}%`);
 
-  for (const table of tables) {
-    const { error } = await client.from(table).delete().eq('workspace_id', workspaceId);
-    if (error) throw new Error(`Falha ao limpar ${table}: ${error.message}`);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Lead[];
+}
+
+async function getSeededCampaign(client: SupabaseClient, workspaceId: string): Promise<Campaign | null> {
+  const { data, error } = await client
+    .from('campaigns')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .eq('name', evaluationCampaign.name)
+    .eq('generation_prompt', evaluationCampaign.generationPrompt)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return (data as Campaign | null) ?? null;
+}
+
+async function getSeededThreadIds(
+  client: SupabaseClient,
+  workspaceId: string,
+  leadIds: string[],
+  campaignId: string | null,
+): Promise<string[]> {
+  const threadIds = new Set<string>();
+
+  if (leadIds.length > 0) {
+    const { data, error } = await client
+      .from('conversation_threads')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .in('lead_id', leadIds);
+
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      threadIds.add(row.id);
+    }
+  }
+
+  if (campaignId) {
+    const { data, error } = await client
+      .from('conversation_threads')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .eq('campaign_id', campaignId);
+
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      threadIds.add(row.id);
+    }
+  }
+
+  return [...threadIds];
+}
+
+async function deleteRowsByIds(
+  client: SupabaseClient,
+  table: string,
+  column: string,
+  ids: string[],
+  workspaceId: string,
+): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await client.from(table).delete().eq('workspace_id', workspaceId).in(column, ids);
+  if (error) throw new Error(`Falha ao limpar ${table}: ${error.message}`);
+}
+
+async function deleteConversationArtifacts(
+  client: SupabaseClient,
+  workspaceId: string,
+  leadIds: string[],
+  campaignId: string | null,
+): Promise<void> {
+  const threadIds = await getSeededThreadIds(client, workspaceId, leadIds, campaignId);
+
+  await deleteRowsByIds(client, 'conversation_simulation_tokens', 'thread_id', threadIds, workspaceId);
+  await deleteRowsByIds(client, 'conversation_messages', 'thread_id', threadIds, workspaceId);
+  await deleteRowsByIds(client, 'conversation_threads', 'id', threadIds, workspaceId);
+  await deleteRowsByIds(client, 'generated_messages', 'lead_id', leadIds, workspaceId);
+  await deleteRowsByIds(client, 'sent_message_events', 'lead_id', leadIds, workspaceId);
+
+  if (campaignId) {
+    const { error: generatedByCampaignError } = await client
+      .from('generated_messages')
+      .delete()
+      .eq('workspace_id', workspaceId)
+      .eq('campaign_id', campaignId);
+    if (generatedByCampaignError) throw new Error(`Falha ao limpar generated_messages: ${generatedByCampaignError.message}`);
+
+    const { error: sentByCampaignError } = await client
+      .from('sent_message_events')
+      .delete()
+      .eq('workspace_id', workspaceId)
+      .eq('campaign_id', campaignId);
+    if (sentByCampaignError) throw new Error(`Falha ao limpar sent_message_events: ${sentByCampaignError.message}`);
   }
 }
 
-async function replaceEvaluationLeads(
+async function resetEvaluationData(client: SupabaseClient, workspaceId: string): Promise<void> {
+  const seededLeads = await getSeededLeads(client, workspaceId);
+  const seededCampaign = await getSeededCampaign(client, workspaceId);
+  const leadIds = seededLeads.map((lead) => lead.id);
+
+  await deleteConversationArtifacts(client, workspaceId, leadIds, seededCampaign?.id ?? null);
+  await deleteRowsByIds(client, 'lead_custom_field_values', 'lead_id', leadIds, workspaceId);
+
+  if (seededCampaign) {
+    const { error: campaignError } = await client.from('campaigns').delete().eq('id', seededCampaign.id).eq('workspace_id', workspaceId);
+    if (campaignError) throw new Error(campaignError.message);
+  }
+
+  if (leadIds.length > 0) {
+    const { error: leadsError } = await client.from('leads').delete().eq('workspace_id', workspaceId).in('id', leadIds);
+    if (leadsError) throw new Error(leadsError.message);
+  }
+}
+
+async function upsertEvaluationLeads(
   client: SupabaseClient,
   workspaceId: string,
   user: User,
   stageMap: Map<string, PipelineStage>,
   fieldMap: Map<string, WorkspaceCustomField>,
 ): Promise<Lead[]> {
-  const { error: deleteLeadsError } = await client.from('leads').delete().eq('workspace_id', workspaceId);
-  if (deleteLeadsError) throw new Error(deleteLeadsError.message);
+  const existingSeededLeads = await getSeededLeads(client, workspaceId);
+  const existingLeadMap = new Map(existingSeededLeads.map((lead) => [lead.email ?? '', lead]));
+  const persistedLeads: Lead[] = [];
 
-  const rows = evaluationLeads.map((lead, index) => ({
-    workspace_id: workspaceId,
-    current_stage_id: stageIdByName(stageMap, lead.stageName),
-    assigned_user_id: user.id,
-    technical_owner_name: lead.technicalOwnerName,
-    name: lead.name,
-    email: lead.email,
-    phone: lead.phone,
-    company: lead.company,
-    job_title: lead.jobTitle,
-    lead_source: lead.leadSource,
-    notes: getEvaluationLeadNote(lead.company),
-    created_by: user.id,
-    created_at: new Date(Date.now() - (8 - index) * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - (8 - index) * 60 * 60 * 1000).toISOString(),
-  }));
+  for (const seed of evaluationLeads) {
+    const existingLead = existingLeadMap.get(seed.email);
+    const payload = {
+      workspace_id: workspaceId,
+      current_stage_id: stageIdByName(stageMap, seed.stageName),
+      assigned_user_id: user.id,
+      technical_owner_name: seed.technicalOwnerName,
+      name: seed.name,
+      email: seed.email,
+      phone: seed.phone,
+      company: seed.company,
+      job_title: seed.jobTitle,
+      lead_source: seed.leadSource,
+      notes: getEvaluationLeadNote(seed.company),
+      created_by: existingLead?.created_by ?? user.id,
+      updated_at: new Date().toISOString(),
+    };
 
-  const { data: insertedLeads, error: insertLeadsError } = await client.from('leads').insert(rows).select();
-  if (insertLeadsError || !insertedLeads) {
-    throw new Error(insertLeadsError?.message ?? 'Falha ao criar leads de avaliação.');
+    const query = existingLead
+      ? client.from('leads').update(payload).eq('id', existingLead.id).eq('workspace_id', workspaceId).select().single()
+      : client
+          .from('leads')
+          .insert({
+            ...payload,
+            created_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+    const { data, error } = await query;
+    if (error || !data) {
+      throw new Error(error?.message ?? `Falha ao persistir lead de avaliacao ${seed.name}.`);
+    }
+
+    persistedLeads.push(data as Lead);
   }
 
-  const leadByName = new Map((insertedLeads as Lead[]).map((lead) => [lead.name, lead]));
-  const customValueRows = evaluationLeads.flatMap((lead) => {
-    const leadRecord = leadByName.get(lead.name);
-    if (!leadRecord) return [];
+  const persistedLeadIds = persistedLeads.map((lead) => lead.id);
+  await deleteRowsByIds(client, 'lead_custom_field_values', 'lead_id', persistedLeadIds, workspaceId);
 
-    return Object.entries(lead.customValues).map(([fieldKey, valueText]) => ({
-      workspace_id: workspaceId,
-      lead_id: leadRecord.id,
-      custom_field_id: fieldMap.get(fieldKey)?.id,
-      value_text: valueText,
-      created_at: leadRecord.created_at,
-      updated_at: leadRecord.updated_at,
-    }));
-  }).filter((row) => Boolean(row.custom_field_id));
+  const customValueRows = evaluationLeads
+    .flatMap((seed) => {
+      const lead = persistedLeads.find((item) => item.email === seed.email);
+      if (!lead) return [];
+
+      return Object.entries(seed.customValues).map(([fieldKey, valueText]) => ({
+        workspace_id: workspaceId,
+        lead_id: lead.id,
+        custom_field_id: fieldMap.get(fieldKey)?.id,
+        value_text: valueText,
+        created_at: lead.created_at,
+        updated_at: new Date().toISOString(),
+      }));
+    })
+    .filter((row) => Boolean(row.custom_field_id));
 
   if (customValueRows.length > 0) {
     const { error: customValuesError } = await client.from('lead_custom_field_values').insert(customValueRows);
     if (customValuesError) throw new Error(customValuesError.message);
   }
 
-  return insertedLeads as Lead[];
+  return persistedLeads;
 }
 
 async function upsertEvaluationCampaign(
@@ -357,16 +500,7 @@ async function upsertEvaluationCampaign(
     updated_at: new Date().toISOString(),
   };
 
-  const { data: existingCampaign, error: existingError } = await client
-    .from('campaigns')
-    .select('*')
-    .eq('workspace_id', workspaceId)
-    .eq('name', evaluationCampaign.name)
-    .limit(1)
-    .maybeSingle();
-
-  if (existingError) throw new Error(existingError.message);
-
+  const existingCampaign = await getSeededCampaign(client, workspaceId);
   const query = existingCampaign
     ? client.from('campaigns').update(payload).eq('id', existingCampaign.id).eq('workspace_id', workspaceId).select().single()
     : client
@@ -380,7 +514,7 @@ async function upsertEvaluationCampaign(
 
   const { data, error } = await query;
   if (error || !data) {
-    throw new Error(error?.message ?? 'Falha ao criar campanha de avaliação.');
+    throw new Error(error?.message ?? 'Falha ao criar campanha de avaliacao.');
   }
 
   return data as Campaign;
@@ -393,14 +527,7 @@ async function seedThreadAndMessages(
   lead: Lead,
   campaign: Campaign,
 ): Promise<string> {
-  const { error: deleteThreadsError } = await client.from('conversation_threads').delete().eq('workspace_id', workspace.id);
-  if (deleteThreadsError) throw new Error(deleteThreadsError.message);
-
-  const { error: deleteGeneratedError } = await client.from('generated_messages').delete().eq('workspace_id', workspace.id);
-  if (deleteGeneratedError) throw new Error(deleteGeneratedError.message);
-
-  const { error: deleteEventsError } = await client.from('sent_message_events').delete().eq('workspace_id', workspace.id);
-  if (deleteEventsError) throw new Error(deleteEventsError.message);
+  await deleteConversationArtifacts(client, workspace.id, [lead.id], campaign.id);
 
   const { data: generatedMessages, error: generatedError } = await client
     .from('generated_messages')
@@ -538,18 +665,29 @@ async function seedThreadAndMessages(
   return token;
 }
 
-async function countTable(client: SupabaseClient, table: string, workspaceId: string): Promise<number> {
+async function countRowsByIds(
+  client: SupabaseClient,
+  table: string,
+  column: string,
+  ids: string[],
+  workspaceId: string,
+): Promise<number> {
+  if (ids.length === 0) return 0;
   const { count, error } = await client
     .from(table)
     .select('*', { count: 'exact', head: true })
-    .eq('workspace_id', workspaceId);
+    .eq('workspace_id', workspaceId)
+    .in(column, ids);
 
   if (error) throw new Error(error.message);
   return count ?? 0;
 }
 
-export async function loadEvaluationStatus(client: SupabaseClient): Promise<EvaluationStatus> {
-  const workspace = await getEvaluationWorkspace(client);
+export async function loadEvaluationStatus(
+  client: SupabaseClient,
+  preferredWorkspaceId?: string | null,
+): Promise<EvaluationStatus> {
+  const workspace = await getEvaluationWorkspace(client, preferredWorkspaceId);
   if (!workspace) {
     return {
       workspace: null,
@@ -562,54 +700,69 @@ export async function loadEvaluationStatus(client: SupabaseClient): Promise<Eval
     };
   }
 
-  const [leads, campaigns, threads, messages, simulationTokens] = await Promise.all([
-    countTable(client, 'leads', workspace.id),
-    countTable(client, 'campaigns', workspace.id),
-    countTable(client, 'conversation_threads', workspace.id),
-    countTable(client, 'conversation_messages', workspace.id),
-    countTable(client, 'conversation_simulation_tokens', workspace.id),
+  const seededLeads = await getSeededLeads(client, workspace.id);
+  const seededCampaign = await getSeededCampaign(client, workspace.id);
+  const threadIds = await getSeededThreadIds(
+    client,
+    workspace.id,
+    seededLeads.map((lead) => lead.id),
+    seededCampaign?.id ?? null,
+  );
+
+  const [messages, simulationTokens] = await Promise.all([
+    countRowsByIds(client, 'conversation_messages', 'thread_id', threadIds, workspace.id),
+    countRowsByIds(client, 'conversation_simulation_tokens', 'thread_id', threadIds, workspace.id),
   ]);
 
   return {
     workspace,
-    leads,
-    campaigns,
-    threads,
+    leads: seededLeads.length,
+    campaigns: seededCampaign ? 1 : 0,
+    threads: threadIds.length,
     messages,
     simulationTokens,
     simulatorUrl: null,
   };
 }
 
-export async function seedEvaluationLeads(client: SupabaseClient, user: User): Promise<EvaluationStatus> {
-  const workspace = await ensureEvaluationWorkspace(client, user);
+export async function seedEvaluationLeads(
+  client: SupabaseClient,
+  user: User,
+  preferredWorkspaceId?: string | null,
+): Promise<EvaluationStatus> {
+  const workspace = await ensureEvaluationWorkspace(client, preferredWorkspaceId);
   const stageMap = await loadStages(client, workspace.id);
   const fieldMap = await syncEvaluationSchema(client, workspace.id, stageMap);
-  await replaceEvaluationLeads(client, workspace.id, user, stageMap, fieldMap);
-  return loadEvaluationStatus(client);
+  await upsertEvaluationLeads(client, workspace.id, user, stageMap, fieldMap);
+  return loadEvaluationStatus(client, workspace.id);
 }
 
-export async function seedEvaluationCampaign(client: SupabaseClient, user: User): Promise<EvaluationStatus> {
-  const workspace = await ensureEvaluationWorkspace(client, user);
+export async function seedEvaluationCampaign(
+  client: SupabaseClient,
+  user: User,
+  preferredWorkspaceId?: string | null,
+): Promise<EvaluationStatus> {
+  const workspace = await ensureEvaluationWorkspace(client, preferredWorkspaceId);
   const stageMap = await loadStages(client, workspace.id);
   await upsertEvaluationCampaign(client, workspace.id, user, stageMap);
-  return loadEvaluationStatus(client);
+  return loadEvaluationStatus(client, workspace.id);
 }
 
 export async function prepareEvaluationScenario(
   client: SupabaseClient,
   user: User,
   origin: string,
+  preferredWorkspaceId?: string | null,
 ): Promise<EvaluationStatus> {
-  const workspace = await ensureEvaluationWorkspace(client, user);
-  await resetWorkspaceData(client, workspace.id);
+  const workspace = await ensureEvaluationWorkspace(client, preferredWorkspaceId);
+  await resetEvaluationData(client, workspace.id);
   const stageMap = await loadStages(client, workspace.id);
   const fieldMap = await syncEvaluationSchema(client, workspace.id, stageMap);
-  const leads = await replaceEvaluationLeads(client, workspace.id, user, stageMap, fieldMap);
+  const leads = await upsertEvaluationLeads(client, workspace.id, user, stageMap, fieldMap);
   const campaign = await upsertEvaluationCampaign(client, workspace.id, user, stageMap);
   const simulatorLead = leads.find((lead) => lead.name === 'Alan Menezes') ?? leads[0];
   const token = await seedThreadAndMessages(client, workspace, user, simulatorLead, campaign);
-  const status = await loadEvaluationStatus(client);
+  const status = await loadEvaluationStatus(client, workspace.id);
 
   return {
     ...status,
@@ -617,12 +770,15 @@ export async function prepareEvaluationScenario(
   };
 }
 
-export async function resetEvaluationScenario(client: SupabaseClient): Promise<EvaluationStatus> {
-  const workspace = await getEvaluationWorkspace(client);
+export async function resetEvaluationScenario(
+  client: SupabaseClient,
+  preferredWorkspaceId?: string | null,
+): Promise<EvaluationStatus> {
+  const workspace = await getEvaluationWorkspace(client, preferredWorkspaceId);
   if (!workspace) {
-    return loadEvaluationStatus(client);
+    return loadEvaluationStatus(client, preferredWorkspaceId);
   }
 
-  await resetWorkspaceData(client, workspace.id);
-  return loadEvaluationStatus(client);
+  await resetEvaluationData(client, workspace.id);
+  return loadEvaluationStatus(client, workspace.id);
 }

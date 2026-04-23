@@ -25,7 +25,13 @@ const emptyStatus: EvaluationStatus = {
   simulatorUrl: null,
 };
 
-export function EvaluationPanelScreen({ user }: { user: User }) {
+export function EvaluationPanelScreen({
+  user,
+  preferredWorkspaceId = null,
+}: {
+  user: User;
+  preferredWorkspaceId?: string | null;
+}) {
   const simulatorStorageKey = `sdr-evaluation-simulator-link:${user.id}`;
   const [status, setStatus] = useState<EvaluationStatus>(emptyStatus);
   const [loading, setLoading] = useState(true);
@@ -34,7 +40,7 @@ export function EvaluationPanelScreen({ user }: { user: User }) {
   const [error, setError] = useState<string | null>(null);
 
   const shortcuts = useMemo(() => {
-    const workspaceId = status.workspace?.id ?? null;
+    const workspaceId = status.workspace?.id ?? preferredWorkspaceId ?? null;
     const origin = window.location.origin;
 
     return {
@@ -43,7 +49,7 @@ export function EvaluationPanelScreen({ user }: { user: User }) {
       campaigns: buildEvaluationAppUrl(origin, workspaceId, 'campaigns'),
       messages: buildEvaluationAppUrl(origin, workspaceId, 'messages'),
     };
-  }, [status.workspace?.id]);
+  }, [preferredWorkspaceId, status.workspace?.id]);
 
   const refreshStatus = useCallback(async () => {
     if (!supabase) return;
@@ -51,7 +57,7 @@ export function EvaluationPanelScreen({ user }: { user: User }) {
     setError(null);
 
     try {
-      const nextStatus = await loadEvaluationStatus(supabase);
+      const nextStatus = await loadEvaluationStatus(supabase, preferredWorkspaceId);
       const storedSimulatorUrl = window.localStorage.getItem(simulatorStorageKey);
       setStatus({
         ...nextStatus,
@@ -66,7 +72,7 @@ export function EvaluationPanelScreen({ user }: { user: User }) {
     } finally {
       setLoading(false);
     }
-  }, [simulatorStorageKey]);
+  }, [preferredWorkspaceId, simulatorStorageKey]);
 
   useEffect(() => {
     void refreshStatus();
@@ -95,11 +101,13 @@ export function EvaluationPanelScreen({ user }: { user: User }) {
   }
 
   async function handleReset() {
-    if (!window.confirm('Isso limpará apenas o workspace auxiliar de avaliação técnica. Deseja continuar?')) {
+    if (!window.confirm('Isso limpara apenas os dados seeded de avaliacao do workspace atual. Deseja continuar?')) {
       return;
     }
 
-    await runAction('reset', 'Dados auxiliares de avaliação resetados com sucesso.', () => resetEvaluationScenario(supabase!));
+    await runAction('reset', 'Dados seeded de avaliacao resetados com sucesso no workspace atual.', () =>
+      resetEvaluationScenario(supabase!, preferredWorkspaceId),
+    );
   }
 
   return (
@@ -107,22 +115,22 @@ export function EvaluationPanelScreen({ user }: { user: User }) {
       <section className="evaluation-shell">
         <header className="evaluation-hero">
           <div className="evaluation-hero-copy">
-            <span className="section-kicker">Painel auxiliar de avaliação técnica</span>
-            <h1>Ferramenta isolada para preparar a demonstração com dados determinísticos</h1>
+            <span className="section-kicker">Painel auxiliar de avaliacao tecnica</span>
+            <h1>Ferramenta isolada para preparar a demonstracao com dados deterministicos</h1>
             <p>
-              Esta interface existe apenas para acelerar a validação funcional do sistema e não compõe o fluxo normal do produto.
+              Esta interface existe apenas para acelerar a validacao funcional do sistema e nao compoe o fluxo normal do produto.
             </p>
             <div className="evaluation-chip-row">
               <span className="evaluation-chip">Sem IA</span>
-              <span className="evaluation-chip">Dados reproduzíveis</span>
-              <span className="evaluation-chip">Workspace isolado</span>
+              <span className="evaluation-chip">Dados reproduziveis</span>
+              <span className="evaluation-chip">Workspace da sessao</span>
             </div>
           </div>
 
           <aside className="evaluation-hero-card">
             <span className="section-kicker">Uso do avaliador</span>
             <strong>1 clique para preparar o ambiente</strong>
-            <p>Gere leads, campanha, conversa seeded e atalhos diretos para Dashboard, Leads, Campanhas e Mensagens IA.</p>
+            <p>Gere leads, campanha, conversa seeded e atalhos diretos para Dashboard, Leads, Campanhas e Mensagens IA no workspace logado.</p>
             <a className="evaluation-link" href={shortcuts.dashboard} target="_blank" rel="noreferrer">
               Abrir app principal
               <ArrowUpRight aria-hidden />
@@ -132,7 +140,7 @@ export function EvaluationPanelScreen({ user }: { user: User }) {
 
         {(notice || error) && (
           <section className={error ? 'evaluation-banner evaluation-banner-error' : 'evaluation-banner'}>
-            <strong>{error ? 'Ação não concluída' : 'Ação concluída'}</strong>
+            <strong>{error ? 'Acao nao concluida' : 'Acao concluida'}</strong>
             <p>{error ?? notice}</p>
           </section>
         )}
@@ -140,14 +148,14 @@ export function EvaluationPanelScreen({ user }: { user: User }) {
         <section className="evaluation-grid">
           <article className="evaluation-status-card evaluation-status-card-wide">
             <div className="evaluation-card-topline">
-              <span className="section-kicker">Workspace auxiliar</span>
+              <span className="section-kicker">Workspace atual</span>
               <Beaker aria-hidden />
             </div>
-            <strong>{status.workspace?.name ?? 'Workspace de avaliação ainda não criado'}</strong>
+            <strong>{status.workspace?.name ?? 'Nenhum workspace disponivel para avaliacao'}</strong>
             <p>
               {status.workspace
                 ? `ID interno: ${status.workspace.id}`
-                : 'As ações abaixo criam o workspace técnico dedicado automaticamente, sem tocar no workspace principal.'}
+                : 'Entre em um workspace para gerar os dados deterministicos do painel de avaliacao.'}
             </p>
           </article>
 
@@ -166,7 +174,7 @@ export function EvaluationPanelScreen({ user }: { user: User }) {
               <Megaphone aria-hidden />
             </div>
             <strong>{loading ? '...' : status.campaigns}</strong>
-            <p>Campanha determinística pronta para leitura e navegação da estratégia.</p>
+            <p>Campanha deterministica pronta para leitura e navegacao da estrategia.</p>
           </article>
 
           <article className="evaluation-status-card">
@@ -182,8 +190,8 @@ export function EvaluationPanelScreen({ user }: { user: User }) {
         <section className="panel evaluation-actions-panel">
           <div className="panel-heading">
             <div>
-              <span className="section-kicker">Ações determinísticas</span>
-              <h2>Prepare o cenário de avaliação sem cadastro manual</h2>
+              <span className="section-kicker">Acoes deterministicas</span>
+              <h2>Prepare o cenario de avaliacao sem cadastro manual</h2>
             </div>
             <button type="button" className="ghost compact" onClick={() => void refreshStatus()} disabled={loading || busyAction !== null}>
               <RefreshCcw aria-hidden className={loading ? 'spin' : undefined} />
@@ -195,7 +203,9 @@ export function EvaluationPanelScreen({ user }: { user: User }) {
             <button
               type="button"
               onClick={() =>
-                void runAction('leads', 'Leads de exemplo gerados no workspace auxiliar.', () => seedEvaluationLeads(supabase!, user))
+                void runAction('leads', 'Leads de exemplo gerados no workspace atual.', () =>
+                  seedEvaluationLeads(supabase!, user, preferredWorkspaceId),
+                )
               }
               disabled={busyAction !== null}
             >
@@ -207,7 +217,9 @@ export function EvaluationPanelScreen({ user }: { user: User }) {
               type="button"
               className="secondary"
               onClick={() =>
-                void runAction('campaign', 'Campanha fixa criada no workspace auxiliar.', () => seedEvaluationCampaign(supabase!, user))
+                void runAction('campaign', 'Campanha fixa criada no workspace atual.', () =>
+                  seedEvaluationCampaign(supabase!, user, preferredWorkspaceId),
+                )
               }
               disabled={busyAction !== null}
             >
@@ -218,19 +230,19 @@ export function EvaluationPanelScreen({ user }: { user: User }) {
             <button
               type="button"
               onClick={() =>
-                void runAction('scenario', 'Cenário básico de avaliação preparado com sucesso.', () =>
-                  prepareEvaluationScenario(supabase!, user, window.location.origin),
+                void runAction('scenario', 'Cenario basico de avaliacao preparado com sucesso no workspace atual.', () =>
+                  prepareEvaluationScenario(supabase!, user, window.location.origin, preferredWorkspaceId),
                 )
               }
               disabled={busyAction !== null}
             >
               <Sparkles aria-hidden />
-              {busyAction === 'scenario' ? 'Preparando cenário...' : 'Popular cenário básico de avaliação'}
+              {busyAction === 'scenario' ? 'Preparando cenario...' : 'Popular cenario basico de avaliacao'}
             </button>
 
             <button type="button" className="ghost" onClick={() => void handleReset()} disabled={busyAction !== null}>
               <RotateCcw aria-hidden />
-              {busyAction === 'reset' ? 'Resetando...' : 'Resetar dados de avaliação'}
+              {busyAction === 'reset' ? 'Resetando...' : 'Resetar dados de avaliacao'}
             </button>
           </div>
         </section>
@@ -240,7 +252,7 @@ export function EvaluationPanelScreen({ user }: { user: User }) {
             <div className="panel-heading">
               <div>
                 <span className="section-kicker">Atalhos limpos</span>
-                <h2>Abrir rapidamente as áreas principais do app</h2>
+                <h2>Abrir rapidamente as areas principais do app</h2>
               </div>
               <LayoutDashboard aria-hidden />
             </div>
@@ -268,15 +280,13 @@ export function EvaluationPanelScreen({ user }: { user: User }) {
           <article className="panel evaluation-shortcut-panel evaluation-shortcut-panel-emphasis">
             <div className="panel-heading">
               <div>
-                <span className="section-kicker">Fluxo crítico</span>
+                <span className="section-kicker">Fluxo critico</span>
                 <h2>Simulador do cliente</h2>
               </div>
               <Bot aria-hidden />
             </div>
 
-            <p>
-              O cenário básico deixa uma conversa seeded pronta para o avaliador validar envio, histórico e simulador sem depender de IA.
-            </p>
+            <p>O cenario basico deixa uma conversa seeded pronta para o avaliador validar envio, historico e simulador sem depender de IA.</p>
 
             {status.simulatorUrl ? (
               <a className="evaluation-link evaluation-link-primary" href={status.simulatorUrl} target="_blank" rel="noreferrer">
@@ -285,7 +295,7 @@ export function EvaluationPanelScreen({ user }: { user: User }) {
               </a>
             ) : (
               <p className="evaluation-inline-note">
-                Primeiro use <strong>Popular cenário básico de avaliação</strong> para gerar o link direto do simulador.
+                Primeiro use <strong>Popular cenario basico de avaliacao</strong> para gerar o link direto do simulador.
               </p>
             )}
           </article>
