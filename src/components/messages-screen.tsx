@@ -15,6 +15,7 @@ import type {
   SentMessageEvent,
 } from '../types/domain';
 import { findStageByName, formatDateTime, getLeadChannel, getLeadMetaLine } from '../utils/crm-ui';
+import { getErrorMessage } from '../utils/error-messages';
 import { buildStageAutomationErrorWarning } from '../utils/stage-automation-feedback';
 
 function formatDeliveryStatus(status: SentMessageEvent['delivery_status']) {
@@ -251,7 +252,7 @@ export function MessagesScreen({
       setNotice('Mensagens geradas e salvas.');
       await onReload();
     } catch (generateError) {
-      setError(generateError instanceof Error ? generateError.message : 'Falha inesperada ao gerar mensagens.');
+      setError(getErrorMessage(generateError, 'ai'));
     } finally {
       setBusy(false);
     }
@@ -417,7 +418,7 @@ export function MessagesScreen({
 
       await onReload();
     } catch (sendError) {
-      setError(sendError instanceof Error ? sendError.message : 'Falha inesperada ao simular envio.');
+      setError(getErrorMessage(sendError, 'simulator'));
     } finally {
       setSimulationBusy(false);
     }
@@ -443,7 +444,7 @@ export function MessagesScreen({
 
       window.open(result.data.url, '_blank', 'noopener,noreferrer,width=430,height=760');
     } catch (linkError) {
-      setError(linkError instanceof Error ? linkError.message : 'Falha inesperada ao abrir simulador.');
+      setError(getErrorMessage(linkError, 'simulator'));
     } finally {
       setSimulatorLinkBusy(false);
     }

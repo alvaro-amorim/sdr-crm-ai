@@ -1,4 +1,5 @@
 import type { StageTriggerAutomationResult } from '../services/crm';
+import { getErrorMessage } from './error-messages';
 
 export type StageAutomationFeedback = {
   notice: string;
@@ -38,7 +39,8 @@ export function buildStageAutomationFeedback(params: {
 }
 
 export function buildStageAutomationErrorWarning(failurePrefix: string, error: unknown): string {
-  const detail = error instanceof Error && error.message.trim().length > 0 ? withPeriod(error.message) : null;
+  const detailMessage = getErrorMessage(error, 'automation');
+  const detail = detailMessage ? withPeriod(detailMessage) : null;
 
   if (!detail) {
     return withPeriod(failurePrefix);

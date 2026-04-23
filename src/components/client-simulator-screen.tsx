@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Campaign, ConversationMessage, ConversationThread, Lead } from '../types/domain';
 import { formatDateTime } from '../utils/crm-ui';
+import { getErrorMessage } from '../utils/error-messages';
 
 type SimulatorThread = ConversationThread & {
   leads?: Lead;
@@ -38,14 +39,7 @@ function getChannelLabel(channel: string | null | undefined) {
 }
 
 function getFriendlySimulatorError(error: unknown) {
-  const message = error instanceof Error ? error.message : '';
-  if (message.includes('Edge Function returned a non-2xx status code')) {
-    return 'A simulação não conseguiu gerar a resposta da IA nesta tentativa. Tente novamente.';
-  }
-  if (message.includes('Failed to fetch')) {
-    return 'Falha de conexão ao chamar a simulação. Verifique a internet e tente novamente.';
-  }
-  return message || 'Falha ao responder como cliente.';
+  return getErrorMessage(error, 'simulator');
 }
 
 function wait(ms: number) {

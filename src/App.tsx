@@ -51,6 +51,7 @@ import type {
   PipelineStage,
 } from './types/domain';
 import { getLeadMetaLine } from './utils/crm-ui';
+import { getAuthErrorMessage, getErrorMessage, type ErrorMessageScope } from './utils/error-messages';
 import { createFieldKey, findMissingRequiredFields, STANDARD_LEAD_FIELDS } from './utils/pipeline';
 import { buildStageAutomationErrorWarning, buildStageAutomationFeedback } from './utils/stage-automation-feedback';
 
@@ -118,43 +119,8 @@ function derivePlanFromCampaign(campaign: Campaign | null): CampaignStrategyPlan
   };
 }
 
-function getSafeMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Falha inesperada. Tente novamente.';
-}
-
-function getAuthSafeMessage(error: unknown): string {
-  const rawMessage = error instanceof Error ? error.message : String(error ?? '');
-  const normalized = rawMessage.toLowerCase();
-
-  if (normalized.includes('email rate limit') || normalized.includes('rate limit') || normalized.includes('too many requests')) {
-    return 'Muitas tentativas em pouco tempo. Aguarde alguns instantes e tente novamente.';
-  }
-  if (normalized.includes('invalid login credentials')) {
-    return 'E-mail ou senha inválidos.';
-  }
-  if (normalized.includes('email not confirmed')) {
-    return 'Confirme seu e-mail antes de entrar.';
-  }
-  if (normalized.includes('user already registered') || normalized.includes('already registered')) {
-    return 'Este e-mail já está cadastrado. Entre com sua senha ou use a recuperação de senha.';
-  }
-  if (normalized.includes('signup') && normalized.includes('disabled')) {
-    return 'Cadastro por e-mail está indisponível neste momento.';
-  }
-  if (normalized.includes('password') && (normalized.includes('weak') || normalized.includes('at least'))) {
-    return 'Use uma senha mais forte, com pelo menos 6 caracteres.';
-  }
-  if (normalized.includes('invalid email') || normalized.includes('unable to validate email')) {
-    return 'Informe um e-mail válido.';
-  }
-  if (normalized.includes('oauth') || normalized.includes('provider') || normalized.includes('exchange')) {
-    return 'Não foi possível concluir o login com Google. Tente novamente.';
-  }
-  if (normalized.includes('network') || normalized.includes('failed to fetch')) {
-    return 'Falha de conexão com a autenticação. Verifique a internet e tente novamente.';
-  }
-
-  return rawMessage || 'Falha na autenticação. Tente novamente.';
+function getSafeMessage(error: unknown, scope: ErrorMessageScope = 'general'): string {
+  return getErrorMessage(error, scope);
 }
 
 function getWorkspaceMemberDisplayName(member: CrmData['workspaceMembers'][number], user?: User): string {
@@ -257,7 +223,7 @@ export default function App() {
     async function initializeSession() {
       const callbackError = readAuthCallbackError();
       if (callbackError) {
-        setError(getAuthSafeMessage(new Error(callbackError)));
+        setError(getAuthErrorMessage(new Error(callbackError)));
         clearAuthCallbackUrl();
       }
 
@@ -266,7 +232,7 @@ export default function App() {
         const { data: exchangedData, error: exchangeError } = await supabaseClient.auth.exchangeCodeForSession(code);
         clearAuthCallbackUrl();
         if (exchangeError) {
-          setError(getAuthSafeMessage(exchangeError));
+          setError(getAuthErrorMessage(exchangeError));
         } else if (!cancelled) {
           setSession(exchangedData.session);
         }
@@ -281,7 +247,7 @@ export default function App() {
 
     void initializeSession().catch((sessionError: unknown) => {
       if (!cancelled) {
-        setError(getAuthSafeMessage(sessionError));
+        setError(getAuthErrorMessage(sessionError));
         setLoading(false);
       }
     });
@@ -316,7 +282,7 @@ export default function App() {
       }
       setData(await loadCrmData(supabase, workspace));
     } catch (loadError) {
-      setError(getSafeMessage(loadError));
+      setError(getSafeMessage(loadError, 'workspace'));
     } finally {
       setBusy(false);
     }
@@ -335,7 +301,7 @@ export default function App() {
       setData(await loadCrmData(supabase, workspace));
       setNotice('Workspace criado com funil padrão.');
     } catch (workspaceError) {
-      setError(getSafeMessage(workspaceError));
+      setError(getSafeMessage(workspaceError, 'workspace'));
     } finally {
       setBusy(false);
     }
@@ -561,7 +527,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
         if (result.error) throw result.error;
       }
     } catch (authError) {
-      setError(getAuthSafeMessage(authError));
+      setError(getAuthErrorMessage(authError));
     } finally {
       setBusy(false);
     }
@@ -581,7 +547,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
       });
       if (oauthError) throw oauthError;
     } catch (googleError) {
-      setError(getAuthSafeMessage(googleError));
+      setError(getAuthErrorMessage(googleError));
       setBusy(false);
     }
   }
@@ -711,7 +677,7 @@ function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
       setSuccess('Senha atualizada com sucesso.');
       window.setTimeout(onDone, 900);
     } catch (updateError) {
-      setError(getAuthSafeMessage(updateError));
+      setError(getAuthErrorMessage(updateError));
     } finally {
       setBusy(false);
     }
@@ -1175,7 +1141,7 @@ function LeadsView({
 
       await onReload();
     } catch (moveError) {
-      setError(getSafeMessage(moveError));
+      setError(getSafeMessage(moveError, 'lead'));
     }
   }
 
@@ -1417,7 +1383,7 @@ function LeadForm({
 
       onSaved(feedback.notice);
     } catch (saveError) {
-      setError(getSafeMessage(saveError));
+      setError(getSafeMessage(saveError, 'lead'));
     } finally {
       setSaving(false);
     }
@@ -1815,7 +1781,7 @@ function FieldsView({
       setNotice('Campo personalizado criado.');
       await onReload();
     } catch (fieldError) {
-      setError(getSafeMessage(fieldError));
+      setError(getSafeMessage(fieldError, 'workspace'));
     }
   }
 
@@ -1960,7 +1926,7 @@ function RequiredFieldsPanel({
       setNotice('Regras de etapa salvas.');
       await onReload();
     } catch (ruleError) {
-      setError(getSafeMessage(ruleError));
+      setError(getSafeMessage(ruleError, 'workspace'));
     }
   }
 
@@ -2265,7 +2231,7 @@ function CampaignForm({
       });
       setPlanMeta({ model: result.data.model });
     } catch (planError) {
-      setError(getSafeMessage(planError));
+      setError(getSafeMessage(planError, 'ai'));
     } finally {
       setPlanningBusy(false);
     }
@@ -2293,7 +2259,7 @@ function CampaignForm({
       });
       onSaved();
     } catch (campaignError) {
-      setError(getSafeMessage(campaignError));
+      setError(getSafeMessage(campaignError, 'campaign'));
     }
   }
 

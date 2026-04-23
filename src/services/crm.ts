@@ -15,6 +15,7 @@ import type {
   WorkspaceCustomField,
   WorkspaceMember,
 } from '../types/domain';
+import { getErrorMessage } from '../utils/error-messages';
 
 export type LeadInput = {
   id?: string;
@@ -410,7 +411,7 @@ export async function runStageTriggerAutomation(
     } catch (error) {
       failedCampaigns.push({
         name: campaign.name,
-        error: error instanceof Error ? error.message : 'Falha inesperada ao gerar mensagens.',
+        error: getErrorMessage(error, 'ai'),
       });
     }
   }

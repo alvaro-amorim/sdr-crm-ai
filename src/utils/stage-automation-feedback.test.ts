@@ -55,7 +55,7 @@ describe('stage automation feedback', () => {
 
   it('preserva a mensagem principal quando a automacao nao pode ser concluida', () => {
     expect(buildStageAutomationErrorWarning('Lead movido, mas o gatilho automatico nao pode ser concluido', new Error('Falha HTTP 502'))).toBe(
-      'Lead movido, mas o gatilho automatico nao pode ser concluido. Falha HTTP 502.',
+      'Lead movido, mas o gatilho automatico nao pode ser concluido. Serviço de IA indisponível nesta tentativa. Tente novamente.',
     );
   });
 });
