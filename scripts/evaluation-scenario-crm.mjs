@@ -817,7 +817,7 @@ async function main() {
     count: reloadedLeads.filter((lead) => lead.current_stage_id === stage.id).length,
   }));
 
-  console.log('10/11 Smoke test realista concluído com sucesso.');
+  console.log('10/11 Cenário pesado de avaliação concluído com sucesso.');
   const summary = {
     workspace_id: workspace.id,
     workspace_name: workspace.name,
