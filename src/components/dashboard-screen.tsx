@@ -48,6 +48,8 @@ type OperationLeadRow = {
   campaign: Campaign | null;
   thread: ConversationThread | null;
   latestMessage: ConversationMessage | null;
+  latestInboundMessage: ConversationMessage | null;
+  latestOutboundMessage: ConversationMessage | null;
   sortAt: string;
 };
 
@@ -83,6 +85,12 @@ function sortByNewest<T extends { sortAt: string }>(items: T[]) {
 function getMessagePreview(message: ConversationMessage | null) {
   if (!message) return 'Sem mensagem registrada nesta conversa.';
   return message.message_text.length > 180 ? `${message.message_text.slice(0, 180)}...` : message.message_text;
+}
+
+function getLatestMessageByDirection(messages: ConversationMessage[], direction: ConversationMessage['direction']) {
+  return messages
+    .filter((message) => message.direction === direction)
+    .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())[0] ?? null;
 }
 
 function getThreadLabel(thread: ConversationThread | null) {
@@ -128,7 +136,13 @@ function getStageNextAction(stage: PipelineStage | null, leads: Lead[], hasCampa
   return 'Revise os dados da etapa e defina o próximo playbook comercial.';
 }
 
-export function DashboardScreen({ data }: { data: CrmData }) {
+export function DashboardScreen({
+  data,
+  onOpenLeadConversation,
+}: {
+  data: CrmData;
+  onOpenLeadConversation: (leadId: string, campaignId?: string | null) => void;
+}) {
   const [selectedStageId, setSelectedStageId] = useState(data.stages[0]?.id ?? '');
   const [insightsCollapsed, setInsightsCollapsed] = useState(false);
   const [diagnosticOpen, setDiagnosticOpen] = useState(false);
@@ -206,6 +220,7 @@ export function DashboardScreen({ data }: { data: CrmData }) {
       const lead = leadsById.get(thread.lead_id);
       if (!lead) return null;
       const latestMessage = latestConversationMessageByThread.get(thread.id) ?? null;
+      const threadMessages = messagesByThread.get(thread.id) ?? [];
       return {
         id: thread.id,
         lead,
@@ -213,6 +228,8 @@ export function DashboardScreen({ data }: { data: CrmData }) {
         campaign: campaignsById.get(thread.campaign_id) ?? null,
         thread,
         latestMessage,
+        latestInboundMessage: getLatestMessageByDirection(threadMessages, 'inbound'),
+        latestOutboundMessage: getLatestMessageByDirection(threadMessages, 'outbound'),
         sortAt: latestMessage?.created_at ?? thread.updated_at,
       };
     })
@@ -224,6 +241,8 @@ export function DashboardScreen({ data }: { data: CrmData }) {
     campaign: null,
     thread: null,
     latestMessage: null,
+    latestInboundMessage: null,
+    latestOutboundMessage: null,
     sortAt: lead.updated_at,
   }));
   const mostRecentConversation = [...data.conversationMessages].sort(
@@ -419,6 +438,12 @@ export function DashboardScreen({ data }: { data: CrmData }) {
   }, [activeCampaigns, leadOnlyRows, meetingStage?.id, messagesByThread, operationalRows, qualifiedStage?.id]);
 
   const activeShortcut = operationalShortcuts.find((shortcut) => shortcut.key === activeShortcutKey) ?? null;
+  const previewRow = activeShortcut?.rows[0] ?? null;
+
+  function openLeadConversation(row: OperationLeadRow) {
+    setActiveShortcutKey(null);
+    onOpenLeadConversation(row.lead.id, row.campaign?.id ?? row.thread?.campaign_id ?? null);
+  }
 
   return (
     <section className="stack">
@@ -712,9 +737,28 @@ export function DashboardScreen({ data }: { data: CrmData }) {
             <section className="operation-modal-preview">
               <div>
                 <span className="section-kicker">Prévia da conversa</span>
-                <h3>{activeShortcut.rows[0]?.lead.name ?? 'Sem lead para prévia'}</h3>
+                <h3>{previewRow?.lead.name ?? 'Sem lead para prévia'}</h3>
               </div>
-              <p>{getMessagePreview(activeShortcut.rows[0]?.latestMessage ?? null)}</p>
+              {previewRow ? (
+                <>
+                  <div className="operation-message-pair">
+                    <article>
+                      <span>Cliente</span>
+                      <p>{getMessagePreview(previewRow.latestInboundMessage)}</p>
+                    </article>
+                    <article>
+                      <span>SDR</span>
+                      <p>{getMessagePreview(previewRow.latestOutboundMessage)}</p>
+                    </article>
+                  </div>
+                  <button type="button" className="secondary compact" onClick={() => openLeadConversation(previewRow)}>
+                    <MessageCircleReply aria-hidden />
+                    Ver conversa deste lead
+                  </button>
+                </>
+              ) : (
+                <p>Sem conversa registrada nesta categoria.</p>
+              )}
             </section>
 
             {activeShortcut.rows.length === 0 ? (
@@ -732,14 +776,22 @@ export function DashboardScreen({ data }: { data: CrmData }) {
                     <div className="operation-row-main">
                       <strong>{row.lead.name}</strong>
                       <span>{getLeadMetaLine(row.lead)}</span>
-                      <p>{getMessagePreview(row.latestMessage)}</p>
+                      <div className="operation-row-messages">
+                        <p><strong>Cliente:</strong> {getMessagePreview(row.latestInboundMessage)}</p>
+                        <p><strong>SDR:</strong> {getMessagePreview(row.latestOutboundMessage)}</p>
+                      </div>
                     </div>
                     <div className="operation-row-tags">
                       <span>{row.stage?.name ?? 'Sem etapa'}</span>
                       <span>{row.campaign?.name ?? 'Sem campanha'}</span>
                       <span>{getThreadLabel(row.thread)}</span>
                     </div>
-                    <time dateTime={row.sortAt}>{formatDateTime(row.sortAt)}</time>
+                    <div className="operation-row-actions">
+                      <time dateTime={row.sortAt}>{formatDateTime(row.sortAt)}</time>
+                      <button type="button" className="ghost compact" onClick={() => openLeadConversation(row)}>
+                        Ver conversa
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>

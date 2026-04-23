@@ -16,7 +16,14 @@ import type {
 } from '../types/domain';
 import { findStageByName, formatDateTime, getLeadChannel, getLeadMetaLine } from '../utils/crm-ui';
 import { getErrorMessage } from '../utils/error-messages';
+import { rankLeadOptions, toLeadSearchOption } from '../utils/lead-search';
 import { buildStageAutomationErrorWarning } from '../utils/stage-automation-feedback';
+
+export type MessageFocusTarget = {
+  leadId: string;
+  campaignId?: string | null;
+  nonce: number;
+};
 
 function formatDeliveryStatus(status: SentMessageEvent['delivery_status']) {
   switch (status) {
@@ -114,21 +121,24 @@ export function MessagesScreen({
   onReload,
   setError,
   setNotice,
+  focusTarget,
 }: {
   data: CrmData;
   user: User;
   onReload: () => void;
   setError: (message: string | null) => void;
   setNotice: (message: string | null) => void;
+  focusTarget?: MessageFocusTarget | null;
 }) {
-  const sortedLeads = useMemo(() => sortByLabel(data.leads, (lead) => lead.name), [data.leads]);
   const activeCampaigns = useMemo(
     () => sortByLabel(data.campaigns.filter((campaign) => campaign.is_active), (campaign) => campaign.name),
     [data.campaigns],
   );
-  const [leadId, setLeadId] = useState(sortedLeads[0]?.id ?? '');
+  const [leadId, setLeadId] = useState('');
   const [leadQuery, setLeadQuery] = useState('');
+  const [leadSelectorOpen, setLeadSelectorOpen] = useState(false);
   const [campaignId, setCampaignId] = useState(activeCampaigns[0]?.id ?? '');
+  const [consumedFocusNonce, setConsumedFocusNonce] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [simulationMessage, setSimulationMessage] = useState<GeneratedMessage | null>(null);
   const [simulationBusy, setSimulationBusy] = useState(false);
@@ -137,14 +147,7 @@ export function MessagesScreen({
   const selectedCampaign = data.campaigns.find((campaign) => campaign.id === campaignId) ?? null;
   const selectedStage = selectedLead ? data.stages.find((stage) => stage.id === selectedLead.current_stage_id) ?? null : null;
   const targetStage = findStageByName(data.stages, 'Tentando Contato');
-  const leadOptions = useMemo(
-    () =>
-      sortedLeads.map((lead) => ({
-        id: lead.id,
-        label: lead.company ? `${lead.name} · ${lead.company}` : lead.name,
-      })),
-    [sortedLeads],
-  );
+  const leadOptions = useMemo(() => rankLeadOptions(leadQuery, data.leads), [data.leads, leadQuery]);
   const leadMessages = data.generatedMessages
     .filter((message) => message.lead_id === leadId && (!campaignId || message.campaign_id === campaignId))
     .sort((left, right) => left.variation_index - right.variation_index);
@@ -196,19 +199,43 @@ export function MessagesScreen({
     : [];
 
   useEffect(() => {
-    if (leadId && data.leads.some((lead) => lead.id === leadId)) return;
-    setLeadId(sortedLeads[0]?.id ?? '');
-  }, [data.leads, leadId, sortedLeads]);
+    if (!leadId || data.leads.some((lead) => lead.id === leadId)) return;
+    setLeadId('');
+    setLeadQuery('');
+  }, [data.leads, leadId]);
 
   useEffect(() => {
     if (!selectedLead) {
-      setLeadQuery('');
       return;
     }
 
-    const selectedOption = leadOptions.find((option) => option.id === selectedLead.id);
-    setLeadQuery(selectedOption?.label ?? selectedLead.name);
-  }, [leadOptions, selectedLead]);
+    setLeadQuery(toLeadSearchOption(selectedLead).label);
+  }, [selectedLead]);
+
+  useEffect(() => {
+    if (!focusTarget) return;
+    if (consumedFocusNonce === focusTarget.nonce) return;
+
+    const focusedLead = data.leads.find((lead) => lead.id === focusTarget.leadId);
+    if (!focusedLead) return;
+
+    setLeadId(focusedLead.id);
+    setLeadQuery(toLeadSearchOption(focusedLead).label);
+    setLeadSelectorOpen(false);
+
+    if (focusTarget.campaignId && data.campaigns.some((campaign) => campaign.id === focusTarget.campaignId)) {
+      setCampaignId(focusTarget.campaignId);
+      setConsumedFocusNonce(focusTarget.nonce);
+      return;
+    }
+
+    const leadThread = data.conversationThreads.find((thread) => thread.lead_id === focusedLead.id);
+    if (leadThread && data.campaigns.some((campaign) => campaign.id === leadThread.campaign_id)) {
+      setCampaignId(leadThread.campaign_id);
+    }
+
+    setConsumedFocusNonce(focusTarget.nonce);
+  }, [consumedFocusNonce, data.campaigns, data.conversationThreads, data.leads, focusTarget]);
 
   useEffect(() => {
     if (campaignId && activeCampaigns.some((campaign) => campaign.id === campaignId)) return;
@@ -217,19 +244,18 @@ export function MessagesScreen({
 
   function handleLeadQueryChange(value: string) {
     setLeadQuery(value);
+    setLeadSelectorOpen(true);
+    setLeadId('');
+  }
 
-    const exactMatch = leadOptions.find((option) => option.label === value);
-    if (exactMatch) {
-      setLeadId(exactMatch.id);
-      return;
-    }
+  function selectLead(lead: Lead) {
+    setLeadId(lead.id);
+    setLeadQuery(toLeadSearchOption(lead).label);
+    setLeadSelectorOpen(false);
 
-    const normalizedValue = value.trim().toLocaleLowerCase('pt-BR');
-    if (!normalizedValue) return;
-
-    const includesMatch = leadOptions.find((option) => option.label.toLocaleLowerCase('pt-BR').includes(normalizedValue));
-    if (includesMatch) {
-      setLeadId(includesMatch.id);
+    const leadThread = data.conversationThreads.find((thread) => thread.lead_id === lead.id);
+    if (leadThread && data.campaigns.some((campaign) => campaign.id === leadThread.campaign_id && campaign.is_active)) {
+      setCampaignId(leadThread.campaign_id);
     }
   }
 
@@ -459,26 +485,61 @@ export function MessagesScreen({
 
       <section className="panel message-workbench">
         <div className="message-toolbar">
-          <label className="autocomplete-field">
-            Lead
+          <div className="lead-selector-field">
+            <div className="lead-selector-heading">
+              <label htmlFor="messageLead">Lead</label>
+              <button
+                type="button"
+                className="ghost compact"
+                onClick={() => {
+                  setLeadQuery('');
+                  setLeadSelectorOpen((current) => !current);
+                }}
+              >
+                {leadSelectorOpen && !leadQuery ? 'Ocultar lista' : 'Ver todos'}
+              </button>
+            </div>
             <div className="autocomplete-input-shell">
               <Search aria-hidden />
               <input
+                id="messageLead"
                 name="messageLead"
-                list="messageLeadOptions"
                 value={leadQuery}
                 onChange={(event) => handleLeadQueryChange(event.target.value)}
+                onFocus={() => setLeadSelectorOpen(true)}
                 placeholder="Ex.: Contato comercial"
                 autoComplete="off"
               />
             </div>
-            <datalist id="messageLeadOptions">
-              {leadOptions.map((option) => (
-                <option key={option.id} value={option.label} />
-              ))}
-            </datalist>
-            <span className="field-hint">Busque pelo nome do lead. Ex.: Contato comercial.</span>
-          </label>
+            {leadSelectorOpen && (
+              <div className="lead-selector-menu" role="listbox" aria-label="Selecionar lead para conversa">
+                {leadOptions.length === 0 ? (
+                  <div className="lead-selector-empty">Nenhum lead encontrado para esta busca.</div>
+                ) : (
+                  leadOptions.map((option) => (
+                    <button
+                      key={option.lead.id}
+                      type="button"
+                      className={`lead-selector-option ${option.lead.id === leadId ? 'lead-selector-option-active' : ''}`}
+                      onClick={() => selectLead(option.lead)}
+                      role="option"
+                      aria-selected={option.lead.id === leadId}
+                    >
+                      <span className="lead-selector-option-main">
+                        <strong>{option.label}</strong>
+                        <span>{option.subtitle}</span>
+                      </span>
+                      <span className="lead-selector-option-meta">
+                        <small>{option.matchLabel}</small>
+                        <span>{option.contact}</span>
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+            <span className="field-hint">Digite para filtrar ou abra a lista e selecione explicitamente o lead.</span>
+          </div>
 
           <label>
             Campanha ativa
@@ -491,7 +552,7 @@ export function MessagesScreen({
             </select>
           </label>
 
-          <button type="button" onClick={generateMessages} disabled={busy || data.leads.length === 0 || activeCampaigns.length === 0}>
+          <button type="button" onClick={generateMessages} disabled={busy || !leadId || data.leads.length === 0 || activeCampaigns.length === 0}>
             <Sparkles aria-hidden />
             {busy ? 'Gerando mensagens...' : 'Gerar mensagens'}
           </button>

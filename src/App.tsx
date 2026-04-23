@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { DashboardScreen } from './components/dashboard-screen';
 import { ClientSimulatorScreen } from './components/client-simulator-screen';
-import { MessagesScreen } from './components/messages-screen';
+import { MessagesScreen, type MessageFocusTarget } from './components/messages-screen';
 import { envError, supabase } from './lib/supabase';
 import {
   createWorkspaceWithDefaults,
@@ -210,6 +210,7 @@ export default function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [messageFocusTarget, setMessageFocusTarget] = useState<MessageFocusTarget | null>(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -307,6 +308,15 @@ export default function App() {
     }
   }
 
+  function openLeadConversation(leadId: string, campaignId?: string | null) {
+    setMessageFocusTarget({
+      leadId,
+      campaignId: campaignId ?? null,
+      nonce: Date.now(),
+    });
+    setTab('messages');
+  }
+
   if (window.location.pathname === '/client-simulator') {
     return <ClientSimulatorScreen />;
   }
@@ -350,7 +360,7 @@ export default function App() {
       }} />
       <OperationGuide tab={tab} />
 
-      {tab === 'dashboard' && <Dashboard data={data} />}
+      {tab === 'dashboard' && <Dashboard data={data} onOpenLeadConversation={openLeadConversation} />}
       {tab === 'leads' && (
         <LeadsView
           data={data}
@@ -379,6 +389,7 @@ export default function App() {
           onReload={reloadData}
           setError={setError}
           setNotice={setNotice}
+          focusTarget={messageFocusTarget}
         />
       )}
     </Shell>
@@ -406,6 +417,17 @@ function FullPageState({ title }: { title: string }) {
         <h1>{title}</h1>
       </section>
     </main>
+  );
+}
+
+function GoogleIcon() {
+  return (
+    <svg className="google-mark" viewBox="0 0 24 24" aria-hidden>
+      <path fill="#4285F4" d="M21.6 12.23c0-.74-.07-1.45-.19-2.13H12v4.03h5.38a4.6 4.6 0 0 1-1.99 3.02v2.51h3.22c1.89-1.74 2.99-4.3 2.99-7.43Z" />
+      <path fill="#34A853" d="M12 22c2.7 0 4.96-.89 6.61-2.34l-3.22-2.51c-.9.6-2.04.95-3.39.95-2.6 0-4.81-1.76-5.6-4.12H3.07v2.59A9.98 9.98 0 0 0 12 22Z" />
+      <path fill="#FBBC05" d="M6.4 13.98a6 6 0 0 1 0-3.96V7.43H3.07a10.01 10.01 0 0 0 0 9.14l3.33-2.59Z" />
+      <path fill="#EA4335" d="M12 5.9c1.47 0 2.78.5 3.82 1.5l2.86-2.86A9.6 9.6 0 0 0 12 2a9.98 9.98 0 0 0-8.93 5.43l3.33 2.59C7.19 7.66 9.4 5.9 12 5.9Z" />
+    </svg>
   );
 }
 
@@ -630,6 +652,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
         </button>
         {mode !== 'forgot' && (
           <button type="button" className="google-button" onClick={signInWithGoogle} disabled={busy}>
+            <GoogleIcon />
             {busyAction === 'google' ? 'Abrindo Google...' : 'Entrar com Google'}
           </button>
         )}
@@ -1014,8 +1037,14 @@ function OperationGuide({ tab }: { tab: Tab }) {
   );
 }
 
-function Dashboard({ data }: { data: CrmData }) {
-  return <DashboardScreen data={data} />;
+function Dashboard({
+  data,
+  onOpenLeadConversation,
+}: {
+  data: CrmData;
+  onOpenLeadConversation: (leadId: string, campaignId?: string | null) => void;
+}) {
+  return <DashboardScreen data={data} onOpenLeadConversation={onOpenLeadConversation} />;
 }
 
 function LeadsView({
@@ -2504,12 +2533,14 @@ function MessagesView({
   onReload,
   setError,
   setNotice,
+  focusTarget,
 }: {
   data: CrmData;
   user: User;
   onReload: () => void;
   setError: (message: string | null) => void;
   setNotice: (message: string | null) => void;
+  focusTarget?: MessageFocusTarget | null;
 }) {
   return (
     <MessagesScreen
@@ -2518,6 +2549,7 @@ function MessagesView({
       onReload={onReload}
       setError={setError}
       setNotice={setNotice}
+      focusTarget={focusTarget}
     />
   );
 }
