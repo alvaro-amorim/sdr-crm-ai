@@ -97,11 +97,11 @@ Objetivo:
 
 - acelerar a validacao funcional pelo avaliador;
 - nao misturar seeds de apoio com o fluxo normal do produto;
-- manter todos os dados do avaliador em um workspace tecnico isolado.
+- popular dados deterministicos no workspace atual da sessao do avaliador.
 
 Comportamento:
 
-- cria ou reutiliza o workspace `Avaliacao Tecnica SDR Expert`;
+- usa o workspace logado do avaliador, inclusive quando aberto por `?workspace=`;
 - funciona automaticamente em `localhost`;
 - em ambiente remoto exige `VITE_ENABLE_EVALUATION_PANEL=true`;
 - oferece 4 acoes deterministicas:
@@ -114,7 +114,7 @@ Comportamento:
   - Leads
   - Campanhas
   - Mensagens IA
-  - simulador seeded
+  - chat como cliente quando a conversa seeded existir
 
 Mais detalhes:
 
@@ -199,7 +199,7 @@ Painel auxiliar:
 
 - abrir `http://localhost:5173/__evaluation`
 - preparar o cenario com um clique
-- navegar pelos atalhos do app principal no workspace tecnico
+- navegar pelos atalhos do app principal no workspace atual da sessao
 
 ## Deploy
 
@@ -207,6 +207,7 @@ Painel auxiliar:
 - variaveis publicas na Vercel:
   - `VITE_SUPABASE_URL`
   - `VITE_SUPABASE_ANON_KEY`
+  - `VITE_ENABLE_EVALUATION_PANEL=true` para expor o painel remoto do avaliador
 - `OPENAI_API_KEY` e `SUPABASE_SERVICE_ROLE_KEY` ficam apenas no Supabase.
 
 Deploy de referencia:

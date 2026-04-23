@@ -47,7 +47,7 @@ Validacoes recorrentes desta fase:
 - criada a rota isolada ` /__evaluation `;
 - o painel ficou fora da navegacao principal;
 - os dados do avaliador passaram a ser sempre deterministas e sem IA;
-- o workspace tecnico dedicado evita contaminar o fluxo normal do produto;
+- o painel opera no workspace atual da sessao e separa dados seeded por marcador interno;
 - README e docs passaram a explicar:
   - como habilitar a rota;
   - o que cada botao faz;

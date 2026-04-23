@@ -24,9 +24,9 @@ Base funcional do MVP criada com frontend React, schema Supabase, RLS, Edge Func
 
 - rota: `/__evaluation`
 - uso previsto:
-  - preparar rapidamente um workspace tecnico pronto para navegacao;
+  - preparar rapidamente o workspace atual do avaliador para navegacao;
   - evitar cadastro manual durante a avaliacao;
-  - resetar apenas os dados de apoio do avaliador.
+  - resetar apenas os dados seeded de apoio do avaliador.
 - isolamento:
   - fora da navegacao principal;
   - visivel localmente por padrao;
@@ -105,8 +105,9 @@ Opcionais do cenario pesado:
 8. Painel auxiliar
    - abrir `/__evaluation`;
    - preparar o cenario basico;
-   - validar que os atalhos abrem o app principal no workspace tecnico;
-   - resetar o workspace auxiliar sem afetar outros dados.
+   - validar que os atalhos abrem o app principal no workspace atual da sessao;
+   - validar que o atalho `Abrir chat como cliente` aparece quando a conversa seeded existir;
+   - resetar apenas os dados seeded sem afetar outros dados do workspace.
 
 ## Revisao de seguranca
 
@@ -115,4 +116,4 @@ Opcionais do cenario pesado:
 - service role restrita a Edge Functions;
 - RLS ativa nas tabelas principais;
 - simulador publico limitado a thread especifica por token;
-- seeds limpam apenas o workspace dedicado e nao tocam outros workspaces.
+- seeds limpam apenas dados marcados como avaliacao/smoke e nao removem workspaces normais inteiros.

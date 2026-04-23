@@ -14,7 +14,7 @@ Se o objetivo for apenas acelerar a navegacao funcional do avaliador com dados f
 /__evaluation
 ```
 
-O painel deixa um workspace tecnico pronto com um clique e nao substitui este seed pesado.
+O painel deixa o workspace atual do avaliador pronto com um clique e nao substitui este seed pesado.
 
 ## Objetivo
 
