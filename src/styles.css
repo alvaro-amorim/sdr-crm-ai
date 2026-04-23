@@ -1860,10 +1860,197 @@ h3 {
   gap: 18px;
 }
 
+.page-command-panel {
+  align-items: stretch;
+  border-radius: 24px;
+  box-shadow: 0 24px 72px rgba(20, 39, 37, 0.08);
+  display: grid;
+  gap: 22px;
+  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+  overflow: hidden;
+  padding: 24px;
+  position: relative;
+}
+
+.page-command-panel::after {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent);
+  content: "";
+  inset: 0 auto 0 52%;
+  pointer-events: none;
+  position: absolute;
+  width: 1px;
+}
+
+.page-command-panel-leads {
+  background:
+    radial-gradient(circle at top left, rgba(57, 112, 163, 0.12), transparent 28%),
+    linear-gradient(135deg, rgba(29, 95, 99, 0.11), rgba(255, 255, 255, 0.98)),
+    #ffffff;
+}
+
+.page-command-panel-fields {
+  background:
+    radial-gradient(circle at top left, rgba(243, 195, 95, 0.14), transparent 28%),
+    linear-gradient(135deg, rgba(29, 95, 99, 0.08), rgba(255, 255, 255, 0.98)),
+    #ffffff;
+}
+
+.page-command-panel-campaigns {
+  background:
+    radial-gradient(circle at top right, rgba(243, 195, 95, 0.12), transparent 24%),
+    linear-gradient(135deg, rgba(29, 95, 99, 0.14), rgba(255, 255, 255, 0.98)),
+    #ffffff;
+}
+
+.page-command-copy,
+.page-command-side,
+.page-command-mini-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.page-command-copy {
+  align-content: start;
+}
+
+.page-command-copy h2 {
+  font-size: 1.7rem;
+  line-height: 1.1;
+  max-width: 22ch;
+}
+
+.page-command-copy p {
+  color: #50605d;
+  font-size: 1rem;
+  line-height: 1.65;
+  max-width: 64ch;
+}
+
+.page-command-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.page-command-chip {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(29, 95, 99, 0.12);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
+  color: #214d51;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 8px 12px;
+}
+
+.page-command-side {
+  align-content: start;
+}
+
+.page-command-card {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(29, 95, 99, 0.12);
+  border-radius: 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+}
+
+.page-command-card-primary {
+  background: linear-gradient(145deg, #153b3e, #1d5f63);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 22px 58px rgba(16, 43, 44, 0.2);
+  color: #ffffff;
+}
+
+.page-command-card-topline {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.page-command-card-topline svg {
+  color: #f3c35f;
+  height: 18px;
+  width: 18px;
+}
+
+.page-command-card strong {
+  color: #18201f;
+  font-size: 1.18rem;
+  line-height: 1.2;
+}
+
+.page-command-card p {
+  color: #61706d;
+  line-height: 1.55;
+}
+
+.page-command-card-primary strong {
+  color: #ffffff;
+  font-size: 1.4rem;
+}
+
+.page-command-card-primary p,
+.page-command-note {
+  color: rgba(235, 246, 243, 0.82);
+}
+
+.page-command-note {
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.page-command-mini-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .campaign-summary-grid {
   display: grid;
   gap: 14px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.lead-summary-card-primary {
+  background: linear-gradient(180deg, rgba(29, 95, 99, 0.08), #ffffff 28%);
+}
+
+.lead-summary-card-contact {
+  background: linear-gradient(180deg, rgba(57, 112, 163, 0.08), #ffffff 28%);
+}
+
+.lead-summary-card-warning {
+  background: linear-gradient(180deg, rgba(243, 195, 95, 0.18), #ffffff 28%);
+}
+
+.lead-summary-card-progress {
+  background: linear-gradient(180deg, rgba(35, 102, 66, 0.09), #ffffff 28%);
+}
+
+.field-summary-card-library {
+  background: linear-gradient(180deg, rgba(29, 95, 99, 0.08), #ffffff 28%);
+}
+
+.field-summary-card-rules {
+  background: linear-gradient(180deg, rgba(57, 112, 163, 0.08), #ffffff 28%);
+}
+
+.field-summary-card-coverage {
+  background: linear-gradient(180deg, rgba(243, 195, 95, 0.18), #ffffff 28%);
+}
+
+.campaign-summary-card-library {
+  background: linear-gradient(180deg, rgba(29, 95, 99, 0.08), #ffffff 28%);
+}
+
+.campaign-summary-card-active {
+  background: linear-gradient(180deg, rgba(35, 102, 66, 0.09), #ffffff 28%);
+}
+
+.campaign-summary-card-trigger {
+  background: linear-gradient(180deg, rgba(57, 112, 163, 0.1), #ffffff 28%);
 }
 
 .campaign-grid {
@@ -1896,12 +2083,14 @@ h3 {
 }
 
 .campaign-plan-panel {
-  background: #f8fbfa;
+  background:
+    radial-gradient(circle at top right, rgba(243, 195, 95, 0.1), transparent 24%),
+    linear-gradient(180deg, rgba(29, 95, 99, 0.05), #f8fbfa 18%);
   border: 1px solid #dfe9e5;
-  border-radius: 8px;
+  border-radius: 20px;
   display: grid;
   gap: 16px;
-  padding: 16px;
+  padding: 18px;
 }
 
 .campaign-plan-grid {
@@ -1928,12 +2117,12 @@ h3 {
 }
 
 .campaign-card-playbook {
-  background: #f8fbfa;
+  background: linear-gradient(180deg, #f8fbfa, #ffffff 32%);
   border: 1px solid #e1e9e6;
-  border-radius: 8px;
+  border-radius: 18px;
   display: grid;
   gap: 14px;
-  padding: 16px;
+  padding: 18px;
 }
 
 .campaign-card-selected {
@@ -2015,6 +2204,54 @@ h3 {
   align-content: start;
 }
 
+.lead-form,
+.lead-spotlight,
+.lead-board-panel,
+.field-create-form,
+.field-library,
+.required-fields-panel,
+.campaign-form,
+.campaign-library {
+  border-radius: 22px;
+  box-shadow: 0 24px 68px rgba(20, 39, 37, 0.08);
+}
+
+.lead-form,
+.field-create-form,
+.campaign-form {
+  background:
+    radial-gradient(circle at top right, rgba(243, 195, 95, 0.1), transparent 24%),
+    linear-gradient(180deg, rgba(29, 95, 99, 0.05), #ffffff 18%);
+  border-color: rgba(29, 95, 99, 0.12);
+}
+
+.lead-spotlight {
+  background:
+    radial-gradient(circle at top left, rgba(57, 112, 163, 0.1), transparent 22%),
+    linear-gradient(180deg, rgba(29, 95, 99, 0.04), #ffffff 18%);
+  border-color: rgba(29, 95, 99, 0.1);
+}
+
+.lead-spotlight .chat-summary-card,
+.required-stage-summary .chat-summary-card {
+  border-radius: 18px;
+}
+
+.lead-spotlight .chat-summary-card:first-child {
+  background: linear-gradient(180deg, rgba(29, 95, 99, 0.08), #ffffff 28%);
+}
+
+.lead-board-panel {
+  background: linear-gradient(180deg, rgba(29, 95, 99, 0.03), #ffffff 14%, #fbfcfc);
+  border-color: rgba(29, 95, 99, 0.1);
+}
+
+.field-library,
+.required-fields-panel {
+  background: linear-gradient(180deg, rgba(29, 95, 99, 0.04), #ffffff 18%, #fbfcfc);
+  border-color: rgba(29, 95, 99, 0.1);
+}
+
 .field-form-actions {
   display: flex;
   justify-content: flex-start;
@@ -2028,7 +2265,7 @@ h3 {
 .field-card {
   background: #f8fbfa;
   border: 1px solid #e1e9e6;
-  border-radius: 8px;
+  border-radius: 16px;
   display: grid;
   gap: 8px;
   padding: 14px;
@@ -2060,7 +2297,7 @@ h3 {
 .required-fields-section {
   background: #f8fbfa;
   border: 1px solid #e1e9e6;
-  border-radius: 8px;
+  border-radius: 16px;
   display: grid;
   gap: 12px;
   padding: 16px;
@@ -3257,6 +3494,8 @@ h3 {
   .dashboard-hero,
   .dashboard-grid,
   .dashboard-insight-strip,
+  .page-command-panel,
+  .page-command-mini-grid,
   .dashboard-shortcut-grid,
   .selected-stage-grid,
   .diagnostic-grid,
@@ -3284,9 +3523,18 @@ h3 {
   }
 
   .operation-guide,
-  .operation-guide-collapsed {
+  .operation-guide-collapsed,
+  .page-command-panel {
     align-items: stretch;
     grid-template-columns: 1fr;
+  }
+
+  .page-command-panel::after {
+    display: none;
+  }
+
+  .page-command-copy h2 {
+    max-width: none;
   }
 
   .operation-guide-actions {
@@ -3567,6 +3815,20 @@ h3 {
   .workspace-onboarding-highlight,
   .workspace-onboarding-side-card {
     padding: 14px;
+  }
+
+  .page-command-panel {
+    border-radius: 18px;
+    padding: 18px;
+  }
+
+  .page-command-card {
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  .page-command-copy h2 {
+    font-size: 1.42rem;
   }
 
   .auth-proof-card {

@@ -1210,6 +1210,11 @@ function LeadsView({
     );
   }).length;
   const leadsInContact = data.leads.filter((lead) => stageById.get(lead.current_stage_id)?.name === 'Tentando Contato').length;
+  const selectedLeadReadinessLabel = !selectedLead
+    ? 'Selecione um lead no funil'
+    : selectedLeadMissing.length > 0
+      ? `${selectedLeadMissing.length} pendência(s) antes do próximo movimento`
+      : 'Lead pronto para avançar';
 
   useEffect(() => {
     if (!data.leads.length) {
@@ -1303,8 +1308,57 @@ function LeadsView({
     <section className="stack">
       <Header title="Leads e funil" subtitle="Cadastro, edição e movimentação por etapa." />
 
+      <section className="panel page-command-panel page-command-panel-leads">
+        <div className="page-command-copy">
+          <span className="section-kicker">Cockpit de qualificação</span>
+          <h2>{selectedLead ? `${selectedLead.name} está no foco da operação` : 'Monte contexto, destaque um lead e conduza o funil com clareza'}</h2>
+          <p>
+            Use o formulário para registrar o essencial, traga um lead para o foco do time e mova a operação sem perder consistência
+            dos dados nem a narrativa da prova.
+          </p>
+          <div className="page-command-chip-row">
+            <span className="page-command-chip">{data.leads.length} lead(s) ativos</span>
+            <span className="page-command-chip">{leadsWithPendingFields} com revisão obrigatória</span>
+            <span className="page-command-chip">{leadsInContact} em contato</span>
+          </div>
+        </div>
+        <div className="page-command-side">
+          <article className="page-command-card page-command-card-primary">
+            <div className="page-command-card-topline">
+              <span className="section-kicker">Lead em foco</span>
+              <Users aria-hidden />
+            </div>
+            <strong>{selectedLead ? selectedLead.name : 'Nenhum lead selecionado'}</strong>
+            <p>
+              {selectedLead
+                ? `${getLeadMetaLine(selectedLead)} • Etapa atual: ${selectedLeadStage?.name ?? 'Sem etapa definida'}`
+                : 'Clique em um card do kanban para trazer um lead para a leitura principal da tela.'}
+            </p>
+            <span className="page-command-note">
+              {selectedLead
+                ? selectedLeadMissing.length > 0
+                  ? `Bloqueios ativos: ${selectedLeadMissing.join(', ')}.`
+                  : 'Sem bloqueios ativos para a etapa atual.'
+                : 'O kanban vira a cena principal quando um lead é escolhido explicitamente.'}
+            </span>
+          </article>
+          <div className="page-command-mini-grid">
+            <article className="page-command-card">
+              <span className="section-kicker">Prontidão</span>
+              <strong>{selectedLeadReadinessLabel}</strong>
+              <p>Use essa leitura para decidir se vale editar dados antes de mover a etapa.</p>
+            </article>
+            <article className="page-command-card">
+              <span className="section-kicker">Responsável do workspace</span>
+              <strong>{selectedLeadWorkspaceOwner ?? 'A definir'}</strong>
+              <p>Quando existir dono claro, a demonstração fica mais crível e operacional.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <div className="leads-summary-grid">
-        <article className="overview-card">
+        <article className="overview-card lead-summary-card lead-summary-card-primary">
           <div className="overview-card-topline">
             <span className="section-kicker">Leads no funil</span>
             <Users aria-hidden />
@@ -1312,7 +1366,7 @@ function LeadsView({
           <strong>{data.leads.length}</strong>
           <p>Volume total de oportunidades acompanhadas neste workspace.</p>
         </article>
-        <article className="overview-card">
+        <article className="overview-card lead-summary-card lead-summary-card-contact">
           <div className="overview-card-topline">
             <span className="section-kicker">Com contato válido</span>
             <Mail aria-hidden />
@@ -1320,7 +1374,7 @@ function LeadsView({
           <strong>{leadsWithContact}</strong>
           <p>Leads com e-mail ou telefone já prontos para abordagem.</p>
         </article>
-        <article className="overview-card overview-card-accent">
+        <article className="overview-card overview-card-accent lead-summary-card lead-summary-card-warning">
           <div className="overview-card-topline">
             <span className="section-kicker">Precisam de revisão</span>
             <CircleAlert aria-hidden />
@@ -1328,7 +1382,7 @@ function LeadsView({
           <strong>{leadsWithPendingFields}</strong>
           <p>Leads com campos obrigatórios faltando na etapa atual.</p>
         </article>
-        <article className="overview-card">
+        <article className="overview-card lead-summary-card lead-summary-card-progress">
           <div className="overview-card-topline">
             <span className="section-kicker">Em contato</span>
             <CheckCircle2 aria-hidden />
@@ -1924,6 +1978,12 @@ function FieldsView({
   const stagesWithRules = new Set(data.requiredFields.map((rule) => rule.stage_id)).size;
   const standardRules = data.requiredFields.filter((rule) => rule.field_key).length;
   const customRules = data.requiredFields.filter((rule) => rule.custom_field_id).length;
+  const mostProtectedStage = data.stages
+    .map((stage) => ({
+      name: stage.name,
+      rules: data.requiredFields.filter((rule) => rule.stage_id === stage.id).length,
+    }))
+    .sort((left, right) => right.rules - left.rules)[0] ?? null;
 
   async function createCustomField(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1958,8 +2018,51 @@ function FieldsView({
     <section className="stack">
       <Header title="Campos e regras" subtitle="Campos personalizados e obrigatoriedade por etapa." />
 
+      <section className="panel page-command-panel page-command-panel-fields">
+        <div className="page-command-copy">
+          <span className="section-kicker">Governança de qualidade</span>
+          <h2>Defina só o que protege a operação e deixe o restante fora do caminho</h2>
+          <p>
+            Campos extras e bloqueios por etapa devem reforçar a leitura comercial, não transformar o CRM em um cadastro pesado.
+            A ideia aqui é parecer criterioso, rápido e seguro.
+          </p>
+          <div className="page-command-chip-row">
+            <span className="page-command-chip">{data.customFields.length} campo(s) extras</span>
+            <span className="page-command-chip">{stagesWithRules} etapa(s) com trava ativa</span>
+            <span className="page-command-chip">{data.requiredFields.length} regra(s) publicadas</span>
+          </div>
+        </div>
+        <div className="page-command-side">
+          <article className="page-command-card page-command-card-primary">
+            <div className="page-command-card-topline">
+              <span className="section-kicker">Etapa mais protegida</span>
+              <ShieldAlert aria-hidden />
+            </div>
+            <strong>{mostProtectedStage && mostProtectedStage.rules > 0 ? mostProtectedStage.name : 'Base livre para primeira leitura'}</strong>
+            <p>
+              {mostProtectedStage && mostProtectedStage.rules > 0
+                ? `${mostProtectedStage.rules} regra(s) fazem essa etapa exigir mais consistência antes do avanço.`
+                : 'Ainda não existe uma etapa com volume relevante de validações obrigatórias.'}
+            </p>
+            <span className="page-command-note">Use isso para mostrar critério sem travar a operação cedo demais.</span>
+          </article>
+          <div className="page-command-mini-grid">
+            <article className="page-command-card">
+              <span className="section-kicker">Regras padrão</span>
+              <strong>{standardRules}</strong>
+              <p>Dados base do lead que garantem leitura mínima antes de qualquer avanço importante.</p>
+            </article>
+            <article className="page-command-card">
+              <span className="section-kicker">Regras personalizadas</span>
+              <strong>{customRules}</strong>
+              <p>Critérios específicos do workspace para qualificação mais precisa da abordagem.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <div className="fields-summary-grid">
-        <article className="overview-card">
+        <article className="overview-card field-summary-card field-summary-card-library">
           <div className="overview-card-topline">
             <span className="section-kicker">Campos personalizados</span>
             <Plus aria-hidden />
@@ -1967,7 +2070,7 @@ function FieldsView({
           <strong>{data.customFields.length}</strong>
           <p>Campos extras que enriquecem o contexto do lead sem mudar a estrutura base do CRM.</p>
         </article>
-        <article className="overview-card">
+        <article className="overview-card field-summary-card field-summary-card-rules">
           <div className="overview-card-topline">
             <span className="section-kicker">Etapas com regra</span>
             <Workflow aria-hidden />
@@ -1975,7 +2078,7 @@ function FieldsView({
           <strong>{stagesWithRules}</strong>
           <p>Etapas do funil que já têm bloqueios explícitos para manter integridade operacional.</p>
         </article>
-        <article className="overview-card overview-card-accent">
+        <article className="overview-card overview-card-accent field-summary-card field-summary-card-coverage">
           <div className="overview-card-topline">
             <span className="section-kicker">Cobertura de validação</span>
             <CircleAlert aria-hidden />
@@ -2209,6 +2312,8 @@ function CampaignsView({
   const [editing, setEditing] = useState<Campaign | null>(null);
   const activeCampaigns = data.campaigns.filter((campaign) => campaign.is_active).length;
   const campaignsWithTrigger = data.campaigns.filter((campaign) => campaign.trigger_stage_id).length;
+  const alwaysOnCampaigns = data.campaigns.filter((campaign) => campaign.ai_response_mode !== 'business_hours').length;
+  const businessHoursCampaigns = data.campaigns.filter((campaign) => campaign.ai_response_mode === 'business_hours').length;
   const stageNameById = new Map(data.stages.map((stage) => [stage.id, stage.name]));
   const summarize = (text: string, limit = 150) => (text.length > limit ? `${text.slice(0, limit).trim()}...` : text);
 
@@ -2216,8 +2321,53 @@ function CampaignsView({
     <section className="stack">
       <Header title="Campanhas" subtitle="Playbooks de abordagem, contexto e gatilhos usados pela Edge Function de IA." />
 
+      <section className="panel page-command-panel page-command-panel-campaigns">
+        <div className="page-command-copy">
+          <span className="section-kicker">Orquestração da IA</span>
+          <h2>{editing ? `Refinando o playbook ${editing.name}` : 'Transforme contexto comercial em um playbook convincente para a demo'}</h2>
+          <p>
+            Conecte campanha, etapa gatilho e comportamento de atendimento para que a IA pareça parte do processo, não um bloco isolado
+            de geração de texto.
+          </p>
+          <div className="page-command-chip-row">
+            <span className="page-command-chip">{activeCampaigns} campanha(s) ativa(s)</span>
+            <span className="page-command-chip">{campaignsWithTrigger} gatilho(s) automáticos</span>
+            <span className="page-command-chip">{alwaysOnCampaigns} playbook(s) em resposta 24h</span>
+          </div>
+        </div>
+        <div className="page-command-side">
+          <article className="page-command-card page-command-card-primary">
+            <div className="page-command-card-topline">
+              <span className="section-kicker">Cobertura do simulador</span>
+              <Bot aria-hidden />
+            </div>
+            <strong>
+              {editing ? editing.name : activeCampaigns > 0 ? `${activeCampaigns} playbook(s) prontos para gerar mensagem` : 'Nenhum playbook ativo'}
+            </strong>
+            <p>
+              {editing
+                ? 'Você está em uma edição ativa. Revise contexto, plano e prompt final antes de salvar.'
+                : 'Campanhas bem configuradas fazem o fluxo parecer guiado, previsível e operacional.'}
+            </p>
+            <span className="page-command-note">A janela do cliente fica mais crível quando o playbook já nasce com objetivo e timing claros.</span>
+          </article>
+          <div className="page-command-mini-grid">
+            <article className="page-command-card">
+              <span className="section-kicker">Resposta 24h</span>
+              <strong>{alwaysOnCampaigns}</strong>
+              <p>Playbooks com resposta contínua, ideais para demo fluida sem depender de horário comercial.</p>
+            </article>
+            <article className="page-command-card">
+              <span className="section-kicker">Horário de atendimento</span>
+              <strong>{businessHoursCampaigns}</strong>
+              <p>Playbooks com janela controlada para simular operação mais realista quando necessário.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <div className="campaign-summary-grid">
-        <article className="overview-card">
+        <article className="overview-card campaign-summary-card campaign-summary-card-library">
           <div className="overview-card-topline">
             <span className="section-kicker">Playbooks cadastrados</span>
             <Megaphone aria-hidden />
@@ -2225,7 +2375,7 @@ function CampaignsView({
           <strong>{data.campaigns.length}</strong>
           <p>Campanhas disponíveis para orientar a abordagem comercial do avaliador.</p>
         </article>
-        <article className="overview-card">
+        <article className="overview-card campaign-summary-card campaign-summary-card-active">
           <div className="overview-card-topline">
             <span className="section-kicker">Campanhas ativas</span>
             <CheckCircle2 aria-hidden />
@@ -2233,7 +2383,7 @@ function CampaignsView({
           <strong>{activeCampaigns}</strong>
           <p>Playbooks já prontos para geração imediata de mensagens pela IA.</p>
         </article>
-        <article className="overview-card overview-card-accent">
+        <article className="overview-card overview-card-accent campaign-summary-card campaign-summary-card-trigger">
           <div className="overview-card-topline">
             <span className="section-kicker">Gatilhos automáticos</span>
             <Workflow aria-hidden />
