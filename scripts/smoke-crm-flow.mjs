@@ -27,6 +27,20 @@ const CUSTOM_FIELDS = [
   { name: 'Responsável interno', field_key: 'responsavel_interno', field_type: 'text' },
 ];
 
+const STAGE_REQUIRED_RULES = [
+  ['Lead Mapeado', 'company', null],
+  ['Lead Mapeado', 'job_title', null],
+  ['Lead Mapeado', 'lead_source', null],
+  ['Lead Mapeado', null, 'segmento'],
+  ['Conexao Iniciada', 'email', null],
+  ['Conexao Iniciada', null, 'canal_preferencial'],
+  ['Qualificado', 'phone', null],
+  ['Qualificado', 'assigned_user_id', null],
+  ['Qualificado', null, 'maturidade_sdr'],
+  ['Reuniao Agendada', 'notes', null],
+  ['Reuniao Agendada', null, 'stack_comercial'],
+];
+
 const CAMPAIGNS = [
   {
     slug: 'outbound-icp-operacoes',
@@ -316,6 +330,7 @@ function leadProfile(index, name, company) {
   const portes = ['51-100 colaboradores', '101-200 colaboradores', '201-500 colaboradores', '501-1000 colaboradores', '1001+ colaboradores'];
   const temperaturas = ['frio', 'morno', 'interessado', 'positivo', 'objeção ativa'];
   const canais = ['email', 'whatsapp', 'linkedin'];
+  const technicalOwners = ['Álvaro Martins', 'Marina Costa', 'Lucas Prado', 'Fernanda Lima', 'Caio Torres'];
   const emailDomain = `${safeSlug(company)}.com.br`;
   const phoneSuffix = String(11000000 + index * 7391).slice(-8);
 
@@ -328,6 +343,7 @@ function leadProfile(index, name, company) {
     job_title: jobTitleForIndex(index),
     lead_source: leadSourceForIndex(index),
     notes: `${company} tem sinais de dor em cadência, visibilidade de pipeline e padronização da abordagem SDR.`,
+    technical_owner_name: index % 6 === 0 ? null : technicalOwners[index % technicalOwners.length],
     segmento,
     porte_empresa: portes[index % portes.length],
     stack_comercial: stacks[index % stacks.length],
@@ -622,6 +638,7 @@ async function createLeads(client, workspaceId, userId, stageMap) {
     workspace_id: workspaceId,
     current_stage_id: stageIdByName(stageMap, lead.stageName),
     assigned_user_id: userId,
+    technical_owner_name: lead.technical_owner_name,
     name: lead.name,
     email: lead.email,
     phone: lead.phone,
@@ -840,6 +857,44 @@ async function countTable(client, table, workspaceId) {
   return count ?? 0;
 }
 
+function validateCurrentSchemaState({ leads, campaigns, stageRules, stages, customFieldMap }) {
+  const stageNameById = new Map(stages.map((stage) => [stage.id, stage.name]));
+  const customFieldKeyById = new Map([...customFieldMap.values()].map((field) => [field.id, field.field_key]));
+
+  if (campaigns.some((campaign) => !campaign.trigger_stage_id || !stageNameById.has(campaign.trigger_stage_id))) {
+    throw new Error('O smoke criou campanha sem trigger_stage_id válido.');
+  }
+
+  if (leads.some((lead) => !lead.assigned_user_id)) {
+    throw new Error('O smoke deixou lead sem assigned_user_id, contrariando a configuração atual do cenário.');
+  }
+
+  const leadsWithTechnicalOwner = leads.filter((lead) => typeof lead.technical_owner_name === 'string' && lead.technical_owner_name.trim().length > 0).length;
+  if (leadsWithTechnicalOwner === 0 || leadsWithTechnicalOwner === leads.length) {
+    throw new Error('O smoke precisa manter mistura realista de leads com e sem technical_owner_name.');
+  }
+
+  const expectedRules = new Set(
+    STAGE_REQUIRED_RULES.map(([stageName, fieldKey, customKey]) => `${normalizeStageName(stageName)}|${fieldKey ?? ''}|${customKey ?? ''}`),
+  );
+  const actualRules = new Set(
+    stageRules.map(
+      (rule) =>
+        `${normalizeStageName(stageNameById.get(rule.stage_id) ?? '')}|${rule.field_key ?? ''}|${customFieldKeyById.get(rule.custom_field_id) ?? ''}`,
+    ),
+  );
+
+  if (actualRules.size !== expectedRules.size) {
+    throw new Error(`Regras por etapa divergentes. Esperadas: ${expectedRules.size}. Encontradas: ${actualRules.size}.`);
+  }
+
+  for (const expectedRule of expectedRules) {
+    if (!actualRules.has(expectedRule)) {
+      throw new Error(`Regra por etapa ausente no smoke: ${expectedRule}`);
+    }
+  }
+}
+
 async function main() {
   const cwd = process.cwd();
   const env = { ...readEnvFile(path.join(cwd, '.env.local')), ...process.env };
@@ -937,6 +992,8 @@ async function main() {
     threadCount,
     conversationMessageCount,
     tokenCount,
+    reloadedCampaignsResult,
+    reloadedStageRulesResult,
     reloadedLeadsResult,
     reloadedThreadsResult,
     reloadedConversationMessagesResult,
@@ -948,7 +1005,9 @@ async function main() {
     countTable(client, 'conversation_threads', workspace.id),
     countTable(client, 'conversation_messages', workspace.id),
     countTable(client, 'conversation_simulation_tokens', workspace.id),
-    client.from('leads').select('id,current_stage_id').eq('workspace_id', workspace.id),
+    client.from('campaigns').select('id,trigger_stage_id').eq('workspace_id', workspace.id),
+    client.from('stage_required_fields').select('stage_id,field_key,custom_field_id').eq('workspace_id', workspace.id),
+    client.from('leads').select('id,current_stage_id,assigned_user_id,technical_owner_name').eq('workspace_id', workspace.id),
     client.from('conversation_threads').select('id,status,sentiment_tag,lead_id').eq('workspace_id', workspace.id),
     client
       .from('conversation_messages')
@@ -970,11 +1029,21 @@ async function main() {
     throw new Error(`Conversation messages esperadas: ${expectedMetrics.conversationMessages}. Encontradas: ${conversationMessageCount}.`);
   }
   if (tokenCount !== expectedMetrics.threads) throw new Error('Nem todas as conversas receberam token de simulador.');
+  if (reloadedCampaignsResult.error) throw new Error(`Falha ao recarregar campanhas: ${reloadedCampaignsResult.error.message}`);
+  if (reloadedStageRulesResult.error) throw new Error(`Falha ao recarregar regras por etapa: ${reloadedStageRulesResult.error.message}`);
   if (reloadedLeadsResult.error) throw new Error(`Falha ao recarregar leads: ${reloadedLeadsResult.error.message}`);
   if (reloadedThreadsResult.error) throw new Error(`Falha ao recarregar threads: ${reloadedThreadsResult.error.message}`);
   if (reloadedConversationMessagesResult.error) {
     throw new Error(`Falha ao recarregar mensagens de conversa: ${reloadedConversationMessagesResult.error.message}`);
   }
+
+  validateCurrentSchemaState({
+    leads: reloadedLeadsResult.data ?? [],
+    campaigns: reloadedCampaignsResult.data ?? [],
+    stageRules: reloadedStageRulesResult.data ?? [],
+    stages,
+    customFieldMap,
+  });
 
   const leadsById = new Map((reloadedLeadsResult.data ?? []).map((lead) => [lead.id, lead]));
   const threadsById = new Map((reloadedThreadsResult.data ?? []).map((thread) => [thread.id, thread]));
