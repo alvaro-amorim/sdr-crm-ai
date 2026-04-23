@@ -6,3 +6,6 @@ verify_jwt = false
 
 [functions.simulate-client-chat]
 verify_jwt = false
+
+[functions.generate-evaluation-conversation]
+verify_jwt = false
