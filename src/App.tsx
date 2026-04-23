@@ -498,6 +498,23 @@ function AuthScreen({ authError }: { authError?: string | null }) {
   const [error, setError] = useState<string | null>(authError ?? null);
   const [success, setSuccess] = useState<string | null>(null);
   const busy = busyAction !== null;
+  const authHighlights = [
+    {
+      title: 'Workspace isolado',
+      description: 'Leads, campanhas e mensagens separados por operação para demonstrar controle real do CRM.',
+      icon: Building2,
+    },
+    {
+      title: 'Funil orientado à ação',
+      description: 'Qualifique leads, mova etapas com regra e acompanhe a cadência comercial em um só lugar.',
+      icon: Workflow,
+    },
+    {
+      title: 'Mensagens e simulador',
+      description: 'Gere mensagens com IA, simule o cliente e mostre o fluxo completo da prova técnica.',
+      icon: Bot,
+    },
+  ] as const;
 
   useEffect(() => {
     setError(authError ?? null);
@@ -578,12 +595,38 @@ function AuthScreen({ authError }: { authError?: string | null }) {
   return (
     <main className="auth-screen">
       <section className="auth-copy">
-        <span className="eyebrow">SDR Expert</span>
-        <h1>Mini CRM para SDR com mensagens geradas por IA.</h1>
-        <p>Gerencie leads, funil, campanhas e simule abordagens personalizadas com isolamento por workspace.</p>
+        <div className="auth-copy-main">
+          <span className="eyebrow">SDR Expert</span>
+          <h1>Mini CRM para SDR com mensagens geradas por IA.</h1>
+          <p>Gerencie leads, funil, campanhas e simule abordagens personalizadas com isolamento por workspace.</p>
+        </div>
+        <div className="auth-chip-row" aria-label="Destaques do produto">
+          <span className="auth-chip">CRM operacional</span>
+          <span className="auth-chip">Workspace isolado</span>
+          <span className="auth-chip">IA aplicada à prova</span>
+        </div>
+        <div className="auth-proof-grid">
+          {authHighlights.map((item) => {
+            const Icon = item.icon;
+            return (
+              <article key={item.title} className="auth-proof-card">
+                <span className="auth-proof-icon" aria-hidden>
+                  <Icon />
+                </span>
+                <div>
+                  <strong>{item.title}</strong>
+                  <p>{item.description}</p>
+                </div>
+              </article>
+            );
+          })}
+        </div>
       </section>
       <form className="auth-form" onSubmit={submit}>
-        <div>
+        <div className="auth-form-heading">
+          <span className="auth-form-kicker">
+            {mode === 'login' ? 'Acesso ao workspace' : mode === 'signup' ? 'Cadastro inicial' : 'Recuperação segura'}
+          </span>
           <h2>{mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Criar conta' : 'Recuperar senha'}</h2>
           <p>
             {mode === 'login'
@@ -666,6 +709,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
             </button>
           )}
         </div>
+        <p className="auth-form-note">Fluxo em português, pensado para demo técnica em desktop e mobile.</p>
       </form>
     </main>
   );
@@ -886,26 +930,96 @@ function WorkspaceOnboarding({
   error: string | null;
 }) {
   const [name, setName] = useState(`Workspace ${user.email?.split('@')[0] ?? 'SDR'}`);
+  const onboardingHighlights = [
+    {
+      title: 'Funil padrão pronto',
+      description: 'Etapas iniciais já configuradas para você sair do zero rapidamente.',
+      icon: Route,
+    },
+    {
+      title: 'Base de operação organizada',
+      description: 'Leads, campos, campanhas e mensagens passam a operar com isolamento por workspace.',
+      icon: Workflow,
+    },
+    {
+      title: 'Demo mais forte',
+      description: 'Você consegue mostrar o fluxo completo do CRM sem setup manual disperso.',
+      icon: BookOpen,
+    },
+  ] as const;
 
   return (
-    <section className="panel narrow">
-      <h1>Criar workspace</h1>
-      <p>O workspace isola funil, leads, campos, campanhas e mensagens.</p>
-      <label>
-        Nome do workspace
-        <input
-          name="workspaceName"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Ex.: Operação SDR Brasil"
-        />
-        <span className="field-hint">Dê um nome operacional ao ambiente. Ex.: Operação SDR Brasil.</span>
-      </label>
-      {error && <p className="error">{error}</p>}
-      <button type="button" onClick={() => onCreate(name)} disabled={busy || name.trim().length < 2}>
-        <Plus aria-hidden />
-        {busy ? 'Criando workspace...' : 'Criar workspace e funil padrão'}
-      </button>
+    <section className="workspace-onboarding">
+      <div className="workspace-onboarding-hero">
+        <div className="workspace-onboarding-copy">
+          <span className="eyebrow">Primeira configuração</span>
+          <h1>Criar workspace</h1>
+          <p>O workspace isola funil, leads, campos, campanhas e mensagens para manter a operação organizada desde a primeira demonstração.</p>
+          <div className="workspace-onboarding-chip-row">
+            <span className="workspace-onboarding-chip">Funil padrão</span>
+            <span className="workspace-onboarding-chip">Estrutura pronta para demo</span>
+            <span className="workspace-onboarding-chip">Setup rápido</span>
+          </div>
+        </div>
+        <div className="workspace-onboarding-highlights">
+          {onboardingHighlights.map((item) => {
+            const Icon = item.icon;
+            return (
+              <article key={item.title} className="workspace-onboarding-highlight">
+                <span className="workspace-onboarding-highlight-icon" aria-hidden>
+                  <Icon />
+                </span>
+                <div>
+                  <strong>{item.title}</strong>
+                  <p>{item.description}</p>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="workspace-onboarding-grid">
+        <section className="panel workspace-onboarding-form">
+          <div className="workspace-onboarding-form-copy">
+            <span className="section-kicker">Dados do ambiente</span>
+            <h2>Nome do workspace</h2>
+            <p>Dê um nome operacional claro para o ambiente que será usado na avaliação e nos fluxos internos.</p>
+          </div>
+          <label>
+            Nome do workspace
+            <input
+              name="workspaceName"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Ex.: Operação SDR Brasil"
+            />
+            <span className="field-hint">Dê um nome operacional ao ambiente. Ex.: Operação SDR Brasil.</span>
+          </label>
+          {error && <p className="error">{error}</p>}
+          <button type="button" onClick={() => onCreate(name)} disabled={busy || name.trim().length < 2}>
+            <Plus aria-hidden />
+            {busy ? 'Criando workspace...' : 'Criar workspace e funil padrão'}
+          </button>
+        </section>
+
+        <aside className="workspace-onboarding-side">
+          <article className="workspace-onboarding-side-card">
+            <span className="section-kicker">Ao criar agora</span>
+            <strong>Você ativa a base do CRM</strong>
+            <ul>
+              <li>Funil inicial pronto para cadastrar e mover leads</li>
+              <li>Estrutura preparada para campanhas e Mensagens IA</li>
+              <li>Ambiente separado para demonstração sem mistura de dados</li>
+            </ul>
+          </article>
+          <article className="workspace-onboarding-side-card workspace-onboarding-side-card-accent">
+            <span className="section-kicker">Leitura rápida</span>
+            <strong>Nomeie como uma operação real</strong>
+            <p>Um bom nome melhora a clareza da demo, do dashboard e da navegação desde o primeiro acesso.</p>
+          </article>
+        </aside>
+      </div>
     </section>
   );
 }
