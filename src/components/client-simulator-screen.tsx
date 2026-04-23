@@ -1,6 +1,6 @@
 import { ArrowLeft, Bot, RefreshCcw, Send, UserRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabaseEnv } from '../lib/supabase';
 import type { Campaign, ConversationMessage, ConversationThread, Lead } from '../types/domain';
 import { formatDateTime } from '../utils/crm-ui';
 import { getErrorMessage } from '../utils/error-messages';
@@ -50,6 +50,29 @@ function randomBetween(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+async function invokePublicSimulator(body: { token: string; message?: string }) {
+  if (!supabaseEnv) {
+    throw new Error('Supabase nao configurado.');
+  }
+
+  const response = await fetch(`${supabaseEnv.VITE_SUPABASE_URL.replace(/\/$/, '')}/functions/v1/simulate-client-chat`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${supabaseEnv.VITE_SUPABASE_ANON_KEY}`,
+      apikey: supabaseEnv.VITE_SUPABASE_ANON_KEY,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(payload?.error ?? payload?.message ?? `Falha HTTP ${response.status}.`);
+  }
+
+  return payload as { success?: boolean; error?: string; data?: SimulatorPayload };
+}
+
 export function ClientSimulatorScreen() {
   const token = useMemo(getTokenFromUrl, []);
   const [payload, setPayload] = useState<SimulatorPayload | null>(null);
@@ -70,15 +93,12 @@ export function ClientSimulatorScreen() {
   }
 
   async function loadThread(options: { silent?: boolean } = {}) {
-    if (!supabase || !token) return;
+    if (!token) return;
     if (!options.silent) setBusy(true);
     setError(null);
     try {
-      const { data, error: functionError } = await supabase.functions.invoke('simulate-client-chat', {
-        body: { token },
-      });
-      if (functionError) throw functionError;
-      if (!data?.success) throw new Error(data?.error ?? 'Falha ao carregar conversa.');
+      const data = await invokePublicSimulator({ token });
+      if (!data?.success || !data.data) throw new Error(data?.error ?? 'Falha ao carregar conversa.');
       const processedScheduledMessages = Number(data.data?.processed_scheduled_messages ?? 0);
       await applyPayload(data.data, options.silent && processedScheduledMessages > 0);
     } catch (loadError) {
@@ -90,7 +110,7 @@ export function ClientSimulatorScreen() {
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!supabase || !reply.trim()) return;
+    if (!reply.trim()) return;
 
     const trimmedReply = reply.trim();
     const optimisticMessage: ConversationMessage | null = payload
@@ -123,11 +143,8 @@ export function ClientSimulatorScreen() {
     setError(null);
 
     try {
-      const { data, error: functionError } = await supabase.functions.invoke('simulate-client-chat', {
-        body: { token, message: trimmedReply },
-      });
-      if (functionError) throw functionError;
-      if (!data?.success) throw new Error(data?.error ?? 'Falha ao gerar resposta.');
+      const data = await invokePublicSimulator({ token, message: trimmedReply });
+      if (!data?.success || !data.data) throw new Error(data?.error ?? 'Falha ao gerar resposta.');
       await applyPayload(data.data, true);
     } catch (replyError) {
       setTyping(false);

@@ -211,8 +211,14 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [messageFocusTarget, setMessageFocusTarget] = useState<MessageFocusTarget | null>(null);
+  const isClientSimulatorRoute = window.location.pathname === '/client-simulator';
 
   useEffect(() => {
+    if (isClientSimulatorRoute) {
+      setLoading(false);
+      return;
+    }
+
     if (!supabase) {
       setLoading(false);
       return;
@@ -269,10 +275,10 @@ export default function App() {
       cancelled = true;
       subscription.subscription.unsubscribe();
     };
-  }, []);
+  }, [isClientSimulatorRoute]);
 
   const reloadData = useCallback(async () => {
-    if (!supabase || !session?.user) return;
+    if (isClientSimulatorRoute || !supabase || !session?.user) return;
     setBusy(true);
     setError(null);
     try {
@@ -287,7 +293,7 @@ export default function App() {
     } finally {
       setBusy(false);
     }
-  }, [session?.user]);
+  }, [isClientSimulatorRoute, session?.user]);
 
   useEffect(() => {
     void reloadData();
@@ -317,7 +323,7 @@ export default function App() {
     setTab('messages');
   }
 
-  if (window.location.pathname === '/client-simulator') {
+  if (isClientSimulatorRoute) {
     return <ClientSimulatorScreen />;
   }
 
