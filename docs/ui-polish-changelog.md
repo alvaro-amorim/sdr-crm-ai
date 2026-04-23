@@ -1,10 +1,44 @@
 # UI Polish Changelog
 
+## 2026-04-22 — Alinhamento final de vibe coding e polimento seguro
+
+### Objetivo
+
+Remover a dependência conceitual de uma ferramenta específica de frontend e consolidar a estratégia real de entrega: base funcional própria, apoio de stack de vibe coding para leitura/refino visual, GitHub como fonte da verdade e Vercel como deploy.
+
+### Alterações
+
+- `README.md`
+  - troca a narrativa de ferramenta única por estratégia de vibe coding com Bolt como apoio de auditoria visual.
+  - mantém limites de segurança, Supabase e Vercel claros.
+
+- `CONSTITUICAO_CODEX_SDR_CRM_VIBE_CODING.md`
+  - atualiza a regra operacional para preservar a base funcional acima de qualquer sugestão externa.
+  - remove dependência normativa de ferramenta específica.
+
+- `docs/frontend-vibe-coding/*`
+  - substitui a pasta antiga de preparação por documentação neutra de vibe coding.
+  - preserva screenshots úteis para referência visual.
+  - documenta o diagnóstico do Bolt e as fronteiras seguras para refino.
+
+- `src/styles.css` e `index.html`
+  - adicionam Inter via Google Fonts.
+  - adicionam tokens visuais globais.
+  - corrigem o botão `.secondary`.
+  - reforçam indicador de navegação ativa, cards, estados vazios e feedbacks com microinterações CSS.
+
+### Validação esperada
+
+- `npm run test`
+- `npm run lint`
+- `npm run build`
+
+
 ## 2026-04-21 — Etapas 1, 2, 5 e 6 iniciadas
 
 ### Objetivo do bloco
 
-Melhorar a percepção visual do app antes da etapa padronizada de refinamento com v0, concentrando a primeira entrega em:
+Melhorar a percepção visual do app antes da etapa padronizada de refinamento com stack de vibe coding, concentrando a primeira entrega em:
 
 - layout-base
 - dashboard
@@ -68,7 +102,7 @@ Melhorar a percepção visual do app antes da etapa padronizada de refinamento c
 1. finalizar refinamentos da tela de leads
 2. melhorar a tela de campanhas
 3. revisão final de responsividade
-4. polimento visual final antes do refinamento com v0
+4. polimento visual final com apoio de vibe coding
 
 ## 2026-04-21 — Etapa 4 iniciada
 
@@ -141,13 +175,13 @@ Dar cara de operação comercial à tela de leads, reduzindo a sensação de CRU
 ### Próximo bloco
 
 1. revisão transversal de responsividade e consistência entre dashboard, campanhas, leads e mensagens
-2. polimento final de microcopy, estados vazios e feedbacks antes da etapa de refinamento com v0
+2. polimento final de microcopy, estados vazios e feedbacks antes da etapa de refinamento com vibe coding
 
 ## 2026-04-21 — Etapa 5 executada
 
 ### Objetivo do bloco
 
-Fechar o polimento transversal antes da etapa de refinamento com v0, reforçando leitura operacional, feedbacks de sucesso/erro e a clareza das telas de `Campos` e `Mensagens IA`.
+Fechar o polimento transversal antes da etapa de refinamento com stack de vibe coding, reforçando leitura operacional, feedbacks de sucesso/erro e a clareza das telas de `Campos` e `Mensagens IA`.
 
 ### Alterações implementadas
 
@@ -181,7 +215,7 @@ Fechar o polimento transversal antes da etapa de refinamento com v0, reforçando
 ### Situação da fase
 
 - blocos planejados para o polimento pré-refinamento foram concluídos
-- o próximo passo deixa de ser refino local de UI e passa a ser validação final em produção e refinamento guiado por v0
+- o próximo passo deixa de ser apenas refino local de UI e passa a ser validação final em produção e refinamento guiado por stack de vibe coding
 
 ## 2026-04-21 — Aprimoramento do smoke test
 
@@ -210,7 +244,7 @@ Transformar o smoke test do CRM em um seed de demonstração realista, útil par
 
 ### Objetivo
 
-Preparar o ambiente para avaliação antes da etapa de refinamento com v0, com volume operacional e conversas realistas geradas por IA em vez de exemplos fixos.
+Preparar o ambiente para avaliação antes da etapa de refinamento com stack de vibe coding, com volume operacional e conversas realistas geradas por IA em vez de exemplos fixos.
 
 ### Alterações
 
@@ -350,11 +384,11 @@ Reduzir dúvida de preenchimento nos formulários principais, deixando o formato
 - `npm run lint`
 - `npm run build`
 
-## 2026-04-22 — Polimento final antes do refinamento com v0
+## 2026-04-22 — Polimento final com apoio de vibe coding
 
 ### Objetivo
 
-Fechar a base atual do CRM antes da etapa de refinamento com v0, corrigindo microcopy visível, acentuação e documentação do teste final com usuário limpo.
+Fechar a base atual do CRM antes da etapa de refinamento com stack de vibe coding, corrigindo microcopy visível, acentuação e documentação do teste final com usuário limpo.
 
 ### Alterações
 

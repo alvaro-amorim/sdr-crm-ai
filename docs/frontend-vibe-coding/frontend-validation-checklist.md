@@ -1,8 +1,8 @@
-# v0 Validation Checklist
+# Frontend Validation Checklist
 
-Use esta checklist após qualquer mudança trazida do v0.
+Use esta checklist após qualquer mudança de frontend trazida por ferramenta de vibe coding ou refinada manualmente.
 
-## Validação técnica obrigatória
+## Validação Técnica Obrigatória
 
 - [ ] `npm run test`
 - [ ] `npm run lint`
@@ -10,7 +10,7 @@ Use esta checklist após qualquer mudança trazida do v0.
 - [ ] nenhum import quebrado
 - [ ] nenhuma referência nova a env sensível no frontend
 
-## Rotas e entrada
+## Rotas e Entrada
 
 - [ ] `/` continua abrindo corretamente
 - [ ] `/client-simulator?token=...` continua abrindo
@@ -45,14 +45,14 @@ Use esta checklist após qualquer mudança trazida do v0.
 - [ ] conversa operacional continua visível
 - [ ] abertura do simulador continua disponível
 
-## Envio simulado e simulador
+## Envio Simulado e Simulador
 
 - [ ] envio simulado continua registrando evento
 - [ ] lead continua movendo para a etapa esperada
 - [ ] simulador público continua aceitando resposta
 - [ ] erro com token inválido continua tratado
 
-## Responsividade básica
+## Responsividade Básica
 
 - [ ] sem rolagem horizontal no mobile
 - [ ] menu mobile continua utilizável

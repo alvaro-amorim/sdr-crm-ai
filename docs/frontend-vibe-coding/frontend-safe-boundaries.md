@@ -1,27 +1,26 @@
-# v0 Safe Boundaries
+# Frontend Safe Boundaries
 
-## O que o v0 pode alterar com mais liberdade
+## Pode Alterar com Mais Liberdade
 
-- estrutura visual do shell;
-- layout das telas principais;
+- composição visual do shell;
 - espaçamentos;
 - cards;
-- composição dos formulários;
-- modais e painéis;
 - hierarquia de botões;
-- organização visual do dashboard;
-- organização visual de leads, campanhas e mensagens;
+- estados vazios;
+- microinterações CSS;
+- layout do dashboard;
+- apresentação visual de leads, campanhas e mensagens;
 - responsividade da camada de apresentação.
 
-## O que deve ser tratado com cuidado
+## Tratar com Cuidado
 
-- componentes que já misturam layout com lógica em `src/App.tsx`;
-- sincronização entre seleção de lead, campanha e conversa;
-- feedbacks visuais de sucesso e erro;
+- componentes que misturam layout e lógica em `src/App.tsx`;
+- sincronização entre lead, campanha e conversa;
+- feedbacks de sucesso e erro;
 - estados vazios que ajudam a demo;
 - fluxo do simulador público.
 
-## O que não deve ser mexido inicialmente
+## Não Mexer sem Revisão Técnica
 
 - `src/services/crm.ts`
 - `src/lib/env.ts`
@@ -32,8 +31,10 @@
 - `supabase/migrations/*`
 - `.env.example`
 - `vercel.json`
+- `package.json`
+- `package-lock.json`
 
-## Integrações sensíveis
+## Integrações Sensíveis
 
 - Supabase Auth
 - queries e mutações do workspace atual
@@ -43,7 +44,7 @@
 - `simulate-client-chat`
 - `generate-smoke-conversation`
 
-## Regras de negócio que não podem quebrar
+## Regras de Negócio que Não Podem Quebrar
 
 ### Auth
 
@@ -57,7 +58,7 @@
 - o shell autenticado só abre com workspace válido;
 - dados nunca devem misturar workspaces.
 
-### Leads e pipeline
+### Leads e Pipeline
 
 - mudança de etapa precisa continuar respeitando obrigatoriedade;
 - lead em foco precisa continuar acessível;
@@ -80,6 +81,6 @@
 - token inválido deve continuar mostrando erro e retry;
 - thread persistida deve continuar legível.
 
-## Regra prática de segurança
+## Regra Prática
 
-Se o v0 sugerir mudança que toque lógica, integrações, chamadas Supabase ou Edge Functions, essa mudança deve ser revisada manualmente antes de entrar no repositório.
+Se uma ferramenta de vibe coding sugerir mudança que toque lógica, integração, chamada Supabase ou Edge Function, a mudança deve ser revisada manualmente antes de entrar no repositório.

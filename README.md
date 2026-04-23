@@ -2,19 +2,19 @@
 
 Mini CRM para operação de SDR com autenticação Supabase, isolamento por workspace, funil comercial, campanhas com apoio de IA e simulador de conversa persistida.
 
-## Visão geral
+## Visão Geral
 
 O projeto foi desenvolvido de forma iterativa:
 
 1. primeiro consolidou a base funcional do produto;
 2. depois estabilizou regras de negócio, integrações com IA, simulador e smoke operacional;
-3. agora o refinamento visual do frontend fica padronizado em **v0**, sempre preservando este repositório como fonte de verdade funcional.
+3. por fim, o frontend passou por refinamento incremental com apoio de ferramentas de vibe coding, mantendo este repositório como fonte de verdade funcional.
 
 Regras operacionais ativas:
 
 - **GitHub** é a fonte de verdade do código;
 - **Vercel** é o fluxo preferencial de deploy do frontend;
-- **v0** é a ferramenta padrão para evolução visual e de UX do frontend existente, sem recriação total do sistema.
+- ferramentas de vibe coding como **Bolt** podem apoiar análise e refinamento visual, mas nenhuma saída entra sem revisão, validação e commit neste repositório.
 
 ## Stack
 
@@ -23,8 +23,9 @@ Regras operacionais ativas:
 - OpenAI para planejamento e geração de mensagens
 - Zod para validação de ambiente e payloads
 - Vitest para regras críticas e utilitários do smoke
+- Vercel para deploy do frontend
 
-## Fluxo principal entregue
+## Fluxo Principal Entregue
 
 O fluxo central hoje cobre:
 
@@ -38,33 +39,33 @@ O fluxo central hoje cobre:
 - geração de 2 ou 3 mensagens por lead;
 - envio simulado com persistência de thread;
 - simulador público por token para responder como cliente;
-- dashboard operacional com métricas e drill-down.
+- dashboard operacional com métricas, atalhos e drill-down.
 
-## Funcionalidades implementadas
+## Funcionalidades Implementadas
 
-- autenticação com Supabase Auth
-- login com Google OAuth
-- recuperação e redefinição de senha
-- workspace inicial com membership do owner
-- isolamento por `workspace_id`
-- RLS nas tabelas principais
-- CRUD de leads
-- campos personalizados por workspace
-- regras de obrigatoriedade por etapa
-- campanhas com briefing, plano de ação e prompt final revisável
+- autenticação com Supabase Auth;
+- login com Google OAuth;
+- recuperação e redefinição de senha;
+- workspace inicial com membership do owner;
+- isolamento por `workspace_id`;
+- RLS nas tabelas principais;
+- CRUD de leads;
+- campos personalizados por workspace;
+- regras de obrigatoriedade por etapa;
+- campanhas com briefing, plano de ação e prompt final revisável;
 - Edge Functions:
   - `generate-lead-messages`
   - `plan-campaign-strategy`
   - `create-simulation-link`
   - `simulate-client-chat`
   - `generate-smoke-conversation`
-- persistência de `generated_messages`, `sent_message_events`, `conversation_threads` e `conversation_messages`
-- simulador público por token
-- smoke test realista com volume operacional
+- persistência de `generated_messages`, `sent_message_events`, `conversation_threads` e `conversation_messages`;
+- simulador público por token;
+- smoke test realista com volume operacional.
 
-## Setup local real
+## Setup Local
 
-### 1. Instalar dependências
+### 1. Instalar Dependências
 
 ```bash
 npm install
@@ -81,14 +82,14 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
 `OPENAI_API_KEY` é opcional no ambiente local e serve apenas para o smoke quando você quiser gerar as conversas diretamente do script. A chave nunca deve ficar no frontend publicado.
 
-### 3. Linkar o projeto Supabase
+### 3. Linkar o Projeto Supabase
 
 ```bash
 npx supabase login
 npx supabase link --project-ref your-project-ref
 ```
 
-### 4. Aplicar as migrations
+### 4. Aplicar as Migrations
 
 As migrations atuais do repositório são:
 
@@ -122,7 +123,7 @@ Se o projeto remoto já tiver parte do histórico aplicada, use `migration repai
   - `http://localhost:5173`
 - habilitar Google em `Authentication > Sign In / Providers > Google`.
 
-### 6. Configurar secrets das Edge Functions
+### 6. Configurar Secrets das Edge Functions
 
 No ambiente Supabase Functions:
 
@@ -131,7 +132,7 @@ OPENAI_API_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
-### 7. Publicar as Edge Functions necessárias
+### 7. Publicar as Edge Functions
 
 ```bash
 npx supabase functions deploy generate-lead-messages
@@ -141,28 +142,31 @@ npx supabase functions deploy simulate-client-chat
 npx supabase functions deploy generate-smoke-conversation
 ```
 
-### 8. Rodar o frontend local
+### 8. Rodar o Frontend Local
 
 ```bash
 npm run dev
 ```
 
-## Estratégia de refinamento com v0
+## Estratégia de Frontend e Vibe Coding
 
 O frontend não será refeito do zero. A estratégia ativa é:
 
-- preservar esta base funcional;
-- usar **v0** para refinar layout, hierarquia visual, UX e consistência;
-- reintegrar as melhorias em blocos pequenos no repositório principal;
-- validar `test`, `lint` e `build` a cada bloco reintegrado.
+- preservar a base funcional validada;
+- usar ferramentas de vibe coding para acelerar análise, ideias de UX e refinamentos visuais controlados;
+- tratar essas ferramentas como apoio, não como fonte única do código final;
+- reintegrar melhorias em blocos pequenos neste repositório;
+- validar `test`, `lint` e `build` antes de commit ou entrega.
+
+O Bolt foi usado como apoio de auditoria visual do frontend, identificando a estrutura real da SPA, telas principais e refinamentos conservadores para tipografia, navegação, cards e estados vazios.
 
 Documentos de apoio:
 
-- `docs/v0/v0-project-context.md`
-- `docs/v0/v0-safe-boundaries.md`
-- `docs/v0/v0-priority-surfaces.md`
-- `docs/v0/v0-validation-checklist.md`
-- `docs/v0/v0-review-workflow.md`
+- `docs/frontend-vibe-coding/frontend-vibe-coding-context.md`
+- `docs/frontend-vibe-coding/frontend-safe-boundaries.md`
+- `docs/frontend-vibe-coding/frontend-priority-surfaces.md`
+- `docs/frontend-vibe-coding/frontend-validation-checklist.md`
+- `docs/frontend-vibe-coding/frontend-review-workflow.md`
 
 ## Deploy na Vercel
 
@@ -177,7 +181,7 @@ Deploy atual de referência:
 
 - `https://sdr-crm-ai-wine.vercel.app`
 
-## Segurança e multi-tenancy
+## Segurança e Multi-Tenancy
 
 - o frontend não usa `SUPABASE_SERVICE_ROLE_KEY`;
 - apenas variáveis `VITE_` seguras devem aparecer no navegador;
@@ -188,7 +192,7 @@ Deploy atual de referência:
 
 ## IA e Edge Functions
 
-### Planejamento de campanha
+### Planejamento de Campanha
 
 `plan-campaign-strategy` recebe o briefing da campanha e devolve:
 
@@ -199,7 +203,7 @@ Deploy atual de referência:
 
 O usuário pode aprovar, regenerar ou editar antes de salvar a campanha.
 
-### Geração de mensagens
+### Geração de Mensagens
 
 `generate-lead-messages`:
 
@@ -217,12 +221,12 @@ Fallback atual na própria OpenAI:
 
 Sem sucesso em todas as tentativas, nenhuma mensagem é persistida.
 
-### Simulador público
+### Simulador Público
 
 - `create-simulation-link` gera link temporário por token;
 - `simulate-client-chat` resolve a conversa pública, registra a resposta do cliente e gera a próxima resposta SDR.
 
-## Testes e validações
+## Testes e Validações
 
 Validação local padrão:
 
@@ -255,7 +259,7 @@ Cobertura automatizada atual:
 - bloqueio de transição por campos obrigatórios;
 - utilitários do smoke.
 
-## Limitações conhecidas
+## Limitações Conhecidas
 
 - convites e múltiplos papéis avançados ficaram fora do MVP;
 - o kanban usa seletor de etapa em vez de drag and drop;
@@ -263,7 +267,7 @@ Cobertura automatizada atual:
 - a experiência multi-workspace no frontend ainda é mínima;
 - o vídeo demonstrativo ainda precisa ser fechado fora do código.
 
-## Checklist honesto de entrega
+## Checklist Honesto de Entrega
 
 - [x] autenticação
 - [x] workspace
@@ -276,4 +280,5 @@ Cobertura automatizada atual:
 - [x] envio simulado
 - [x] dashboard operacional
 - [x] deploy preferencial na Vercel
+- [x] uso assistido de stack de vibe coding no frontend
 - [ ] vídeo demonstrativo final anexado à entrega
