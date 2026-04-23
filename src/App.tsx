@@ -364,7 +364,7 @@ export default function App() {
         setNotice(null);
         setError(null);
       }} />
-      <OperationGuide tab={tab} />
+      <OperationGuide tab={tab} userId={session.user.id} />
 
       {tab === 'dashboard' && <Dashboard data={data} onOpenLeadConversation={openLeadConversation} />}
       {tab === 'leads' && (
@@ -1112,9 +1112,10 @@ function StatusBar({ notice, error, onClear }: { notice: string | null; error: s
   );
 }
 
-function OperationGuide({ tab }: { tab: Tab }) {
+function OperationGuide({ tab, userId }: { tab: Tab; userId: string }) {
   const [collapsed, setCollapsed] = useState(true);
-  const [modalOpen, setModalOpen] = useState(tab === 'dashboard');
+  const [modalOpen, setModalOpen] = useState(false);
+  const flowGuideStorageKey = `sdr-expert:flow-guide-shown:${userId}`;
   const steps: Array<{ id: Tab; title: string; description: string }> = [
     {
       id: 'dashboard',
@@ -1143,6 +1144,27 @@ function OperationGuide({ tab }: { tab: Tab }) {
     },
   ];
   const activeStep = steps.find((step) => step.id === tab) ?? steps[0];
+  const openFlowGuide = () => {
+    try {
+      window.localStorage.setItem(flowGuideStorageKey, 'true');
+    } catch {
+      // The guide can still be opened manually if browser storage is unavailable.
+    }
+    setModalOpen(true);
+  };
+
+  useEffect(() => {
+    if (tab !== 'dashboard') return;
+
+    try {
+      if (window.localStorage.getItem(flowGuideStorageKey)) return;
+      window.localStorage.setItem(flowGuideStorageKey, 'true');
+    } catch {
+      // If storage is blocked, keep the dashboard entry behavior for this session.
+    }
+
+    setModalOpen(true);
+  }, [flowGuideStorageKey, tab]);
 
   return (
     <>
@@ -1167,7 +1189,7 @@ function OperationGuide({ tab }: { tab: Tab }) {
           </div>
         )}
         <div className="operation-guide-actions">
-          <button type="button" className="ghost compact" onClick={() => setModalOpen(true)}>
+          <button type="button" className="ghost compact" onClick={openFlowGuide}>
             <BookOpen aria-hidden />
             Ver lógica
           </button>
