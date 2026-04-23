@@ -11,3 +11,5 @@ coverage
 .netlify
 .supabase
 supabase/.temp
+
+.vercel
