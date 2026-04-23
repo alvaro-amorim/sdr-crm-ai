@@ -1,8 +1,12 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 
 const envSchema = z.object({
   VITE_SUPABASE_URL: z.string().url('VITE_SUPABASE_URL deve ser uma URL válida.'),
   VITE_SUPABASE_ANON_KEY: z.string().min(20, 'VITE_SUPABASE_ANON_KEY está ausente ou curta demais.'),
+  VITE_ENABLE_EVALUATION_PANEL: z
+    .union([z.literal('true'), z.literal('false'), z.boolean()])
+    .optional()
+    .transform((value) => value === true || value === 'true'),
 });
 
 export type ClientEnv = z.infer<typeof envSchema>;

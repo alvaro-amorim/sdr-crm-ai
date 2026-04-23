@@ -134,6 +134,25 @@ export async function getFirstWorkspace(client: SupabaseClient): Promise<Workspa
   return Array.isArray(workspace) ? (workspace[0] ?? null) : (workspace ?? null);
 }
 
+export async function getAccessibleWorkspace(client: SupabaseClient, preferredWorkspaceId?: string | null): Promise<Workspace | null> {
+  if (preferredWorkspaceId) {
+    const { data, error } = await client
+      .from('workspace_members')
+      .select('id, workspace_id, user_id, role, created_at, workspaces(*)')
+      .eq('workspace_id', preferredWorkspaceId)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    const member = data as unknown as WorkspaceMember | null;
+    const workspace = member?.workspaces;
+    const resolved = Array.isArray(workspace) ? (workspace[0] ?? null) : (workspace ?? null);
+    if (resolved) return resolved;
+  }
+
+  return getFirstWorkspace(client);
+}
+
 export async function loadCrmData(client: SupabaseClient, workspace: Workspace): Promise<CrmData> {
   const [
     workspaceMembersResult,

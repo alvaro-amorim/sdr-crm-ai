@@ -252,6 +252,272 @@ h3 {
   width: 34px;
 }
 
+.evaluation-screen {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(80, 180, 187, 0.12), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(243, 195, 95, 0.12), transparent 22%),
+    linear-gradient(180deg, #f5f4ef 0%, #eef5f3 100%);
+  padding: 32px;
+}
+
+.evaluation-shell {
+  display: grid;
+  gap: 22px;
+  margin: 0 auto;
+  max-width: 1180px;
+}
+
+.evaluation-hero {
+  background: linear-gradient(135deg, rgba(18, 86, 90, 0.97), rgba(20, 46, 45, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 28px;
+  box-shadow: 0 28px 80px rgba(17, 38, 37, 0.18);
+  color: #f6fbfa;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.9fr);
+  overflow: hidden;
+  padding: 28px;
+  position: relative;
+}
+
+.evaluation-hero::after {
+  background: radial-gradient(circle at top right, rgba(243, 195, 95, 0.24), transparent 30%);
+  content: '';
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.evaluation-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.evaluation-hero-copy {
+  display: grid;
+  gap: 14px;
+}
+
+.evaluation-hero-copy h1 {
+  color: #ffffff;
+  font-size: clamp(2.1rem, 4vw, 3.4rem);
+  max-width: 12ch;
+}
+
+.evaluation-hero-copy p,
+.evaluation-hero-card p {
+  color: rgba(240, 248, 246, 0.82);
+  line-height: 1.55;
+}
+
+.evaluation-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.evaluation-chip {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: #f6fbfa;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 8px 12px;
+}
+
+.evaluation-hero-card,
+.evaluation-status-card {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(29, 95, 99, 0.12);
+  border-radius: 22px;
+  box-shadow: 0 18px 50px rgba(23, 47, 46, 0.12);
+  color: #18201f;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 22px;
+}
+
+.evaluation-hero-card {
+  align-content: start;
+}
+
+.evaluation-link {
+  align-items: center;
+  color: #1d5f63;
+  display: inline-flex;
+  font-weight: 700;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.evaluation-link:hover {
+  color: #164b4e;
+}
+
+.evaluation-link-primary {
+  background: linear-gradient(135deg, rgba(29, 95, 99, 0.12), rgba(29, 95, 99, 0.18));
+  border: 1px solid rgba(29, 95, 99, 0.18);
+  border-radius: 16px;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 16px;
+}
+
+.evaluation-banner {
+  background: linear-gradient(135deg, rgba(29, 95, 99, 0.12), rgba(80, 180, 187, 0.08));
+  border: 1px solid rgba(29, 95, 99, 0.16);
+  border-radius: 18px;
+  display: grid;
+  gap: 4px;
+  padding: 16px 18px;
+}
+
+.evaluation-banner strong {
+  color: #164b4e;
+}
+
+.evaluation-banner p {
+  color: #35514d;
+}
+
+.evaluation-banner-error {
+  background: linear-gradient(135deg, rgba(180, 68, 50, 0.14), rgba(180, 68, 50, 0.08));
+  border-color: rgba(180, 68, 50, 0.2);
+}
+
+.evaluation-banner-error strong,
+.evaluation-banner-error p {
+  color: #8a3b2d;
+}
+
+.evaluation-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.evaluation-status-card-wide {
+  grid-column: span 4;
+}
+
+.evaluation-card-topline {
+  align-items: center;
+  color: #4d6460;
+  display: flex;
+  justify-content: space-between;
+}
+
+.evaluation-status-card strong {
+  font-size: 1.7rem;
+  line-height: 1.1;
+}
+
+.evaluation-status-card-wide strong,
+.evaluation-hero-card strong {
+  font-size: 1.2rem;
+}
+
+.evaluation-status-card p,
+.evaluation-inline-note {
+  color: #61706d;
+  line-height: 1.55;
+}
+
+.evaluation-actions-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.evaluation-action-grid,
+.evaluation-shortcuts-grid,
+.evaluation-shortcut-links {
+  display: grid;
+  gap: 14px;
+}
+
+.evaluation-action-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.evaluation-shortcuts-grid {
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.9fr);
+}
+
+.evaluation-shortcut-links {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.evaluation-shortcut-links a {
+  align-items: center;
+  background: linear-gradient(135deg, rgba(29, 95, 99, 0.06), rgba(243, 195, 95, 0.06));
+  border: 1px solid rgba(29, 95, 99, 0.12);
+  border-radius: 16px;
+  color: #164b4e;
+  display: flex;
+  font-weight: 700;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 60px;
+  padding: 0 16px;
+  text-decoration: none;
+}
+
+.evaluation-shortcut-links a:hover {
+  border-color: rgba(29, 95, 99, 0.22);
+  box-shadow: 0 18px 36px rgba(23, 47, 46, 0.08);
+}
+
+.evaluation-shortcut-panel-emphasis {
+  background: linear-gradient(180deg, #ffffff 0%, #f5fbf9 100%);
+}
+
+@media (max-width: 1080px) {
+  .evaluation-hero,
+  .evaluation-shortcuts-grid,
+  .evaluation-action-grid,
+  .evaluation-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .evaluation-status-card-wide,
+  .evaluation-shortcuts-grid > * {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 720px) {
+  .evaluation-screen {
+    padding: 16px;
+  }
+
+  .evaluation-hero,
+  .evaluation-grid,
+  .evaluation-action-grid,
+  .evaluation-shortcuts-grid,
+  .evaluation-shortcut-links {
+    grid-template-columns: 1fr;
+  }
+
+  .evaluation-status-card-wide,
+  .evaluation-shortcuts-grid > *,
+  .evaluation-grid > * {
+    grid-column: span 1;
+  }
+
+  .evaluation-hero {
+    border-radius: 22px;
+    padding: 20px;
+  }
+
+  .evaluation-hero-copy h1 {
+    max-width: none;
+  }
+}
+
 .auth-screen {
   align-items: center;
   background:
