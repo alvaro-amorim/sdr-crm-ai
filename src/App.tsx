@@ -1113,8 +1113,8 @@ function StatusBar({ notice, error, onClear }: { notice: string | null; error: s
 }
 
 function OperationGuide({ tab }: { tab: Tab }) {
-  const [collapsed, setCollapsed] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
+  const [modalOpen, setModalOpen] = useState(tab === 'dashboard');
   const steps: Array<{ id: Tab; title: string; description: string }> = [
     {
       id: 'dashboard',

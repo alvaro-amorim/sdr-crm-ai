@@ -2969,7 +2969,8 @@ h3 {
   overflow: auto;
 }
 
-.chat-modal.flow-guide-modal {
+.chat-modal.flow-guide-modal,
+.chat-modal.dashboard-diagnostic-modal {
   background:
     radial-gradient(circle at top center, rgba(29, 95, 99, 0.18), transparent 40%),
     linear-gradient(180deg, rgba(29, 95, 99, 0.12), rgba(255, 255, 255, 0.98) 22%),
