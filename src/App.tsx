@@ -122,6 +122,41 @@ function getSafeMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Falha inesperada. Tente novamente.';
 }
 
+function getAuthSafeMessage(error: unknown): string {
+  const rawMessage = error instanceof Error ? error.message : String(error ?? '');
+  const normalized = rawMessage.toLowerCase();
+
+  if (normalized.includes('email rate limit') || normalized.includes('rate limit') || normalized.includes('too many requests')) {
+    return 'Muitas tentativas em pouco tempo. Aguarde alguns instantes e tente novamente.';
+  }
+  if (normalized.includes('invalid login credentials')) {
+    return 'E-mail ou senha inválidos.';
+  }
+  if (normalized.includes('email not confirmed')) {
+    return 'Confirme seu e-mail antes de entrar.';
+  }
+  if (normalized.includes('user already registered') || normalized.includes('already registered')) {
+    return 'Este e-mail já está cadastrado. Entre com sua senha ou use a recuperação de senha.';
+  }
+  if (normalized.includes('signup') && normalized.includes('disabled')) {
+    return 'Cadastro por e-mail está indisponível neste momento.';
+  }
+  if (normalized.includes('password') && (normalized.includes('weak') || normalized.includes('at least'))) {
+    return 'Use uma senha mais forte, com pelo menos 6 caracteres.';
+  }
+  if (normalized.includes('invalid email') || normalized.includes('unable to validate email')) {
+    return 'Informe um e-mail válido.';
+  }
+  if (normalized.includes('oauth') || normalized.includes('provider') || normalized.includes('exchange')) {
+    return 'Não foi possível concluir o login com Google. Tente novamente.';
+  }
+  if (normalized.includes('network') || normalized.includes('failed to fetch')) {
+    return 'Falha de conexão com a autenticação. Verifique a internet e tente novamente.';
+  }
+
+  return rawMessage || 'Falha na autenticação. Tente novamente.';
+}
+
 function getWorkspaceMemberDisplayName(member: CrmData['workspaceMembers'][number], user?: User): string {
   const profileName = member.profile_full_name?.trim();
   if (profileName) return profileName;
@@ -222,7 +257,7 @@ export default function App() {
     async function initializeSession() {
       const callbackError = readAuthCallbackError();
       if (callbackError) {
-        setError(`Falha no login OAuth: ${callbackError}`);
+        setError(getAuthSafeMessage(new Error(callbackError)));
         clearAuthCallbackUrl();
       }
 
@@ -231,7 +266,7 @@ export default function App() {
         const { data: exchangedData, error: exchangeError } = await supabaseClient.auth.exchangeCodeForSession(code);
         clearAuthCallbackUrl();
         if (exchangeError) {
-          setError(`Falha ao concluir login OAuth: ${exchangeError.message}`);
+          setError(getAuthSafeMessage(exchangeError));
         } else if (!cancelled) {
           setSession(exchangedData.session);
         }
@@ -246,7 +281,7 @@ export default function App() {
 
     void initializeSession().catch((sessionError: unknown) => {
       if (!cancelled) {
-        setError(getSafeMessage(sessionError));
+        setError(getAuthSafeMessage(sessionError));
         setLoading(false);
       }
     });
@@ -526,7 +561,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
         if (result.error) throw result.error;
       }
     } catch (authError) {
-      setError(getSafeMessage(authError));
+      setError(getAuthSafeMessage(authError));
     } finally {
       setBusy(false);
     }
@@ -546,7 +581,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
       });
       if (oauthError) throw oauthError;
     } catch (googleError) {
-      setError(getSafeMessage(googleError));
+      setError(getAuthSafeMessage(googleError));
       setBusy(false);
     }
   }
@@ -676,7 +711,7 @@ function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
       setSuccess('Senha atualizada com sucesso.');
       window.setTimeout(onDone, 900);
     } catch (updateError) {
-      setError(getSafeMessage(updateError));
+      setError(getAuthSafeMessage(updateError));
     } finally {
       setBusy(false);
     }

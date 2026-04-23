@@ -121,7 +121,16 @@ Se o projeto remoto já tiver parte do histórico aplicada, use `migration repai
   - `https://sdr-crm-ai-wine.vercel.app`
   - `http://127.0.0.1:5173`
   - `http://localhost:5173`
+- configurar SMTP customizado no Supabase Auth Email via Resend:
+  - domínio de envio: `auth.comercias.com.br`;
+  - remetente: `no-reply@auth.comercias.com.br`;
+  - host SMTP: `smtp.resend.com`;
+  - porta SMTP: `465`;
+  - usuário SMTP: `resend`;
+  - senha SMTP: usar a API key do Resend somente no painel do Supabase, nunca no repositório;
 - habilitar Google em `Authentication > Sign In / Providers > Google`.
+
+Validação operacional em 23/04/2026: cadastro por e-mail e recuperação de senha foram testados manualmente após a troca para SMTP customizado via Resend, sem recorrência do erro de limite de envio de e-mails. O frontend continua hospedado normalmente na Vercel; o SMTP afeta apenas os e-mails transacionais do Supabase Auth.
 
 ### 6. Configurar Secrets das Edge Functions
 
