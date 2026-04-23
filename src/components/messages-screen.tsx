@@ -468,7 +468,7 @@ export function MessagesScreen({
                 list="messageLeadOptions"
                 value={leadQuery}
                 onChange={(event) => handleLeadQueryChange(event.target.value)}
-                placeholder="Ex.: Paula Martins ou Bruno Accioly"
+                placeholder="Ex.: Contato comercial"
                 autoComplete="off"
               />
             </div>
@@ -477,7 +477,7 @@ export function MessagesScreen({
                 <option key={option.id} value={option.label} />
               ))}
             </datalist>
-            <span className="field-hint">Busque pelo nome do lead. Ex.: Paula Martins ou Bruno Accioly.</span>
+            <span className="field-hint">Busque pelo nome do lead. Ex.: Contato comercial.</span>
           </label>
 
           <label>

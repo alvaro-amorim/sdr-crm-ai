@@ -269,7 +269,7 @@ export function ClientSimulatorScreen() {
               name="clientReply"
               value={reply}
               onChange={(event) => setReply(event.target.value)}
-              placeholder="Exemplo: Tenho interesse, mas preciso entender prazo de implantação e esforço do meu time."
+              placeholder="Exemplo: Tenho interesse, mas preciso entender prazo de implantação."
               maxLength={1200}
               disabled={busy}
               required

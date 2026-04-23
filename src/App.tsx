@@ -579,9 +579,9 @@ function AuthScreen({ authError }: { authError?: string | null }) {
               autoComplete="name"
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
-              placeholder="Ex.: Álvaro Amorim ou Marina Teixeira"
+              placeholder="Ex.: Responsável comercial"
             />
-            <span className="field-hint">Use o nome que deve aparecer no perfil. Ex.: Álvaro Amorim ou Marina Teixeira.</span>
+            <span className="field-hint">Use o nome que deve aparecer no perfil. Ex.: Responsável comercial.</span>
           </label>
         )}
         <label htmlFor="email">
@@ -593,10 +593,10 @@ function AuthScreen({ authError }: { authError?: string | null }) {
             autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="Ex.: alvaro@empresa.com ou marina.sdr@startup.com.br"
+            placeholder="Ex.: contato@empresa.com.br"
             required
           />
-          <span className="field-hint">Informe um e-mail válido. Ex.: alvaro@empresa.com ou marina.sdr@startup.com.br.</span>
+          <span className="field-hint">Informe um e-mail válido. Ex.: contato@empresa.com.br.</span>
         </label>
         {mode !== 'forgot' && (
           <PasswordField
@@ -606,8 +606,8 @@ function AuthScreen({ authError }: { authError?: string | null }) {
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="Ex.: Vendas2026! ou Sdr#Operacao9"
-            hint="Crie uma senha forte. Ex.: Vendas2026! ou Sdr#Operacao9."
+            placeholder="Ex.: AcessoSeguro2026!"
+            hint="Crie uma senha forte. Ex.: AcessoSeguro2026!."
           />
         )}
         {mode === 'signup' && (
@@ -618,8 +618,8 @@ function AuthScreen({ authError }: { authError?: string | null }) {
             autoComplete="new-password"
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
-            placeholder="Ex.: Vendas2026! ou Sdr#Operacao9"
-            hint="Repita exatamente a senha criada acima. Ex.: Vendas2026! ou Sdr#Operacao9."
+            placeholder="Ex.: AcessoSeguro2026!"
+            hint="Repita exatamente a senha criada acima. Ex.: AcessoSeguro2026!."
           />
         )}
         {error && <p className="error">{error}</p>}
@@ -696,8 +696,8 @@ function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
           autoComplete="new-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          placeholder="Ex.: NovaSenha2026! ou SDR#AcessoSeguro7"
-          hint="Escolha uma senha nova e forte. Ex.: NovaSenha2026! ou SDR#AcessoSeguro7."
+          placeholder="Ex.: NovaSenhaSegura2026!"
+          hint="Escolha uma senha nova e forte. Ex.: NovaSenhaSegura2026!."
         />
         <PasswordField
           id="confirmNewPassword"
@@ -706,8 +706,8 @@ function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
           autoComplete="new-password"
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
-          placeholder="Ex.: NovaSenha2026! ou SDR#AcessoSeguro7"
-          hint="Repita a mesma senha digitada acima. Ex.: NovaSenha2026! ou SDR#AcessoSeguro7."
+          placeholder="Ex.: NovaSenhaSegura2026!"
+          hint="Repita a mesma senha digitada acima. Ex.: NovaSenhaSegura2026!."
         />
         {error && <p className="error">{error}</p>}
         {success && <p className="success-text">{success}</p>}
@@ -873,9 +873,9 @@ function WorkspaceOnboarding({
           name="workspaceName"
           value={name}
           onChange={(event) => setName(event.target.value)}
-          placeholder="Ex.: Operação SDR Brasil ou Pré-vendas Enterprise"
+          placeholder="Ex.: Operação SDR Brasil"
         />
-        <span className="field-hint">Dê um nome operacional ao ambiente. Ex.: Operação SDR Brasil ou Pré-vendas Enterprise.</span>
+        <span className="field-hint">Dê um nome operacional ao ambiente. Ex.: Operação SDR Brasil.</span>
       </label>
       {error && <p className="error">{error}</p>}
       <button type="button" onClick={() => onCreate(name)} disabled={busy || name.trim().length < 2}>
@@ -1428,10 +1428,10 @@ function LeadForm({
           name="leadName"
           value={form.name}
           onChange={(event) => setForm({ ...form, name: event.target.value })}
-          placeholder="Ex.: Priscila Amaral ou Bruno Accioly"
+          placeholder="Ex.: Contato comercial"
           required
         />
-        <span className="field-hint">Digite o nome completo do contato. Ex.: Priscila Amaral ou Bruno Accioly.</span>
+        <span className="field-hint">Digite o nome do contato. Ex.: Contato comercial.</span>
       </label>
       <label>
         E-mail
@@ -1440,9 +1440,9 @@ function LeadForm({
           type="email"
           value={form.email}
           onChange={(event) => setForm({ ...form, email: event.target.value })}
-          placeholder="Ex.: priscila@loghub.com.br ou bruno@fasthaul.com"
+          placeholder="Ex.: contato@empresa.com.br"
         />
-        <span className="field-hint">Use um e-mail profissional do lead. Ex.: priscila@loghub.com.br ou bruno@fasthaul.com.</span>
+        <span className="field-hint">Use um e-mail profissional do lead. Ex.: contato@empresa.com.br.</span>
       </label>
       <label>
         Telefone
@@ -1450,9 +1450,9 @@ function LeadForm({
           name="leadPhone"
           value={form.phone}
           onChange={(event) => setForm({ ...form, phone: event.target.value })}
-          placeholder="Ex.: 11987654321 ou 2133345566"
+          placeholder="Ex.: 11987654321"
         />
-        <span className="field-hint">Informe telefone com DDD. Ex.: 11987654321 ou 2133345566.</span>
+        <span className="field-hint">Informe telefone com DDD. Ex.: 11987654321.</span>
       </label>
       <label>
         Empresa
@@ -1460,9 +1460,9 @@ function LeadForm({
           name="leadCompany"
           value={form.company}
           onChange={(event) => setForm({ ...form, company: event.target.value })}
-          placeholder="Ex.: LogHub ou Escola Integra"
+          placeholder="Ex.: Empresa alvo"
         />
-        <span className="field-hint">Use o nome comercial da conta. Ex.: LogHub ou Escola Integra.</span>
+        <span className="field-hint">Use o nome comercial da conta. Ex.: Empresa alvo.</span>
       </label>
       <label>
         Cargo
@@ -1470,9 +1470,9 @@ function LeadForm({
           name="leadJobTitle"
           value={form.job_title}
           onChange={(event) => setForm({ ...form, job_title: event.target.value })}
-          placeholder="Ex.: Head de Revenue ou Diretora Comercial"
+          placeholder="Ex.: Head de Receita"
         />
-        <span className="field-hint">Registre o papel do lead no processo. Ex.: Head de Revenue ou Diretora Comercial.</span>
+        <span className="field-hint">Registre o papel do lead no processo. Ex.: Head de Receita.</span>
       </label>
       <label>
         Origem
@@ -1480,9 +1480,9 @@ function LeadForm({
           name="leadSource"
           value={form.lead_source}
           onChange={(event) => setForm({ ...form, lead_source: event.target.value })}
-          placeholder="Ex.: Lista ICP 2026 ou Inbound orgânico"
+          placeholder="Ex.: Lista ICP 2026"
         />
-        <span className="field-hint">Explique de onde esse lead veio. Ex.: Lista ICP 2026 ou Inbound orgânico.</span>
+        <span className="field-hint">Explique de onde esse lead veio. Ex.: Lista ICP 2026.</span>
       </label>
       <label>
         Etapa
@@ -1500,10 +1500,10 @@ function LeadForm({
           name="leadTechnicalOwner"
           value={form.technical_owner_name}
           onChange={(event) => setForm({ ...form, technical_owner_name: event.target.value })}
-          placeholder="Ex.: Álvaro Martins ou Marina Costa"
+          placeholder="Ex.: Especialista técnico"
         />
         <span className="field-hint">
-          Informe quem acompanha tecnicamente este lead. Ex.: Álvaro Martins ou Marina Costa. Se ficar em branco, o lead será salvo sem responsável técnico.
+          Informe quem acompanha tecnicamente este lead. Ex.: Especialista técnico. Se ficar em branco, o lead será salvo sem responsável técnico.
         </span>
       </label>
       <label>
@@ -1522,7 +1522,7 @@ function LeadForm({
           ))}
         </select>
         <span className="field-hint">
-          Atribua o lead a um usuário do workspace quando fizer sentido operacional. Ex.: Você ou Owner do workspace.
+          Atribua o lead a um usuário do workspace quando fizer sentido operacional. Ex.: Owner do workspace.
         </span>
       </label>
       <label className="wide">
@@ -1531,9 +1531,9 @@ function LeadForm({
           name="leadNotes"
           value={form.notes}
           onChange={(event) => setForm({ ...form, notes: event.target.value })}
-          placeholder="Ex.: Quer reduzir tempo de resposta do time. ou Ex.: Pediu contato na próxima terça após 10h."
+          placeholder="Ex.: Quer reduzir tempo de resposta do time."
         />
-        <span className="field-hint">Anote contexto útil para a próxima abordagem. Ex.: quer reduzir tempo de resposta do time ou pediu contato na próxima terça após 10h.</span>
+        <span className="field-hint">Anote contexto útil para a próxima abordagem. Ex.: quer reduzir tempo de resposta do time.</span>
       </label>
       {data.customFields.map((field) => (
         <label key={field.id}>
@@ -1542,7 +1542,7 @@ function LeadForm({
             name={`customField-${field.id}`}
             type={field.field_type === 'number' ? 'number' : 'text'}
             value={form.customValues[field.id] ?? ''}
-            placeholder={field.field_type === 'number' ? 'Ex.: 12 ou 45' : 'Ex.: Operação outbound ou Ticket enterprise'}
+            placeholder={field.field_type === 'number' ? 'Ex.: 12' : 'Ex.: Operação outbound'}
             onChange={(event) =>
               setForm({
                 ...form,
@@ -1552,8 +1552,8 @@ function LeadForm({
           />
           <span className="field-hint">
             {field.field_type === 'number'
-              ? 'Preencha com valor quantitativo. Ex.: 12 ou 45.'
-              : 'Preencha com um contexto objetivo. Ex.: Operação outbound ou Ticket enterprise.'}
+              ? 'Preencha com valor quantitativo. Ex.: 12.'
+              : 'Preencha com um contexto objetivo. Ex.: Operação outbound.'}
           </span>
         </label>
       ))}
@@ -1832,10 +1832,10 @@ function FieldsView({
                 name="customFieldName"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="Ex.: Segmento ou Número de vendedores"
+                placeholder="Ex.: Segmento"
                 required
               />
-              <span className="field-hint">Exemplo: segmento, ICP, ticket médio, número de vendedores.</span>
+              <span className="field-hint">Exemplo: segmento.</span>
             </label>
             <label>
               Tipo
@@ -2283,10 +2283,10 @@ function CampaignForm({
           name="campaignName"
           value={form.name}
           onChange={(event) => setForm({ ...form, name: event.target.value })}
-          placeholder="Ex.: Outbound ICP Operações ou Reativação de pipeline"
+          placeholder="Ex.: Outbound ICP Operações"
           required
         />
-        <span className="field-hint">Use um nome claro. Ex.: Outbound ICP Operações ou Reativação de pipeline.</span>
+        <span className="field-hint">Use um nome claro. Ex.: Outbound ICP Operações.</span>
       </label>
       <label>
         Etapa gatilho
@@ -2358,10 +2358,10 @@ function CampaignForm({
           name="campaignContext"
           value={form.context_text}
           onChange={(event) => setForm({ ...form, context_text: event.target.value })}
-          placeholder="Ex.: SaaS B2B com time SDR travado por baixa cadência. ou Ex.: Operação logística com dificuldade para qualificar leads."
+          placeholder="Ex.: SaaS B2B com time SDR travado por baixa cadência."
           required
         />
-        <span className="field-hint">Ex.: SaaS B2B com time SDR travado por baixa cadência ou operação logística com dificuldade para qualificar leads.</span>
+        <span className="field-hint">Ex.: SaaS B2B com time SDR travado por baixa cadência.</span>
         <span className="field-hint">Descreva rapidamente o cenário, produto e dor comercial que a IA deve considerar.</span>
       </label>
       <div className="wide campaign-plan-actions">
