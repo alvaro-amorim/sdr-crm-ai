@@ -30,6 +30,8 @@ html {
 }
 
 body {
+  caret-color: transparent;
+  cursor: default;
   margin: 0;
   max-width: 100%;
   min-width: 320px;
@@ -107,6 +109,17 @@ textarea {
   min-height: 40px;
   padding: 9px 10px;
   width: 100%;
+}
+
+input,
+textarea,
+[contenteditable='true'] {
+  caret-color: auto;
+  cursor: text;
+}
+
+select {
+  cursor: pointer;
 }
 
 textarea {
