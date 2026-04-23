@@ -666,7 +666,7 @@ export function DashboardScreen({
       </div>
 
       {diagnosticOpen && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="dashboard-diagnostic-title">
+        <div className="modal-backdrop dashboard-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="dashboard-diagnostic-title">
           <section className="chat-modal dashboard-diagnostic-modal">
             <div className="chat-modal-header">
               <div>
@@ -698,7 +698,7 @@ export function DashboardScreen({
       )}
 
       {activeShortcut && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="dashboard-operation-title">
+        <div className="modal-backdrop dashboard-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="dashboard-operation-title">
           <section className="chat-modal dashboard-operation-modal">
             <div className="chat-modal-header">
               <div>

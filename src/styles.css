@@ -1432,8 +1432,11 @@ h3 {
 }
 
 .dashboard-diagnostic-modal {
-  max-width: 900px;
+  border-radius: 20px;
+  box-shadow: 0 32px 96px rgba(12, 20, 19, 0.24);
+  max-width: min(900px, calc(100vw - 64px));
   overflow: auto;
+  width: min(100%, 900px);
 }
 
 .dashboard-operation-modal {
@@ -2313,6 +2316,16 @@ h3 {
   z-index: 50;
 }
 
+.dashboard-modal-backdrop {
+  align-items: start;
+  background:
+    linear-gradient(180deg, rgba(9, 16, 15, 0.66), rgba(9, 16, 15, 0.52)),
+    rgba(20, 28, 27, 0.44);
+  backdrop-filter: blur(5px);
+  overflow: auto;
+  padding: clamp(32px, 8vh, 72px) 28px 24px;
+}
+
 .chat-modal {
   background: #ffffff;
   border: 1px solid #d9dfdc;
@@ -2564,12 +2577,10 @@ h3 {
 @keyframes content-fade-in {
   from {
     opacity: 0.94;
-    transform: translateY(2px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -3211,6 +3222,10 @@ h3 {
     max-width: calc(100vw - 32px);
   }
 
+  .dashboard-modal-backdrop {
+    padding: 24px 16px 16px;
+  }
+
   .client-simulator-screen {
     padding: 16px;
   }
@@ -3453,6 +3468,10 @@ h3 {
     align-items: start;
     overflow: auto;
     padding: 12px;
+  }
+
+  .dashboard-modal-backdrop {
+    padding: 16px 12px 12px;
   }
 
   .chat-modal-actions {
