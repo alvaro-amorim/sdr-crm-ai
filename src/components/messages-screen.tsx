@@ -739,20 +739,6 @@ export function MessagesScreen({
         onConfirm={(message) => void simulateSend(message)}
       />
 
-      <button
-        type="button"
-        className="client-simulator-shortcut"
-        onClick={() => void openClientSimulator(activeSimulatorThread)}
-        disabled={!activeSimulatorThread || simulatorLinkBusy}
-        aria-label="Abrir simulador do cliente em nova janela"
-      >
-        <MessageCircleReply aria-hidden />
-        <span>
-          {simulatorLinkBusy
-            ? 'Abrindo simulador do cliente...'
-            : 'Abra o simulador para agir como cliente e testar a próxima resposta da IA em outra janela.'}
-        </span>
-      </button>
     </section>
   );
 }

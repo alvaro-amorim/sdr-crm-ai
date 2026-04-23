@@ -281,16 +281,16 @@ export function EvaluationPanelScreen({
             <div className="panel-heading">
               <div>
                 <span className="section-kicker">Fluxo critico</span>
-                <h2>Simulador do cliente</h2>
+                <h2>Chat como cliente</h2>
               </div>
               <Bot aria-hidden />
             </div>
 
-            <p>O cenario basico deixa uma conversa seeded pronta para o avaliador validar envio, historico e simulador sem depender de IA.</p>
+            <p>O cenario basico deixa uma conversa seeded pronta para o avaliador validar envio, historico e chat do cliente sem depender de IA.</p>
 
             {status.simulatorUrl ? (
               <a className="evaluation-link evaluation-link-primary" href={status.simulatorUrl} target="_blank" rel="noreferrer">
-                Abrir simulador seeded
+                Abrir chat como cliente
                 <ArrowUpRight aria-hidden />
               </a>
             ) : (

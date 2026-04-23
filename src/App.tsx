@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  ExternalLink,
   KeyRound,
   LayoutDashboard,
   LogOut,
@@ -381,7 +382,7 @@ export default function App() {
         setNotice(null);
         setError(null);
       }} />
-      <OperationGuide tab={tab} userId={session.user.id} />
+      <OperationGuide tab={tab} userId={session.user.id} workspaceId={data.workspace.id} />
 
       {tab === 'dashboard' && <Dashboard data={data} onOpenLeadConversation={openLeadConversation} />}
       {tab === 'leads' && (
@@ -1129,10 +1130,15 @@ function StatusBar({ notice, error, onClear }: { notice: string | null; error: s
   );
 }
 
-function OperationGuide({ tab, userId }: { tab: AppTab; userId: string }) {
+function OperationGuide({ tab, userId, workspaceId }: { tab: AppTab; userId: string; workspaceId: string }) {
   const [collapsed, setCollapsed] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const flowGuideStorageKey = `sdr-expert:flow-guide-shown:${userId}`;
+  const evaluationPanelUrl = useMemo(() => {
+    const url = new URL('/__evaluation', window.location.origin);
+    url.searchParams.set('workspace', workspaceId);
+    return url.toString();
+  }, [workspaceId]);
   const steps: Array<{ id: AppTab; title: string; description: string }> = [
     {
       id: 'dashboard',
@@ -1245,6 +1251,10 @@ function OperationGuide({ tab, userId }: { tab: AppTab; userId: string }) {
                 </article>
               ))}
             </div>
+            <a className="flow-guide-evaluation-link" href={evaluationPanelUrl} target="_blank" rel="noreferrer">
+              <ExternalLink aria-hidden />
+              Abrir painel do avaliador
+            </a>
             <div className="flow-guide-note">
               <strong>Fluxo principal:</strong>
               <span>

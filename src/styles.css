@@ -1077,6 +1077,31 @@ h3 {
   padding: 14px;
 }
 
+.flow-guide-evaluation-link {
+  align-items: center;
+  background: #1e6b6f;
+  border: 1px solid rgba(30, 107, 111, 0.26);
+  border-radius: 12px;
+  color: #ffffff;
+  display: inline-flex;
+  font-weight: 900;
+  gap: 8px;
+  justify-content: center;
+  justify-self: start;
+  padding: 11px 14px;
+  text-decoration: none;
+}
+
+.flow-guide-evaluation-link:hover {
+  background: #18595c;
+  transform: translateY(-1px);
+}
+
+.flow-guide-evaluation-link svg {
+  height: 17px;
+  width: 17px;
+}
+
 .sidebar-top {
   display: grid;
   gap: 14px;
@@ -3681,38 +3706,6 @@ h3 {
   color: #29534f;
 }
 
-.client-simulator-shortcut {
-  align-items: center;
-  background: #10201e;
-  border: 1px solid #334542;
-  border-radius: 999px;
-  bottom: 22px;
-  box-shadow: 0 18px 50px rgba(17, 31, 29, 0.28);
-  color: #ffffff;
-  display: inline-flex;
-  gap: 10px;
-  max-width: min(420px, calc(100vw - 44px));
-  min-height: 48px;
-  padding: 10px 16px;
-  position: fixed;
-  right: 22px;
-  z-index: 12;
-}
-
-.client-simulator-shortcut svg {
-  color: #ffd45a;
-  flex: 0 0 18px;
-  height: 18px;
-  width: 18px;
-}
-
-.client-simulator-shortcut span {
-  font-size: 0.82rem;
-  line-height: 1.25;
-  max-width: 320px;
-  text-align: left;
-}
-
 .client-simulator-screen {
   background: #eff2ed;
   color: #0c1715;
@@ -4158,14 +4151,6 @@ h3 {
     min-height: 360px;
   }
 
-  .client-simulator-shortcut {
-    bottom: 14px;
-    left: 14px;
-    max-width: none;
-    right: 14px;
-    width: auto;
-  }
-
   .kanban {
     padding-inline: 2px;
   }
@@ -4435,20 +4420,6 @@ h3 {
   .password-toggle,
   .sidebar-close {
     width: 40px;
-  }
-
-  .client-simulator-shortcut {
-    border-radius: 8px;
-    bottom: 10px;
-    left: 10px;
-    min-height: 44px;
-    padding: 10px 12px;
-    right: 10px;
-    width: auto;
-  }
-
-  .client-simulator-shortcut span {
-    max-width: none;
   }
 
   .client-chat-message {
