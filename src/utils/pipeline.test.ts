@@ -16,6 +16,7 @@ const lead: Lead = {
   workspace_id: 'workspace-1',
   current_stage_id: 'stage-0',
   assigned_user_id: null,
+  technical_owner_name: null,
   name: 'Lead Exemplo',
   email: null,
   phone: '11999999999',

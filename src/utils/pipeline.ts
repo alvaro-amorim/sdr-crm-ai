@@ -25,10 +25,13 @@ export const STANDARD_LEAD_FIELDS: Array<{ key: StandardLeadField; label: string
   { key: 'job_title', label: 'Cargo' },
   { key: 'lead_source', label: 'Origem' },
   { key: 'notes', label: 'Observações' },
-  { key: 'assigned_user_id', label: 'Responsável' },
+  { key: 'technical_owner_name', label: 'Responsável técnico' },
 ];
 
-const standardFieldLabels = new Map(STANDARD_LEAD_FIELDS.map((field) => [field.key, field.label]));
+const standardFieldLabels = new Map<StandardLeadField, string>([
+  ...STANDARD_LEAD_FIELDS.map((field) => [field.key, field.label] as const),
+  ['assigned_user_id', 'Responsável técnico'],
+]);
 
 function hasValue(value: unknown): boolean {
   if (value === null || value === undefined) return false;

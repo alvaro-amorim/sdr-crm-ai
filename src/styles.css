@@ -1880,6 +1880,11 @@ h3 {
   overflow: auto;
 }
 
+.chat-modal.lead-confirm-modal {
+  max-width: 560px;
+  width: min(100%, 560px);
+}
+
 .chat-modal.flow-guide-modal > *,
 .chat-modal.dashboard-diagnostic-modal > *,
 .chat-modal.dashboard-operation-modal > * {

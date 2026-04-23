@@ -60,6 +60,7 @@ const emptyLeadInput: LeadInput = {
   job_title: '',
   lead_source: '',
   notes: '',
+  technical_owner_name: '',
   assigned_user_id: null,
   current_stage_id: '',
   customValues: {},
@@ -1220,6 +1221,7 @@ function LeadForm({
       job_title: lead.job_title ?? '',
       lead_source: lead.lead_source ?? '',
       notes: lead.notes ?? '',
+      technical_owner_name: lead.technical_owner_name ?? '',
       assigned_user_id: lead.assigned_user_id,
       current_stage_id: lead.current_stage_id,
       customValues,
@@ -1227,8 +1229,25 @@ function LeadForm({
   }, [data.customValues, data.stages, lead]);
 
   const [form, setForm] = useState<LeadInput>(initial);
+  const [confirmUnassignedOpen, setConfirmUnassignedOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => setForm(initial), [initial]);
+
+  async function saveLead() {
+    if (!supabase) return;
+
+    try {
+      setSaving(true);
+      await upsertLead(supabase, data.workspace, user, form);
+      setConfirmUnassignedOpen(false);
+      onSaved();
+    } catch (saveError) {
+      setError(getSafeMessage(saveError));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1240,15 +1259,16 @@ function LeadForm({
       return;
     }
 
-    try {
-      await upsertLead(supabase, data.workspace, user, form);
-      onSaved();
-    } catch (saveError) {
-      setError(getSafeMessage(saveError));
+    if (!form.technical_owner_name.trim()) {
+      setConfirmUnassignedOpen(true);
+      return;
     }
+
+    await saveLead();
   }
 
   return (
+    <>
     <form className="panel form-grid lead-form" onSubmit={submit}>
       <div className="form-heading">
         <div className="lead-form-heading">
@@ -1335,15 +1355,16 @@ function LeadForm({
         </select>
       </label>
       <label>
-        Responsável
-        <select
-          name="leadAssignee"
-          value={form.assigned_user_id ?? ''}
-          onChange={(event) => setForm({ ...form, assigned_user_id: event.target.value || null })}
-        >
-          <option value="">Sem responsável</option>
-          <option value={user.id}>Eu</option>
-        </select>
+        Responsável técnico
+        <input
+          name="leadTechnicalOwner"
+          value={form.technical_owner_name}
+          onChange={(event) => setForm({ ...form, technical_owner_name: event.target.value })}
+          placeholder="Ex.: Álvaro Martins ou Marina Costa"
+        />
+        <span className="field-hint">
+          Informe quem acompanha tecnicamente este lead. Ex.: Álvaro Martins ou Marina Costa. Se ficar em branco, o lead será salvo sem responsável técnico.
+        </span>
       </label>
       <label className="wide">
         Observações
@@ -1378,9 +1399,43 @@ function LeadForm({
         </label>
       ))}
       <div className="wide">
-        <button type="submit">{lead ? 'Salvar lead' : 'Cadastrar lead'}</button>
+        <button type="submit" disabled={saving}>{saving ? 'Salvando...' : lead ? 'Salvar lead' : 'Cadastrar lead'}</button>
       </div>
     </form>
+    {confirmUnassignedOpen && (
+      <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="lead-unassigned-title">
+        <section className="chat-modal lead-confirm-modal">
+          <div className="chat-modal-header">
+            <div>
+              <span className="section-kicker">Confirmação</span>
+              <h2 id="lead-unassigned-title">Salvar sem responsável técnico?</h2>
+              <p>Este lead ficará sem responsável técnico definido. Você poderá preencher esse campo depois ao editar o lead.</p>
+            </div>
+            <button
+              type="button"
+              className="ghost icon-button"
+              aria-label="Fechar confirmação"
+              onClick={() => setConfirmUnassignedOpen(false)}
+              disabled={saving}
+            >
+              <X aria-hidden />
+            </button>
+          </div>
+          <div className="chat-modal-footer">
+            <p>Você quer mesmo cadastrar esse lead sem um responsável técnico?</p>
+            <div className="chat-modal-actions">
+              <button type="button" className="secondary" onClick={() => setConfirmUnassignedOpen(false)} disabled={saving}>
+                Voltar e preencher
+              </button>
+              <button type="button" onClick={saveLead} disabled={saving}>
+                {saving ? 'Salvando...' : 'Salvar sem responsável'}
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -1486,7 +1541,9 @@ function LeadCard({
 
       <div className="lead-tag-row">
         <span className="lead-tag">{lead.lead_source || 'Origem não informada'}</span>
-        {lead.assigned_user_id ? <span className="lead-tag">Responsável definido</span> : <span className="lead-tag">Sem responsável</span>}
+        <span className="lead-tag">
+          {lead.technical_owner_name ? `Resp. técnico: ${lead.technical_owner_name}` : 'Sem responsável técnico'}
+        </span>
       </div>
 
       {missing.length > 0 && <p className="lead-card-warning">Campos faltando: {missing.join(', ')}.</p>}

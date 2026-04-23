@@ -6,6 +6,7 @@ export type StandardLeadField =
   | 'job_title'
   | 'lead_source'
   | 'notes'
+  | 'technical_owner_name'
   | 'assigned_user_id';
 
 export type Workspace = {
@@ -56,6 +57,7 @@ export type Lead = {
   workspace_id: string;
   current_stage_id: string;
   assigned_user_id: string | null;
+  technical_owner_name: string | null;
   name: string;
   email: string | null;
   phone: string | null;

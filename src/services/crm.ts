@@ -24,6 +24,7 @@ export type LeadInput = {
   job_title: string;
   lead_source: string;
   notes: string;
+  technical_owner_name: string;
   assigned_user_id: string | null;
   current_stage_id: string;
   customValues: Record<string, string>;
@@ -132,6 +133,7 @@ export async function upsertLead(
     workspace_id: workspace.id,
     current_stage_id: input.current_stage_id,
     assigned_user_id: input.assigned_user_id || null,
+    technical_owner_name: input.technical_owner_name.trim() || null,
     name: input.name.trim(),
     email: input.email.trim() || null,
     phone: input.phone.trim() || null,

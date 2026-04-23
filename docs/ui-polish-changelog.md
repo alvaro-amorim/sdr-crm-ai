@@ -426,6 +426,32 @@ Corrigir o botão de minimizar do guia rápido no mobile, que estava herdando la
 - `npm run lint`
 - `npm run build`
 
+## 2026-04-22 — Responsável técnico textual opcional
+
+### Objetivo
+
+Permitir que o operador escreva o nome do responsável técnico do lead ou deixe o campo em branco de forma consciente.
+
+### Alterações
+
+- `src/App.tsx`
+  - troca o seletor de responsável por um campo de texto livre
+  - adiciona confirmação antes de salvar um lead sem responsável técnico
+  - mostra nos cards se o lead está sem responsável técnico ou quem foi informado
+
+- `src/services/crm.ts` e `src/types/domain.ts`
+  - adiciona suporte ao campo `technical_owner_name`
+
+- `supabase/migrations/20260422232000_add_lead_technical_owner_name.sql`
+  - adiciona a coluna textual opcional em `leads`
+  - migra regras antigas de campo obrigatório de `assigned_user_id` para `technical_owner_name`
+
+### Validação
+
+- `npm run lint`
+- `npm run test`
+- `npm run build`
+
 ## 2026-04-22 — Trava contra rolagem horizontal no mobile
 
 ### Objetivo
