@@ -8,6 +8,14 @@ npm run scenario:evaluation:crm
 
 Ele nao e o smoke test real do projeto. O objetivo aqui e preparar um workspace com volume operacional alto para uma avaliacao mais profunda.
 
+Se o objetivo for apenas acelerar a navegacao funcional do avaliador com dados fixos e sem IA, use primeiro o painel auxiliar:
+
+```bash
+/__evaluation
+```
+
+O painel deixa um workspace tecnico pronto com um clique e nao substitui este seed pesado.
+
 ## Objetivo
 
 - criar um workspace demonstravel com volume operacional crivel;

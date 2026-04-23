@@ -48,11 +48,14 @@ Use `.env.example` como base:
 ```bash
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+VITE_ENABLE_EVALUATION_PANEL=false
 TEST_USER_EMAIL=avaliador@example.com
 TEST_USER_PASSWORD=sua-senha
 ```
 
 `OPENAI_API_KEY` local e opcional e so deve ser usada no cenario pesado de avaliacao. Ela nunca deve ficar no frontend publicado.
+
+`VITE_ENABLE_EVALUATION_PANEL` e opcional. Use `true` apenas quando for necessario expor o painel auxiliar de avaliacao em ambiente remoto de review.
 
 ### 3. Linkar e aplicar o projeto Supabase
 
@@ -81,6 +84,41 @@ npm run dev
 ## Seeds tecnicos
 
 O repositorio agora separa claramente dois fluxos:
+
+### Painel auxiliar de avaliacao tecnica
+
+Rota:
+
+```bash
+/__evaluation
+```
+
+Objetivo:
+
+- acelerar a validacao funcional pelo avaliador;
+- nao misturar seeds de apoio com o fluxo normal do produto;
+- manter todos os dados do avaliador em um workspace tecnico isolado.
+
+Comportamento:
+
+- cria ou reutiliza o workspace `Avaliacao Tecnica SDR Expert`;
+- funciona automaticamente em `localhost`;
+- em ambiente remoto exige `VITE_ENABLE_EVALUATION_PANEL=true`;
+- oferece 4 acoes deterministicas:
+  - gerar leads de exemplo
+  - criar campanha de exemplo
+  - popular cenario basico de avaliacao
+  - resetar dados de avaliacao
+- expõe atalhos diretos para:
+  - Dashboard
+  - Leads
+  - Campanhas
+  - Mensagens IA
+  - simulador seeded
+
+Mais detalhes:
+
+- `docs/evaluation-panel.md`
 
 ### Smoke test real
 
@@ -156,6 +194,12 @@ Cenario pesado:
 ```bash
 npm run scenario:evaluation:crm
 ```
+
+Painel auxiliar:
+
+- abrir `http://localhost:5173/__evaluation`
+- preparar o cenario com um clique
+- navegar pelos atalhos do app principal no workspace tecnico
 
 ## Deploy
 

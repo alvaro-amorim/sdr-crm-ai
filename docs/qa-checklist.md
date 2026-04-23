@@ -20,6 +20,24 @@ Base funcional do MVP criada com frontend React, schema Supabase, RLS, Edge Func
   - cria 100 leads, 4 campanhas e ate 75 conversas com IA real;
   - persiste `conversation_threads`, `conversation_messages`, `generated_messages`, `sent_message_events` e tokens do simulador.
 
+## Painel auxiliar do avaliador
+
+- rota: `/__evaluation`
+- uso previsto:
+  - preparar rapidamente um workspace tecnico pronto para navegacao;
+  - evitar cadastro manual durante a avaliacao;
+  - resetar apenas os dados de apoio do avaliador.
+- isolamento:
+  - fora da navegacao principal;
+  - visivel localmente por padrao;
+  - em ambiente remoto, so com `VITE_ENABLE_EVALUATION_PANEL=true`.
+- acoes disponiveis:
+  - gerar leads de exemplo
+  - criar campanha de exemplo
+  - popular cenario basico de avaliacao
+  - resetar dados de avaliacao
+- o painel nao usa IA para gerar os dados.
+
 ## Convencao dos seeds
 
 ### Smoke real
@@ -84,6 +102,11 @@ Opcionais do cenario pesado:
    - abrir o link do simulador;
    - responder como cliente;
    - validar persistencia da conversa.
+8. Painel auxiliar
+   - abrir `/__evaluation`;
+   - preparar o cenario basico;
+   - validar que os atalhos abrem o app principal no workspace tecnico;
+   - resetar o workspace auxiliar sem afetar outros dados.
 
 ## Revisao de seguranca
 

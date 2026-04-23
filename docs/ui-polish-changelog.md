@@ -41,3 +41,14 @@ Validacoes recorrentes desta fase:
 - o fluxo pesado passou a ser documentado como `cenario de avaliacao`;
 - docs e scripts principais foram alinhados a essa separacao;
 - nomes historicos de migration com `smoke` foram mantidos apenas por compatibilidade de historico.
+
+## 2026-04-23 - Painel auxiliar do avaliador
+
+- criada a rota isolada ` /__evaluation `;
+- o painel ficou fora da navegacao principal;
+- os dados do avaliador passaram a ser sempre deterministas e sem IA;
+- o workspace tecnico dedicado evita contaminar o fluxo normal do produto;
+- README e docs passaram a explicar:
+  - como habilitar a rota;
+  - o que cada botao faz;
+  - quando usar painel, smoke leve ou cenario pesado.

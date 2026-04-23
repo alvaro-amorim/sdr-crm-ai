@@ -1,11 +1,13 @@
 ## Bloco 5 - Cenário pesado de avaliação
 
 Objetivo desta rodada:
+
 - transformar o seed pesado antigo em um cenário técnico de avaliação;
 - manter o volume operacional crível para dashboard, mensagens e simulador;
 - separar esse fluxo do smoke test real e leve do CRM.
 
 O que foi consolidado:
+
 - `scripts/evaluation-scenario-lib.mjs`
   - centraliza cenários, distribuição das conversas e métricas esperadas;
 - `scripts/evaluation-scenario-lib.test.mjs`
@@ -19,13 +21,16 @@ O que foi consolidado:
   - passou a refletir a nomenclatura correta do cenário pesado.
 
 Impacto funcional:
+
 - o cenário pesado continua útil para demonstrar volume operacional realista;
 - a nomenclatura deixa de chamar esse fluxo de smoke test;
 - o produto passa a distinguir claramente:
   - `npm run test:smoke:crm` para seed leve e rápido;
-  - `npm run scenario:evaluation:crm` para o seed pesado de avaliação.
+  - `npm run scenario:evaluation:crm` para o seed pesado de avaliação;
+  - `/__evaluation` para o painel auxiliar determinístico do avaliador.
 
 Validação executada nesta rodada:
+
 - `npm run test`
 - `npm run lint`
 - `npm run build`
