@@ -1062,13 +1062,13 @@ h3 {
 }
 
 .dashboard-hero {
-  align-items: end;
+  align-items: stretch;
   background:
-    linear-gradient(135deg, rgba(29, 95, 99, 0.08), rgba(29, 95, 99, 0.02)),
+    linear-gradient(135deg, rgba(29, 95, 99, 0.1), rgba(29, 95, 99, 0.03)),
     #ffffff;
-  gap: 24px;
-  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
-  padding: 24px;
+  gap: 28px;
+  grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr);
+  padding: 28px;
 }
 
 .dashboard-hero-strategic {
@@ -1077,13 +1077,29 @@ h3 {
 
 .dashboard-hero-copy {
   display: grid;
-  gap: 10px;
+  gap: 14px;
 }
 
 .dashboard-hero-copy p {
   color: #50605d;
   font-size: 1.02rem;
   max-width: 60ch;
+}
+
+.dashboard-context-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dashboard-context-chip {
+  background: rgba(29, 95, 99, 0.07);
+  border: 1px solid rgba(29, 95, 99, 0.12);
+  border-radius: 999px;
+  color: #295356;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 8px 12px;
 }
 
 .dashboard-hero-actions {
@@ -1093,23 +1109,57 @@ h3 {
   margin-top: 4px;
 }
 
+.dashboard-hero-side {
+  display: grid;
+  gap: 14px;
+}
+
+.dashboard-priority-card {
+  background: linear-gradient(145deg, #1d5f63, #163f41);
+  border: 1px solid rgba(16, 32, 30, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 20px 52px rgba(20, 44, 43, 0.18);
+  color: #ffffff;
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+}
+
+.dashboard-priority-kicker {
+  color: rgba(235, 246, 243, 0.78);
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dashboard-priority-card strong {
+  font-size: 1.5rem;
+  line-height: 1.15;
+}
+
+.dashboard-priority-card p {
+  color: rgba(235, 246, 243, 0.88);
+  line-height: 1.5;
+}
+
 .dashboard-hero-highlights {
   display: grid;
   gap: 12px;
 }
 
-.dashboard-hero-highlights div,
+.dashboard-highlight-card,
 .overview-card,
 .chat-summary-card {
   background: #f8fbfa;
   border: 1px solid #e1e9e6;
-  border-radius: 8px;
+  border-radius: 14px;
   display: grid;
   gap: 6px;
   padding: 16px;
 }
 
-.dashboard-hero-highlights div,
+.dashboard-highlight-card,
 .overview-card,
 .chat-summary-card,
 .metric,
@@ -1143,18 +1193,76 @@ h3 {
 .dashboard-grid {
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
 }
 
 .dashboard-insight-strip {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-metrics-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.metric-subtle {
+  background: #f7faf9;
+  border-color: #e3ebe8;
+  border-radius: 16px;
+  box-shadow: none;
+  gap: 10px;
+  min-height: 0;
+  padding: 16px;
+}
+
+.metric-subtle strong {
+  font-size: 1.85rem;
+}
+
+.metric-subtle span {
+  color: #49615f;
+}
+
+.metric-subtle p {
+  color: #6b7a77;
 }
 
 .dashboard-shortcuts-panel {
   display: grid;
   gap: 16px;
+}
+
+.dashboard-shortcut-groups {
+  display: grid;
+  gap: 18px;
+}
+
+.dashboard-shortcut-group {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-shortcut-group-heading {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+}
+
+.dashboard-shortcut-group-heading div {
+  display: grid;
+  gap: 4px;
+}
+
+.dashboard-shortcut-group-heading strong {
+  color: #18201f;
+  font-size: 1rem;
+}
+
+.dashboard-shortcut-group-heading p {
+  color: #61706d;
+  line-height: 1.45;
 }
 
 .dashboard-shortcut-grid {
@@ -1167,14 +1275,14 @@ h3 {
   align-items: start;
   background: #f8fbfa;
   border: 1px solid #dfe8e5;
-  border-radius: 8px;
+  border-radius: 16px;
   color: inherit;
   cursor: pointer;
   display: grid;
   gap: 12px;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  min-height: 168px;
-  padding: 16px;
+  min-height: 156px;
+  padding: 18px;
   position: relative;
   text-align: left;
   transition:
@@ -1289,7 +1397,7 @@ h3 {
 .diagnostic-item {
   background: #ffffff;
   border: 1px solid #d9dfdc;
-  border-radius: 8px;
+  border-radius: 16px;
   box-shadow: 0 14px 38px rgba(31, 43, 40, 0.06);
   display: grid;
   gap: 7px;
@@ -1335,6 +1443,11 @@ h3 {
   grid-template-columns: minmax(0, 1fr) minmax(220px, 0.65fr) minmax(280px, 1fr);
 }
 
+.selected-stage-card-primary {
+  background: linear-gradient(180deg, #ffffff, #f8fbfa);
+  border-color: rgba(29, 95, 99, 0.2);
+}
+
 .selected-stage-card-list ul {
   display: grid;
   gap: 8px;
@@ -1365,6 +1478,11 @@ h3 {
 .dashboard-funnel-panel,
 .activity-panel {
   align-content: start;
+  border-radius: 18px;
+}
+
+.activity-panel {
+  background: linear-gradient(180deg, #ffffff, #fbfcfc);
 }
 
 .panel-heading {
