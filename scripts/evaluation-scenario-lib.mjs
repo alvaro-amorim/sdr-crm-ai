@@ -1,4 +1,4 @@
-export const SMOKE_SCENARIOS = [
+export const EVALUATION_SCENARIOS = [
   {
     key: 'opening_no_response',
     label: 'Abertura sem resposta',
@@ -205,26 +205,26 @@ export const SMOKE_SCENARIOS = [
   },
 ];
 
-export function getSmokeScenarios(mode = 'all') {
+export function getEvaluationScenarios(mode = 'all') {
   if (mode === '1') {
-    return SMOKE_SCENARIOS.filter((scenario) =>
+    return EVALUATION_SCENARIOS.filter((scenario) =>
       ['opening_no_response', 'secondary_follow_up_no_response'].includes(scenario.key),
     );
   }
 
   if (mode === '2') {
-    return SMOKE_SCENARIOS.filter((scenario) =>
+    return EVALUATION_SCENARIOS.filter((scenario) =>
       ['negative_closed', 'interested_follow_up', 'qualified_multi_touch', 'meeting_confirmed'].includes(scenario.key),
     );
   }
 
-  return SMOKE_SCENARIOS;
+  return EVALUATION_SCENARIOS;
 }
 
-export function getSmokeScenarioByKey(key) {
-  const scenario = SMOKE_SCENARIOS.find((item) => item.key === key);
+export function getEvaluationScenarioByKey(key) {
+  const scenario = EVALUATION_SCENARIOS.find((item) => item.key === key);
   if (!scenario) {
-    throw new Error(`Cenario de smoke desconhecido: ${key}`);
+    throw new Error(`Cenario de avaliacao desconhecido: ${key}`);
   }
 
   return scenario;
@@ -257,8 +257,8 @@ function distributeScenarioCounts(limit, scenarios) {
   return base;
 }
 
-export function buildSmokeAssignments(limit, mode = 'all') {
-  const scenarios = getSmokeScenarios(mode);
+export function buildEvaluationAssignments(limit, mode = 'all') {
+  const scenarios = getEvaluationScenarios(mode);
   const counts = distributeScenarioCounts(limit, scenarios);
   const queue = counts.map((entry) => ({ ...entry }));
   const assignments = [];
@@ -280,10 +280,10 @@ export function buildSmokeAssignments(limit, mode = 'all') {
   return assignments;
 }
 
-export function getSmokeExpectedMetrics(assignments) {
+export function getEvaluationExpectedMetrics(assignments) {
   return assignments.reduce(
     (summary, key) => {
-      const scenario = getSmokeScenarioByKey(key);
+      const scenario = getEvaluationScenarioByKey(key);
       const outboundCount = scenario.sequence.filter((step) => step.direction === 'outbound').length;
       const inboundCount = scenario.sequence.filter((step) => step.direction === 'inbound').length;
 
@@ -317,7 +317,7 @@ function normalizeComparableLabel(value) {
 }
 
 export function validateScenarioConversation(messages, scenarioKey) {
-  const scenario = getSmokeScenarioByKey(scenarioKey);
+  const scenario = getEvaluationScenarioByKey(scenarioKey);
 
   if (messages.length !== scenario.sequence.length) {
     throw new Error(
@@ -352,7 +352,7 @@ export function validateScenarioConversation(messages, scenarioKey) {
 }
 
 export function validateScenarioThreadSummary(threadSummary, scenarioKey) {
-  const scenario = getSmokeScenarioByKey(scenarioKey);
+  const scenario = getEvaluationScenarioByKey(scenarioKey);
 
   if (threadSummary.threadStatus !== scenario.threadStatus) {
     throw new Error(

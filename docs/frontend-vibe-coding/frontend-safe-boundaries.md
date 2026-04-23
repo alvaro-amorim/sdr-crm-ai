@@ -42,7 +42,7 @@
 - `generate-lead-messages`
 - `create-simulation-link`
 - `simulate-client-chat`
-- `generate-smoke-conversation`
+- `generate-evaluation-conversation`
 
 ## Regras de Negócio que Não Podem Quebrar
 

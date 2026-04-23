@@ -4,191 +4,26 @@ import process from 'node:process';
 import { createHash, randomBytes } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import {
-  buildSmokeAssignments,
-  getSmokeExpectedMetrics,
-  getSmokeScenarioByKey,
+  buildEvaluationAssignments,
+  getEvaluationExpectedMetrics,
+  getEvaluationScenarioByKey,
   validateScenarioConversation,
   validateScenarioThreadSummary,
-} from './smoke-flow-lib.mjs';
+} from './evaluation-scenario-lib.mjs';
+import {
+  EVALUATION_CAMPAIGN_TEMPLATES,
+  EVALUATION_CUSTOM_FIELDS,
+  EVALUATION_LEAD_IDENTITIES,
+  EVALUATION_STAGE_REQUIRED_RULES,
+  buildEvaluationLeadProfile,
+  isoHoursAgo,
+  normalizeStageName,
+} from './evaluation-fixtures.mjs';
 
 const AI_FALLBACK_CHAIN = [
   { model: 'gpt-4o-mini', temperature: 0.65, timeoutMs: 18000 },
   { model: 'gpt-4o', temperature: 0.55, timeoutMs: 22000 },
   { model: 'gpt-4.1-mini', temperature: 0.5, timeoutMs: 22000 },
-];
-
-const CUSTOM_FIELDS = [
-  { name: 'Segmento', field_key: 'segmento', field_type: 'text' },
-  { name: 'Porte da empresa', field_key: 'porte_empresa', field_type: 'text' },
-  { name: 'Stack comercial', field_key: 'stack_comercial', field_type: 'text' },
-  { name: 'Maturidade SDR', field_key: 'maturidade_sdr', field_type: 'text' },
-  { name: 'Canal preferencial', field_key: 'canal_preferencial', field_type: 'text' },
-  { name: 'Temperatura inicial', field_key: 'temperatura_inicial', field_type: 'text' },
-  { name: 'Responsável interno', field_key: 'responsavel_interno', field_type: 'text' },
-];
-
-const STAGE_REQUIRED_RULES = [
-  ['Lead Mapeado', 'company', null],
-  ['Lead Mapeado', 'job_title', null],
-  ['Lead Mapeado', 'lead_source', null],
-  ['Lead Mapeado', null, 'segmento'],
-  ['Conexão Iniciada', 'email', null],
-  ['Conexão Iniciada', null, 'canal_preferencial'],
-  ['Qualificado', 'phone', null],
-  ['Qualificado', 'assigned_user_id', null],
-  ['Qualificado', null, 'maturidade_sdr'],
-  ['Reunião Agendada', 'notes', null],
-  ['Reunião Agendada', null, 'stack_comercial'],
-];
-
-const CAMPAIGNS = [
-  {
-    slug: 'outbound-icp-operacoes',
-    name: 'Outbound ICP Operações e Revenue',
-    triggerStage: 'Base',
-    channel: 'email',
-    context_text:
-      'Abordagem consultiva para líderes de operação comercial e revenue que precisam ganhar previsibilidade, reduzir improviso dos SDRs e organizar cadências por segmento.',
-    generation_prompt:
-      'Criar mensagens curtas, humanas e profissionais. Conectar dor operacional com ganho de previsibilidade e terminar com CTA leve para diagnóstico.',
-    goal: 'Abrir conversa consultiva com leads frios de ICP claro.',
-  },
-  {
-    slug: 'reativacao-pipeline-parado',
-    name: 'Reativação de pipeline parado',
-    triggerStage: 'Tentando Contato',
-    channel: 'email',
-    context_text:
-      'Reativação de leads que já receberam uma abordagem, mas esfriaram por prioridade interna, timing ruim ou falta de clareza sobre impacto comercial.',
-    generation_prompt:
-      'Retomar contexto sem insistência. Usar uma pergunta curta sobre prioridade, gargalo ou próximo passo possível.',
-    goal: 'Reabrir resposta em leads mornos e recuperar timing.',
-  },
-  {
-    slug: 'qualificacao-diagnostico',
-    name: 'Qualificação para diagnóstico comercial',
-    triggerStage: 'Conexão Iniciada',
-    channel: 'whatsapp',
-    context_text:
-      'Conversa com leads que responderam ou demonstraram interesse e precisam ser qualificados em dor, maturidade do processo, stack e urgência.',
-    generation_prompt:
-      'Conduzir qualificação com tom direto, sem interrogatório. Fazer uma pergunta por vez e apontar valor prático.',
-    goal: 'Transformar interesse em diagnóstico com dados comerciais mínimos.',
-  },
-  {
-    slug: 'avanco-reuniao',
-    name: 'Avanço para reunião',
-    triggerStage: 'Qualificado',
-    channel: 'whatsapp',
-    context_text:
-      'Convite para reunião com leads qualificados que já entendem a dor e precisam de um próximo passo objetivo para avaliar solução e impacto.',
-    generation_prompt:
-      'Avançar para reunião com clareza, confiança e baixa fricção. Sugerir agenda e resumir o que será analisado.',
-    goal: 'Converter lead qualificado em reunião agendada.',
-  },
-];
-
-const LEAD_NAMES = [
-  ['Mariana Costa', 'AtlasLog'],
-  ['Rafael Azevedo', 'NexoCargo'],
-  ['Bianca Nogueira', 'Clara Saúde'],
-  ['Thiago Leme', 'Pulsar ERP'],
-  ['Paula Martins', 'Aurora Ensino'],
-  ['Felipe Barros', 'Nova Farma'],
-  ['Camila Duarte', 'Vértice Energia'],
-  ['Gustavo Prado', 'MobiFleet'],
-  ['Juliana Serra', 'OmniBank'],
-  ['Rodrigo Telles', 'Lince Logística'],
-  ['Larissa Mendonça', 'Senda Transportes'],
-  ['Bruno Farias', 'Axis Supply'],
-  ['Isabela Pires', 'Delta Chain'],
-  ['Marcelo Nunes', 'CargoLink'],
-  ['Renata Queiroz', 'Prime Route'],
-  ['Diego Vasconcelos', 'TrackFlow'],
-  ['Natália Campos', 'Orbita Freight'],
-  ['Vinícius Moura', 'Fortex Log'],
-  ['Aline Teixeira', 'ViaPorto'],
-  ['Eduardo Mattos', 'Vector Cargo'],
-  ['Fernanda Rocha', 'GridMove'],
-  ['Caio Bernardes', 'FastHaul'],
-  ['Tatiane Reis', 'Kargo360'],
-  ['Leonardo Afonso', 'Rota Prime'],
-  ['Priscila Amaral', 'LogHub'],
-  ['Daniel Freitas', 'CoreStack'],
-  ['Beatriz Sampaio', 'Synapse CRM'],
-  ['Henrique Loureiro', 'Orbit SaaS'],
-  ['Luiza Antunes', 'DataFuse'],
-  ['Pedro Mello', 'NovaDesk'],
-  ['Alice Ribeiro', 'ByteFlow'],
-  ['Ricardo Pacheco', 'HiveERP'],
-  ['Sofia Goulart', 'OmniTech'],
-  ['Matheus Rezende', 'CloudBridge'],
-  ['Débora Falcão', 'LeadPilot'],
-  ['Gabriel Rios', 'Atlas SaaS'],
-  ['Marina Valença', 'SigmaSoft'],
-  ['André Silveira', 'Focus ERP'],
-  ['Laura Neves', 'Pulse CRM'],
-  ['João Pimenta', 'LogicDesk'],
-  ['Helena Borges', 'StreamCore'],
-  ['Renato Cabral', 'DockData'],
-  ['Bruna Tavares', 'FlowSuite'],
-  ['César Guimarães', 'SmartLayer'],
-  ['Elisa Monteiro', 'BaseCloud'],
-  ['Fábio Guedes', 'BeamOps'],
-  ['Talita Coelho', 'Nimbi Tech'],
-  ['Otávio Brandão', 'K2 Software'],
-  ['Vanessa Motta', 'LoopDesk'],
-  ['Igor Pacheco', 'Quanta SaaS'],
-  ['Patrícia Linhares', 'Aurora Ensino'],
-  ['Mauro Cezar', 'VidaPlena Saúde'],
-  ['Carol Furtado', 'Colégio Horizonte'],
-  ['Felipe Aragão', 'Clínica Soma'],
-  ['Silvia Nascimento', 'EduPrime'],
-  ['Andréa Viana', 'MedFocus'],
-  ['Danilo Peixoto', 'Instituto Prisma'],
-  ['Júlia Bastos', 'Cuidar+'],
-  ['Marcelo Furtado', 'LearnBridge'],
-  ['Roberta Sá', 'Essentia Care'],
-  ['Pedro Ottoni', 'UniNorte Digital'],
-  ['Isadora Lobo', 'Vitta Saúde'],
-  ['Alan Menezes', 'Escola Integra'],
-  ['Cíntia Mota', 'HealthFirst'],
-  ['Renan Lisboa', 'Campus Now'],
-  ['Mirela Pacheco', 'OdontoPrime'],
-  ['Sérgio Arruda', 'Alfa Educação'],
-  ['Evelin Torres', 'Nexo Clínicas'],
-  ['Rafael Motta', 'Saber+'],
-  ['Luciana Prado', 'BemCare'],
-  ['Guilherme Neri', 'EduLab'],
-  ['Monique Barreto', 'Vida Integral'],
-  ['Tiago Carvalho', 'MedSignal'],
-  ['Daniela Porto', 'Colégio Vertex'],
-  ['Bruno Accioly', 'CarePath'],
-  ['Ana Clara Ramos', 'UrbanFit Franquias'],
-  ['Thiago Bittencourt', 'Rede Mais Varejo'],
-  ['Larissa Figueiredo', 'CredNova'],
-  ['Eduardo Siqueira', 'FortePay'],
-  ['Flávia Moraes', 'IndusPrime'],
-  ['Marcelo Tavares', 'FranqConnect'],
-  ['Juliana Paes', 'OmniRetail'],
-  ['Roberto Simões', 'Capital Axis'],
-  ['Débora Lins', 'Varejo Sul'],
-  ['Vinícius Braga', 'Nexa Finance'],
-  ['Amanda Queiroz', 'StoreGrid'],
-  ['Leandro Amaral', 'Prisma Capital'],
-  ['Aline Barroso', 'Retail One'],
-  ['César Tavares', 'Master Franquias'],
-  ['Mariana Pacheco', 'CredPoint'],
-  ['Rodrigo Leal', 'IndusMax'],
-  ['Nathalia Cunha', 'UrbanBox'],
-  ['Diego Rocha', 'FinCore'],
-  ['Paula Teodoro', 'Fábrica Alpha'],
-  ['Gustavo Noronha', 'Retail Hub'],
-  ['Elisa Correia', 'Selo Finance'],
-  ['Bruno Salgado', 'OmniFranquias'],
-  ['Camila Manso', 'Vitta Crédito'],
-  ['Fernando Reis', 'Indústria Sigma'],
-  ['Raquel Telles', 'Loja Forte'],
 ];
 
 function readEnvFile(filePath) {
@@ -213,18 +48,6 @@ function requireEnv(env, key) {
   const value = env[key];
   if (!value) throw new Error(`Variável obrigatória ausente: ${key}`);
   return value;
-}
-
-function normalizeStageName(name) {
-  return name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-}
-
-function isoHoursAgo(hours) {
-  return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 }
 
 function sleep(ms) {
@@ -263,97 +86,12 @@ function stageIdByName(stageMap, name) {
   return stage.id;
 }
 
-function safeSlug(value) {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
 function hashToken(token) {
   return createHash('sha256').update(token).digest('hex');
 }
 
 function createToken() {
   return randomBytes(32).toString('base64url');
-}
-
-function segmentForIndex(index) {
-  if (index < 25) return 'Logística e Supply Chain';
-  if (index < 50) return 'SaaS B2B e Tecnologia';
-  if (index < 75) return 'Saúde e Educação';
-  return 'Varejo, Franquias, Finanças e Indústria';
-}
-
-function stageForIndex(index) {
-  if (index < 25) return 'Base';
-  if (index < 40) return 'Lead Mapeado';
-  if (index < 60) return 'Tentando Contato';
-  if (index < 75) return 'Conexão Iniciada';
-  if (index < 85) return 'Qualificado';
-  if (index < 90) return 'Reunião Agendada';
-  return 'Desqualificado';
-}
-
-function leadSourceForIndex(index) {
-  const sources = [
-    'Lista ICP 2026',
-    'LinkedIn Sales Navigator',
-    'Webinar de geração de pipeline',
-    'Indicação de cliente',
-    'Evento comercial B2B',
-    'Inbound orgânico',
-  ];
-  return sources[index % sources.length];
-}
-
-function jobTitleForIndex(index) {
-  const titles = [
-    'Head de Revenue Operations',
-    'Gerente de SDR',
-    'Diretora Comercial',
-    'Coordenador de Pré-vendas',
-    'Sales Ops Manager',
-    'Gerente de Crescimento',
-    'Head de Vendas',
-    'Líder de Desenvolvimento de Negócios',
-  ];
-  return titles[index % titles.length];
-}
-
-function leadProfile(index, name, company) {
-  const segmento = segmentForIndex(index);
-  const maturidades = ['Estruturando SDR', 'Time em expansão', 'Operação madura', 'Playbook em revisão', 'Sem cadência formal'];
-  const stacks = ['HubSpot + Apollo', 'Pipedrive + WhatsApp', 'Salesforce + Outreach', 'CRM próprio + planilhas', 'RD Station + Ramper'];
-  const portes = ['51-100 colaboradores', '101-200 colaboradores', '201-500 colaboradores', '501-1000 colaboradores', '1001+ colaboradores'];
-  const temperaturas = ['frio', 'morno', 'interessado', 'positivo', 'objeção ativa'];
-  const canais = ['email', 'whatsapp', 'linkedin'];
-  const technicalOwners = ['Álvaro Martins', 'Marina Costa', 'Lucas Prado', 'Fernanda Lima', 'Caio Torres'];
-  const emailDomain = `${safeSlug(company)}.com.br`;
-  const phoneSuffix = String(11000000 + index * 7391).slice(-8);
-
-  return {
-    slug: safeSlug(`${name}-${company}`),
-    name,
-    company,
-    email: `${safeSlug(name).replace(/-/g, '.')}@${emailDomain}`,
-    phone: index % 7 === 0 ? null : `11${phoneSuffix}`,
-    job_title: jobTitleForIndex(index),
-    lead_source: leadSourceForIndex(index),
-    notes: `${company} tem sinais de dor em cadência, visibilidade de pipeline e padronização da abordagem SDR.`,
-    technical_owner_name: index % 6 === 0 ? null : technicalOwners[index % technicalOwners.length],
-    segmento,
-    porte_empresa: portes[index % portes.length],
-    stack_comercial: stacks[index % stacks.length],
-    maturidade_sdr: maturidades[index % maturidades.length],
-    canal_preferencial: canais[index % canais.length],
-    temperatura_inicial: temperaturas[index % temperaturas.length],
-    responsavel_interno: ['Álvaro Martins', 'SDR Expert IA', 'Operação Comercial'][index % 3],
-    stageName: stageForIndex(index),
-    createdAt: isoHoursAgo(220 - index),
-  };
 }
 
 function buildConversationPrompt({ lead, campaign, scenarioProfile }) {
@@ -468,10 +206,10 @@ async function callOpenAiConversation(openAiKey, prompt, scenarioProfile) {
 }
 
 async function callEdgeConversation({ supabaseUrl, supabaseAnonKey, authToken, workspaceId, lead, campaign, scenarioProfile, wave }) {
-  let lastError = 'Falha desconhecida na Edge Function de smoke.';
+  let lastError = 'Falha desconhecida na Edge Function do cenario de avaliacao.';
 
   for (let attempt = 1; attempt <= 4; attempt += 1) {
-    const response = await fetch(`${supabaseUrl.replace(/\/$/, '')}/functions/v1/generate-smoke-conversation`, {
+    const response = await fetch(`${supabaseUrl.replace(/\/$/, '')}/functions/v1/generate-evaluation-conversation`, {
       method: 'POST',
       headers: {
         apikey: supabaseAnonKey,
@@ -511,7 +249,7 @@ async function callEdgeConversation({ supabaseUrl, supabaseAnonKey, authToken, w
       }
     }
 
-    lastError = `Falha na Edge Function de smoke: HTTP ${response.status} ${data?.error ?? data?.message ?? ''}`.trim();
+    lastError = `Falha na Edge Function do cenario de avaliacao: HTTP ${response.status} ${data?.error ?? data?.message ?? ''}`.trim();
     if (![0, 429, 502, 503, 504].includes(response.status) || attempt === 4) break;
     await sleep(1200 * attempt);
   }
@@ -536,11 +274,11 @@ async function getOrCreateWorkspace(client, workspaceName) {
     .limit(1)
     .maybeSingle();
 
-  if (existingWorkspaceError) throw new Error(`Falha ao buscar workspace do smoke: ${existingWorkspaceError.message}`);
+  if (existingWorkspaceError) throw new Error(`Falha ao buscar workspace do cenario de avaliacao: ${existingWorkspaceError.message}`);
   if (existingWorkspace) return existingWorkspace;
 
   const { data, error } = await client.rpc('create_workspace_with_defaults', { workspace_name: workspaceName });
-  if (error) throw new Error(`Falha ao criar workspace do smoke: ${error.message}`);
+  if (error) throw new Error(`Falha ao criar workspace do cenario de avaliacao: ${error.message}`);
   if (!data) throw new Error('RPC create_workspace_with_defaults não retornou workspace.');
   return data;
 }
@@ -577,14 +315,14 @@ async function loadStages(client, workspaceId) {
 }
 
 async function createCustomFields(client, workspaceId) {
-  const rows = CUSTOM_FIELDS.map((field) => ({ workspace_id: workspaceId, ...field }));
+  const rows = EVALUATION_CUSTOM_FIELDS.map((field) => ({ workspace_id: workspaceId, ...field }));
   const { data, error } = await client.from('workspace_custom_fields').insert(rows).select();
   if (error || !data) throw new Error(`Falha ao criar campos personalizados: ${error?.message ?? 'sem retorno'}`);
   return new Map(data.map((field) => [field.field_key, field]));
 }
 
 async function saveStageRequiredFields(client, workspaceId, stageMap, customFieldMap) {
-  const rows = STAGE_REQUIRED_RULES
+  const rows = EVALUATION_STAGE_REQUIRED_RULES
     .map(([stageName, fieldKey, customKey]) => ({
       workspace_id: workspaceId,
       stage_id: stageIdByName(stageMap, stageName),
@@ -598,7 +336,7 @@ async function saveStageRequiredFields(client, workspaceId, stageMap, customFiel
 }
 
 async function createCampaigns(client, workspaceId, userId, stageMap) {
-  const rows = CAMPAIGNS.map((campaign, index) => ({
+  const rows = EVALUATION_CAMPAIGN_TEMPLATES.map((campaign, index) => ({
     workspace_id: workspaceId,
     name: campaign.name,
     context_text: campaign.context_text,
@@ -613,7 +351,7 @@ async function createCampaigns(client, workspaceId, userId, stageMap) {
   const { data, error } = await client.from('campaigns').insert(rows).select();
   if (error || !data) throw new Error(`Falha ao criar campanhas: ${error?.message ?? 'sem retorno'}`);
   return new Map(
-    CAMPAIGNS.map((campaign) => {
+    EVALUATION_CAMPAIGN_TEMPLATES.map((campaign) => {
       const record = data.find((item) => item.name === campaign.name);
       return [campaign.slug, record ? { ...record, slug: campaign.slug, channel: campaign.channel, goal: campaign.goal } : null];
     }),
@@ -621,7 +359,7 @@ async function createCampaigns(client, workspaceId, userId, stageMap) {
 }
 
 async function createLeads(client, workspaceId, userId, stageMap) {
-  const profiles = LEAD_NAMES.map(([name, company], index) => leadProfile(index, name, company));
+  const profiles = EVALUATION_LEAD_IDENTITIES.map(([name, company], index) => buildEvaluationLeadProfile(index, name, company));
   const rows = profiles.map((lead) => ({
     workspace_id: workspaceId,
     current_stage_id: stageIdByName(stageMap, lead.stageName),
@@ -655,7 +393,7 @@ async function createLeads(client, workspaceId, userId, stageMap) {
 async function saveLeadCustomValues(client, workspaceId, leadMap, customFieldMap) {
   const rows = [];
   for (const { record, profile } of leadMap.values()) {
-    for (const field of CUSTOM_FIELDS) {
+    for (const field of EVALUATION_CUSTOM_FIELDS) {
       rows.push({
         workspace_id: workspaceId,
         lead_id: record.id,
@@ -689,7 +427,7 @@ async function insertConversation({
   delayMs,
 }) {
   const { record: lead, profile } = leadBundle;
-  const scenarioProfile = getSmokeScenarioByKey(scenarioKey);
+  const scenarioProfile = getEvaluationScenarioByKey(scenarioKey);
   const generated = await generateConversation({
     supabaseUrl,
     supabaseAnonKey,
@@ -850,20 +588,20 @@ function validateCurrentSchemaState({ leads, campaigns, stageRules, stages, cust
   const customFieldKeyById = new Map([...customFieldMap.values()].map((field) => [field.id, field.field_key]));
 
   if (campaigns.some((campaign) => !campaign.trigger_stage_id || !stageNameById.has(campaign.trigger_stage_id))) {
-    throw new Error('O smoke criou campanha sem trigger_stage_id válido.');
+    throw new Error('O cenario de avaliacao criou campanha sem trigger_stage_id válido.');
   }
 
   if (leads.some((lead) => !lead.assigned_user_id)) {
-    throw new Error('O smoke deixou lead sem assigned_user_id, contrariando a configuração atual do cenário.');
+    throw new Error('O cenario de avaliacao deixou lead sem assigned_user_id, contrariando a configuração atual do cenário.');
   }
 
   const leadsWithTechnicalOwner = leads.filter((lead) => typeof lead.technical_owner_name === 'string' && lead.technical_owner_name.trim().length > 0).length;
   if (leadsWithTechnicalOwner === 0 || leadsWithTechnicalOwner === leads.length) {
-    throw new Error('O smoke precisa manter mistura realista de leads com e sem technical_owner_name.');
+    throw new Error('O cenario de avaliacao precisa manter mistura realista de leads com e sem technical_owner_name.');
   }
 
   const expectedRules = new Set(
-    STAGE_REQUIRED_RULES.map(([stageName, fieldKey, customKey]) => `${normalizeStageName(stageName)}|${fieldKey ?? ''}|${customKey ?? ''}`),
+    EVALUATION_STAGE_REQUIRED_RULES.map(([stageName, fieldKey, customKey]) => `${normalizeStageName(stageName)}|${fieldKey ?? ''}|${customKey ?? ''}`),
   );
   const actualRules = new Set(
     stageRules.map(
@@ -878,7 +616,7 @@ function validateCurrentSchemaState({ leads, campaigns, stageRules, stages, cust
 
   for (const expectedRule of expectedRules) {
     if (!actualRules.has(expectedRule)) {
-      throw new Error(`Regra por etapa ausente no smoke: ${expectedRule}`);
+      throw new Error(`Regra por etapa ausente no cenario de avaliacao: ${expectedRule}`);
     }
   }
 }
@@ -891,11 +629,11 @@ async function main() {
   const openAiKey = env.OPENAI_API_KEY?.trim() || '';
   const testUserEmail = requireEnv(env, 'TEST_USER_EMAIL');
   const testUserPassword = requireEnv(env, 'TEST_USER_PASSWORD');
-  const workspaceName = env.SMOKE_WORKSPACE_NAME?.trim() || 'Operação SDR Demo';
-  const publicBaseUrl = env.SMOKE_PUBLIC_BASE_URL?.trim() || 'https://sdr-crm-ai-wine.vercel.app';
-  const delayMs = Number(env.SMOKE_AI_DELAY_MS ?? 500);
-  const requestedWave = env.SMOKE_WAVE?.trim() || 'all';
-  const threadLimit = Number(env.SMOKE_THREAD_LIMIT ?? 100);
+  const workspaceName = env.EVALUATION_WORKSPACE_NAME?.trim() || 'Operacao SDR Avaliacao';
+  const publicBaseUrl = env.EVALUATION_PUBLIC_BASE_URL?.trim() || 'https://sdr-crm-ai-wine.vercel.app';
+  const delayMs = Number(env.EVALUATION_AI_DELAY_MS ?? 500);
+  const requestedWave = env.EVALUATION_WAVE?.trim() || 'all';
+  const threadLimit = Number(env.EVALUATION_THREAD_LIMIT ?? 100);
 
   const client = createClient(supabaseUrl, supabaseAnonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -931,8 +669,8 @@ async function main() {
   const campaignMap = await createCampaigns(client, workspace.id, authData.user.id, stageMap);
 
   const selectedProfiles = profiles.slice(0, Math.min(threadLimit, profiles.length));
-  const scenarioAssignments = buildSmokeAssignments(selectedProfiles.length, requestedWave);
-  const expectedMetrics = getSmokeExpectedMetrics(scenarioAssignments);
+  const scenarioAssignments = buildEvaluationAssignments(selectedProfiles.length, requestedWave);
+  const expectedMetrics = getEvaluationExpectedMetrics(scenarioAssignments);
   const simulatorSamples = [];
   let totalAiMessages = 0;
   const modelUsage = new Map();
@@ -941,11 +679,11 @@ async function main() {
   console.log(`7/11 Semeando ${selectedProfiles.length} conversas operacionais com IA real...`);
   for (const [index, profile] of selectedProfiles.entries()) {
     const scenarioKey = scenarioAssignments[index];
-    const scenarioProfile = getSmokeScenarioByKey(scenarioKey);
+    const scenarioProfile = getEvaluationScenarioByKey(scenarioKey);
     const leadBundle = leadMap.get(profile.slug);
     const campaign = campaignMap.get(scenarioProfile.campaignSlug);
-    if (!leadBundle) throw new Error(`Lead do smoke não encontrado: ${profile.name}`);
-    if (!campaign) throw new Error(`Campanha do smoke não encontrada para o cenário ${scenarioProfile.key}.`);
+    if (!leadBundle) throw new Error(`Lead do cenario de avaliacao não encontrado: ${profile.name}`);
+    if (!campaign) throw new Error(`Campanha do cenario de avaliacao não encontrada para o cenário ${scenarioProfile.key}.`);
 
     const result = await insertConversation({
       client,
@@ -1004,8 +742,8 @@ async function main() {
       .order('created_at', { ascending: true }),
   ]);
 
-  if (leadCount < 100) throw new Error('O smoke não criou os 100 leads esperados.');
-  if (campaignCount < 4) throw new Error('O smoke não criou as 4 campanhas esperadas.');
+  if (leadCount < 100) throw new Error('O cenario de avaliacao nao criou os 100 leads esperados.');
+  if (campaignCount < 4) throw new Error('O cenario de avaliacao nao criou as 4 campanhas esperadas.');
   if (threadCount !== expectedMetrics.threads) throw new Error(`Threads esperadas: ${expectedMetrics.threads}. Encontradas: ${threadCount}.`);
   if (generatedMessageCount !== expectedMetrics.generatedMessages) {
     throw new Error(`Generated messages esperadas: ${expectedMetrics.generatedMessages}. Encontradas: ${generatedMessageCount}.`);

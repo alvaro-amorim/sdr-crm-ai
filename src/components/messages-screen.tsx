@@ -685,7 +685,7 @@ export function MessagesScreen({
             <MessageCircleReply aria-hidden />
             <div>
               <h2>Nenhuma conversa simulável criada</h2>
-              <p className="empty">Rode o smoke realista para popular threads, respostas de clientes e links de simulação.</p>
+              <p className="empty">Rode o cenário de avaliação para popular threads, respostas de clientes e links de simulação.</p>
             </div>
           </div>
         )}

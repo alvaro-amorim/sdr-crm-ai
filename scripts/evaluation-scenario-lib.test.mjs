@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildSmokeAssignments,
-  getSmokeExpectedMetrics,
-  getSmokeScenarioByKey,
+  buildEvaluationAssignments,
+  getEvaluationExpectedMetrics,
+  getEvaluationScenarioByKey,
   validateScenarioConversation,
   validateScenarioThreadSummary,
-} from './smoke-flow-lib.mjs';
+} from './evaluation-scenario-lib.mjs';
 
-describe('smoke-flow-lib', () => {
+describe('evaluation-scenario-lib', () => {
   it('distribui os cenarios sem perder o total solicitado', () => {
-    const assignments = buildSmokeAssignments(100, 'all');
+    const assignments = buildEvaluationAssignments(100, 'all');
     expect(assignments).toHaveLength(100);
 
     const uniqueKeys = new Set(assignments);
@@ -19,14 +19,14 @@ describe('smoke-flow-lib', () => {
   });
 
   it('limita a onda 1 aos cenarios sem resposta', () => {
-    const assignments = buildSmokeAssignments(20, '1');
+    const assignments = buildEvaluationAssignments(20, '1');
     expect(new Set(assignments)).toEqual(
       new Set(['opening_no_response', 'secondary_follow_up_no_response']),
     );
   });
 
   it('calcula metricas esperadas a partir dos cenarios', () => {
-    const metrics = getSmokeExpectedMetrics([
+    const metrics = getEvaluationExpectedMetrics([
       'opening_no_response',
       'secondary_follow_up_no_response',
       'negative_closed',
@@ -52,7 +52,7 @@ describe('smoke-flow-lib', () => {
     ).not.toThrow();
   });
 
-  it('rejeita direcao invalida na sequencia do smoke', () => {
+  it('rejeita direcao invalida na sequencia do cenario de avaliacao', () => {
     expect(() =>
       validateScenarioConversation(
         [
@@ -77,7 +77,7 @@ describe('smoke-flow-lib', () => {
   });
 
   it('valida o resumo final esperado para reuniao agendada', () => {
-    const scenario = getSmokeScenarioByKey('meeting_confirmed');
+    const scenario = getEvaluationScenarioByKey('meeting_confirmed');
 
     expect(() =>
       validateScenarioThreadSummary(
