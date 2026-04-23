@@ -916,7 +916,12 @@ h3 {
   min-width: 0;
   overflow-x: clip;
   padding: 28px;
+  position: relative;
   width: 100%;
+}
+
+.content:has(.modal-backdrop) {
+  z-index: 100;
 }
 
 .content-shell {
