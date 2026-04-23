@@ -605,22 +605,6 @@ function AuthScreen({ authError }: { authError?: string | null }) {
           <span className="auth-chip">Workspace isolado</span>
           <span className="auth-chip">IA aplicada à prova</span>
         </div>
-        <div className="auth-proof-grid">
-          {authHighlights.map((item) => {
-            const Icon = item.icon;
-            return (
-              <article key={item.title} className="auth-proof-card">
-                <span className="auth-proof-icon" aria-hidden>
-                  <Icon />
-                </span>
-                <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.description}</p>
-                </div>
-              </article>
-            );
-          })}
-        </div>
       </section>
       <form className="auth-form" onSubmit={submit}>
         <div className="auth-form-heading">
@@ -711,6 +695,22 @@ function AuthScreen({ authError }: { authError?: string | null }) {
         </div>
         <p className="auth-form-note">Fluxo em português, pensado para demo técnica em desktop e mobile.</p>
       </form>
+      <div className="auth-proof-grid">
+        {authHighlights.map((item) => {
+          const Icon = item.icon;
+          return (
+            <article key={item.title} className="auth-proof-card">
+              <span className="auth-proof-icon" aria-hidden>
+                <Icon />
+              </span>
+              <div>
+                <strong>{item.title}</strong>
+                <p>{item.description}</p>
+              </div>
+            </article>
+          );
+        })}
+      </div>
     </main>
   );
 }

@@ -245,6 +245,9 @@ h3 {
   background-size: cover;
   display: grid;
   gap: 32px;
+  grid-template-areas:
+    "copy form"
+    "proof form";
   grid-template-columns: minmax(0, 1.1fr) minmax(420px, 0.9fr);
   padding: 56px;
 }
@@ -253,6 +256,7 @@ h3 {
   color: #ffffff;
   display: grid;
   gap: 24px;
+  grid-area: copy;
   max-width: 760px;
 }
 
@@ -262,10 +266,10 @@ h3 {
 }
 
 .auth-copy h1 {
-  font-size: clamp(2.3rem, 5.8vw, 5.1rem);
+  font-size: clamp(2.1rem, 5vw, 4.55rem);
   letter-spacing: 0;
-  line-height: 0.98;
-  max-width: 780px;
+  line-height: 1.01;
+  max-width: 720px;
 }
 
 .auth-copy p {
@@ -293,8 +297,10 @@ h3 {
 
 .auth-proof-grid {
   display: grid;
+  grid-area: proof;
   gap: 12px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 960px;
 }
 
 .auth-proof-card {
@@ -304,10 +310,10 @@ h3 {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
   display: grid;
-  gap: 12px;
+  gap: 10px;
   grid-template-columns: auto minmax(0, 1fr);
-  min-height: 148px;
-  padding: 16px;
+  min-height: 128px;
+  padding: 14px;
 }
 
 .auth-proof-icon {
@@ -316,14 +322,14 @@ h3 {
   border-radius: 999px;
   color: #ffd670;
   display: grid;
-  height: 42px;
+  height: 38px;
   place-items: center;
-  width: 42px;
+  width: 38px;
 }
 
 .auth-proof-icon svg {
-  height: 20px;
-  width: 20px;
+  height: 18px;
+  width: 18px;
 }
 
 .auth-proof-card div {
@@ -333,12 +339,12 @@ h3 {
 
 .auth-proof-card strong {
   color: #ffffff;
-  font-size: 0.98rem;
+  font-size: 0.92rem;
 }
 
 .auth-proof-card p {
   color: #d7e6e2;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   line-height: 1.45;
   max-width: none;
 }
@@ -359,6 +365,7 @@ h3 {
     0 2px 0 rgba(255, 255, 255, 0.35) inset;
   display: grid;
   gap: 18px;
+  grid-area: form;
   min-width: 0;
   padding: 30px;
 }
@@ -2974,7 +2981,6 @@ h3 {
   .form-grid,
   .inline-form,
   .auth-links,
-  .auth-proof-grid,
   .dashboard-hero,
   .dashboard-grid,
   .dashboard-insight-strip,
@@ -3033,12 +3039,20 @@ h3 {
 
   .auth-screen {
     align-items: start;
+    grid-template-areas:
+      "copy"
+      "form"
+      "proof";
     min-height: 100svh;
     padding: 24px;
   }
 
   .auth-copy {
     max-width: none;
+  }
+
+  .auth-proof-grid {
+    grid-template-columns: 1fr;
   }
 
   .auth-proof-card {
@@ -3242,7 +3256,7 @@ h3 {
   }
 
   .auth-copy h1 {
-    font-size: 2.35rem;
+    font-size: 2.12rem;
   }
 
   .auth-copy p {
@@ -3275,6 +3289,11 @@ h3 {
   .workspace-onboarding-highlight,
   .workspace-onboarding-side-card {
     padding: 14px;
+  }
+
+  .auth-proof-card {
+    gap: 10px;
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
   .workspace-onboarding-copy h1 {
