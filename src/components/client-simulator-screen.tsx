@@ -14,6 +14,12 @@ type SimulatorPayload = {
   messages: ConversationMessage[];
   generated_model?: string;
   used_fallback?: boolean;
+  pending_message?: {
+    id: string;
+    scheduled_for: string;
+    status: 'pending' | 'sent' | 'canceled';
+  } | null;
+  processed_scheduled_messages?: number;
 };
 
 function getTokenFromUrl() {
@@ -42,16 +48,36 @@ function getFriendlySimulatorError(error: unknown) {
   return message || 'Falha ao responder como cliente.';
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function randomBetween(min: number, max: number) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 export function ClientSimulatorScreen() {
   const token = useMemo(getTokenFromUrl, []);
   const [payload, setPayload] = useState<SimulatorPayload | null>(null);
   const [reply, setReply] = useState('');
   const [busy, setBusy] = useState(false);
+  const [typing, setTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadThread() {
+  async function applyPayload(data: SimulatorPayload, humanized = false) {
+    if (humanized) {
+      await wait(randomBetween(20_000, 45_000));
+      setTyping(true);
+      await wait(randomBetween(3_000, 6_000));
+      setTyping(false);
+    }
+
+    setPayload(data);
+  }
+
+  async function loadThread(options: { silent?: boolean } = {}) {
     if (!supabase || !token) return;
-    setBusy(true);
+    if (!options.silent) setBusy(true);
     setError(null);
     try {
       const { data, error: functionError } = await supabase.functions.invoke('simulate-client-chat', {
@@ -59,11 +85,12 @@ export function ClientSimulatorScreen() {
       });
       if (functionError) throw functionError;
       if (!data?.success) throw new Error(data?.error ?? 'Falha ao carregar conversa.');
-      setPayload(data.data);
+      const processedScheduledMessages = Number(data.data?.processed_scheduled_messages ?? 0);
+      await applyPayload(data.data, options.silent && processedScheduledMessages > 0);
     } catch (loadError) {
-      setError(getFriendlySimulatorError(loadError));
+      if (!options.silent) setError(getFriendlySimulatorError(loadError));
     } finally {
-      setBusy(false);
+      if (!options.silent) setBusy(false);
     }
   }
 
@@ -107,8 +134,9 @@ export function ClientSimulatorScreen() {
       });
       if (functionError) throw functionError;
       if (!data?.success) throw new Error(data?.error ?? 'Falha ao gerar resposta.');
-      setPayload(data.data);
+      await applyPayload(data.data, true);
     } catch (replyError) {
+      setTyping(false);
       setError(getFriendlySimulatorError(replyError));
       if (optimisticMessage) {
         setPayload((current) =>
@@ -129,6 +157,15 @@ export function ClientSimulatorScreen() {
   useEffect(() => {
     void loadThread();
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    const intervalId = window.setInterval(() => {
+      if (!busy) void loadThread({ silent: true });
+    }, 30_000);
+
+    return () => window.clearInterval(intervalId);
+  }, [busy, token]);
 
   if (!token) {
     return (
@@ -173,6 +210,13 @@ export function ClientSimulatorScreen() {
           </div>
         )}
 
+        {payload?.pending_message?.status === 'pending' && (
+          <div className="status">
+            <strong>Resposta pronta para envio</strong>
+            <span>Será disparada automaticamente em {formatDateTime(payload.pending_message.scheduled_for)} no horário de São Paulo.</span>
+          </div>
+        )}
+
         <div className="client-simulator-context">
           <article>
             <strong>{lead?.company ?? 'Empresa'}</strong>
@@ -211,6 +255,16 @@ export function ClientSimulatorScreen() {
               );
             })
           )}
+          {typing && (
+            <article className="client-chat-message">
+              <div className="client-chat-avatar">
+                <Bot aria-hidden />
+              </div>
+              <div className="client-chat-bubble client-chat-typing">
+                <strong>SDR Expert está digitando...</strong>
+              </div>
+            </article>
+          )}
         </section>
 
         <form className="client-reply-form" onSubmit={submit}>
@@ -229,7 +283,7 @@ export function ClientSimulatorScreen() {
           </label>
           <button type="submit" disabled={busy || reply.trim().length === 0}>
             <Send aria-hidden />
-            {busy ? 'Gerando resposta...' : 'Enviar resposta'}
+            {busy ? 'Aguardando IA...' : 'Enviar resposta'}
           </button>
         </form>
       </section>

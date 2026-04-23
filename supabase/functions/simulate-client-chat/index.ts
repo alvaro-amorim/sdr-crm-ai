@@ -33,6 +33,11 @@ type AiCompletionVerdict = {
 
 type FallbackReason = 'openai_not_configured' | 'openai_call_failed';
 
+type BusinessWindow = {
+  isBusinessHours: boolean;
+  nextOpeningIso: string;
+};
+
 const aiFallbackChain: AiAttempt[] = [
   { model: 'gpt-4o-mini', temperature: 0.55, timeoutMs: 12000 },
   { model: 'gpt-4o', temperature: 0.5, timeoutMs: 14000 },
@@ -55,6 +60,82 @@ function toHex(buffer: ArrayBuffer) {
 async function sha256(value: string) {
   const encoded = new TextEncoder().encode(value);
   return toHex(await crypto.subtle.digest('SHA-256', encoded));
+}
+
+function parseTime(value: unknown, fallback: string) {
+  const text = String(value ?? fallback);
+  const [hour = '0', minute = '0'] = text.split(':');
+  return {
+    hour: Number(hour),
+    minute: Number(minute),
+  };
+}
+
+function getSaoPauloParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+
+  const byType = new Map(parts.map((part) => [part.type, part.value]));
+  return {
+    year: Number(byType.get('year')),
+    month: Number(byType.get('month')),
+    day: Number(byType.get('day')),
+    hour: Number(byType.get('hour')),
+    minute: Number(byType.get('minute')),
+  };
+}
+
+function saoPauloLocalToUtcIso(parts: { year: number; month: number; day: number; hour: number; minute: number }) {
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour + 3, parts.minute, 0)).toISOString();
+}
+
+function addSaoPauloDays(parts: { year: number; month: number; day: number; hour: number; minute: number }, days: number) {
+  const utc = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days, 12, 0, 0));
+  const shifted = getSaoPauloParts(utc);
+  return { ...shifted, hour: parts.hour, minute: parts.minute };
+}
+
+function resolveBusinessWindow(campaign: Record<string, unknown>): BusinessWindow {
+  const mode = campaign.ai_response_mode;
+  if (mode !== 'business_hours') {
+    return { isBusinessHours: true, nextOpeningIso: new Date().toISOString() };
+  }
+
+  const start = parseTime(campaign.ai_response_window_start, '09:00');
+  const end = parseTime(campaign.ai_response_window_end, '18:00');
+  const now = getSaoPauloParts();
+  const nowMinutes = now.hour * 60 + now.minute;
+  const startMinutes = start.hour * 60 + start.minute;
+  const endMinutes = end.hour * 60 + end.minute;
+  const wrapsMidnight = startMinutes > endMinutes;
+  const isBusinessHours = wrapsMidnight
+    ? nowMinutes >= startMinutes || nowMinutes < endMinutes
+    : nowMinutes >= startMinutes && nowMinutes < endMinutes;
+
+  if (isBusinessHours) {
+    return { isBusinessHours: true, nextOpeningIso: new Date().toISOString() };
+  }
+
+  const openingToday = { ...now, hour: start.hour, minute: start.minute };
+  const nextOpening =
+    !wrapsMidnight && nowMinutes < startMinutes ? openingToday : addSaoPauloDays(openingToday, nowMinutes < startMinutes ? 0 : 1);
+
+  return {
+    isBusinessHours: false,
+    nextOpeningIso: saoPauloLocalToUtcIso(nextOpening),
+  };
+}
+
+function formatSaoPauloTime(value: unknown, fallback: string) {
+  const { hour, minute } = parseTime(value, fallback);
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
 function isRetryableStatus(status: number): boolean {
@@ -187,12 +268,14 @@ function buildPrompt({
   messages,
   clientMessage,
   expectedPromptPurpose,
+  outsideBusinessHours,
 }: {
   lead: Record<string, unknown>;
   campaign: Record<string, unknown>;
   messages: Array<Record<string, unknown>>;
   clientMessage: string;
   expectedPromptPurpose: string;
+  outsideBusinessHours?: boolean;
 }) {
   const history = messages
     .map((message) => {
@@ -208,6 +291,9 @@ function buildPrompt({
     'Se houver objecao forte ou recusa, responda com encerramento cordial e sem insistir.',
     'Se houver interesse, avance para diagnostico, envio de material ou agendamento.',
     'Classifique a conversa com base principal na mensagem do cliente e no historico, nao no sentimento da sua propria resposta.',
+    outsideBusinessHours
+      ? 'A mensagem sera enviada somente quando o horario de atendimento em Sao Paulo iniciar. Comece reconhecendo que o cliente chamou fora do horario e retome com prioridade de forma natural, sem parecer resposta automatica.'
+      : 'Responda como continuidade imediata da conversa.',
     `Tipo esperado da sua proxima mensagem: ${expectedPromptPurpose}.`,
     'Retorne JSON valido sem markdown.',
     `Lead: ${JSON.stringify(lead)}`,
@@ -216,6 +302,19 @@ function buildPrompt({
     `Nova resposta do cliente: ${clientMessage}`,
     `Guardrails deterministas: ${JSON.stringify(getDeterministicConversationOutcome(clientMessage))}`,
   ].join('\n\n');
+}
+
+function buildOutsideHoursNotice({
+  lead,
+  campaign,
+}: {
+  lead: Record<string, unknown>;
+  campaign: Record<string, unknown>;
+}) {
+  const firstName = String(lead?.name ?? 'Cliente').split(' ')[0] || 'Cliente';
+  const start = formatSaoPauloTime(campaign.ai_response_window_start, '09:00');
+  const end = formatSaoPauloTime(campaign.ai_response_window_end, '18:00');
+  return `Recebi sua mensagem, ${firstName}. Nosso atendimento funciona das ${start} às ${end}, no horário de São Paulo. Já deixei seu retorno como prioridade e vou te responder assim que o atendimento iniciar.`;
 }
 
 serve(async (request) => {
@@ -257,8 +356,18 @@ serve(async (request) => {
   const messages = Array.isArray(context.messages) ? context.messages : [];
 
   if (!parsed.data.message) {
-    return json(200, { success: true, data: { thread, messages } });
+    return json(200, {
+      success: true,
+      data: {
+        thread,
+        messages,
+        pending_message: context.pending_message ?? null,
+        processed_scheduled_messages: context.processed_scheduled_messages ?? 0,
+      },
+    });
   }
+
+  const businessWindow = resolveBusinessWindow(thread.campaigns ?? {});
 
   const prompt = buildPrompt({
     lead: thread.leads,
@@ -275,6 +384,7 @@ serve(async (request) => {
       ],
       threadStatus: getDeterministicConversationOutcome(parsed.data.message).thread_status ?? thread.status,
     }),
+    outsideBusinessHours: !businessWindow.isBusinessHours,
   });
 
   try {
@@ -294,10 +404,10 @@ serve(async (request) => {
       history: [...messages, { direction: 'inbound', sentiment_tag: generated.sentiment_tag }],
       threadStatus: generated.thread_status,
     });
-    const { data: saved, error: saveError } = await publicClient.rpc('append_simulation_exchange', {
+
+    const rpcPayload = {
       target_token_hash: tokenHash,
       client_message: parsed.data.message,
-      ai_message: generated.message_text,
       ai_model: generated.model,
       ai_usage: generated.usage,
       ai_sentiment: generated.sentiment_tag,
@@ -306,7 +416,19 @@ serve(async (request) => {
       ai_thread_status: generated.thread_status,
       ai_stage_action: generated.lead_stage_action,
       ai_should_close: generated.should_close,
-    });
+    };
+
+    const { data: saved, error: saveError } = businessWindow.isBusinessHours
+      ? await publicClient.rpc('append_simulation_exchange', {
+          ...rpcPayload,
+          ai_message: generated.message_text,
+        })
+      : await publicClient.rpc('append_scheduled_simulation_exchange', {
+          ...rpcPayload,
+          away_message: buildOutsideHoursNotice({ lead: thread.leads, campaign: thread.campaigns }),
+          scheduled_ai_message: generated.message_text,
+          scheduled_for: businessWindow.nextOpeningIso,
+        });
 
     if (saveError || !saved?.messages) {
       return json(500, { success: false, error: 'Falha ao salvar resposta da IA.' });
@@ -319,6 +441,8 @@ serve(async (request) => {
         messages: saved.messages,
         generated_model: generated.model,
         used_fallback: generated.model.startsWith('fallback-rule-engine'),
+        pending_message: saved.pending_message ?? null,
+        scheduled_for: saved.pending_message?.scheduled_for ?? null,
       },
     });
   } catch (_error) {

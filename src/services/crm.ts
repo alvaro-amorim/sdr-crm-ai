@@ -37,6 +37,9 @@ export type CampaignInput = {
   context_text: string;
   generation_prompt: string;
   trigger_stage_id: string | null;
+  ai_response_mode: 'always' | 'business_hours';
+  ai_response_window_start: string;
+  ai_response_window_end: string;
   is_active: boolean;
 };
 
@@ -310,6 +313,9 @@ export async function upsertCampaign(
     context_text: input.context_text.trim(),
     generation_prompt: input.generation_prompt.trim(),
     trigger_stage_id: input.trigger_stage_id || null,
+    ai_response_mode: input.ai_response_mode,
+    ai_response_window_start: input.ai_response_window_start,
+    ai_response_window_end: input.ai_response_window_end,
     is_active: input.is_active,
     created_by: user.id,
     updated_at: new Date().toISOString(),

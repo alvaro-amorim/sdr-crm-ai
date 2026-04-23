@@ -1369,6 +1369,12 @@ h3 {
   font-weight: 500;
 }
 
+.campaign-hours-row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .campaign-card-list {
   display: grid;
   gap: 12px;
@@ -2454,6 +2460,10 @@ h3 {
   background: #ffffff;
   border: 1px solid #d5dfdb;
   color: #0d1917;
+}
+
+.client-chat-typing {
+  opacity: 0.82;
 }
 
 .client-chat-meta {

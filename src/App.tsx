@@ -75,6 +75,9 @@ const emptyCampaignInput: CampaignInput = {
   context_text: '',
   generation_prompt: '',
   trigger_stage_id: null,
+  ai_response_mode: 'always',
+  ai_response_window_start: '09:00',
+  ai_response_window_end: '18:00',
   is_active: true,
 };
 
@@ -2124,6 +2127,15 @@ function CampaignsView({
                       <p>{summarize(campaign.generation_prompt)}</p>
                     </div>
 
+                    <div className="campaign-card-section">
+                      <span className="section-kicker">Atendimento IA</span>
+                      <p>
+                        {campaign.ai_response_mode === 'business_hours'
+                          ? `Responde das ${campaign.ai_response_window_start.slice(0, 5)} às ${campaign.ai_response_window_end.slice(0, 5)} no horário de São Paulo.`
+                          : 'Responde automaticamente 24h no simulador.'}
+                      </p>
+                    </div>
+
                     <div className="campaign-card-actions">
                       <button type="button" className="ghost compact" onClick={() => setEditing(campaign)}>
                         Editar playbook
@@ -2162,6 +2174,9 @@ function CampaignForm({
         context_text: campaign.context_text,
         generation_prompt: campaign.generation_prompt,
         trigger_stage_id: campaign.trigger_stage_id,
+        ai_response_mode: campaign.ai_response_mode ?? 'always',
+        ai_response_window_start: campaign.ai_response_window_start?.slice(0, 5) ?? '09:00',
+        ai_response_window_end: campaign.ai_response_window_end?.slice(0, 5) ?? '18:00',
         is_active: campaign.is_active,
       }
     : emptyCampaignInput;
@@ -2232,6 +2247,10 @@ function CampaignForm({
       setError('Gere ou revise o plano da campanha antes de salvar.');
       return;
     }
+    if (form.ai_response_mode === 'business_hours' && form.ai_response_window_start === form.ai_response_window_end) {
+      setError('Defina horários diferentes para início e fim do atendimento da IA.');
+      return;
+    }
     try {
       await upsertCampaign(supabase, data.workspace, user, {
         ...form,
@@ -2293,8 +2312,47 @@ function CampaignForm({
         />
         Campanha ativa
       </label>
+      <label>
+        Resposta da IA
+        <select
+          name="campaignAiResponseMode"
+          value={form.ai_response_mode}
+          onChange={(event) =>
+            setForm({
+              ...form,
+              ai_response_mode: event.target.value === 'business_hours' ? 'business_hours' : 'always',
+            })
+          }
+        >
+          <option value="always">Responder 24h</option>
+          <option value="business_hours">Responder apenas em horário de atendimento</option>
+        </select>
+        <span className="field-hint">O fuso usado no simulador é sempre São Paulo.</span>
+      </label>
+      <div className="campaign-hours-row">
+        <label>
+          Início do atendimento
+          <input
+            name="campaignAiResponseWindowStart"
+            type="time"
+            value={form.ai_response_window_start}
+            onChange={(event) => setForm({ ...form, ai_response_window_start: event.target.value })}
+            disabled={form.ai_response_mode === 'always'}
+          />
+        </label>
+        <label>
+          Fim do atendimento
+          <input
+            name="campaignAiResponseWindowEnd"
+            type="time"
+            value={form.ai_response_window_end}
+            onChange={(event) => setForm({ ...form, ai_response_window_end: event.target.value })}
+            disabled={form.ai_response_mode === 'always'}
+          />
+        </label>
+      </div>
       <label className="wide">
-        Contexto do briefing
+	        Contexto do briefing
         <textarea
           name="campaignContext"
           value={form.context_text}

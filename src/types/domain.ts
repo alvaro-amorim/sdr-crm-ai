@@ -88,6 +88,9 @@ export type Campaign = {
   context_text: string;
   generation_prompt: string;
   trigger_stage_id: string | null;
+  ai_response_mode: 'always' | 'business_hours';
+  ai_response_window_start: string;
+  ai_response_window_end: string;
   is_active: boolean;
   created_by: string;
   created_at: string;
