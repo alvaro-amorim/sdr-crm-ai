@@ -228,6 +228,24 @@ h3 {
   padding: 28px;
 }
 
+.setup-panel-note {
+  background: linear-gradient(145deg, rgba(29, 95, 99, 0.08), rgba(243, 195, 95, 0.05));
+  border: 1px solid rgba(29, 95, 99, 0.12);
+  border-radius: 16px;
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+}
+
+.setup-panel-note strong {
+  color: #18201f;
+}
+
+.setup-panel-note p {
+  color: #61706d;
+  line-height: 1.5;
+}
+
 .setup-panel svg {
   color: #b44432;
   height: 34px;
@@ -293,6 +311,36 @@ h3 {
   font-size: 0.8rem;
   font-weight: 800;
   padding: 8px 12px;
+}
+
+.auth-signal-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 920px;
+}
+
+.auth-signal-card {
+  backdrop-filter: blur(10px);
+  background: rgba(10, 30, 29, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  display: grid;
+  gap: 6px;
+  min-height: 106px;
+  padding: 16px;
+}
+
+.auth-signal-card strong {
+  color: #ffffff;
+  font-size: 1rem;
+}
+
+.auth-signal-card p {
+  color: #d7e6e2;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  max-width: none;
 }
 
 .auth-proof-grid {
@@ -372,6 +420,24 @@ h3 {
   padding: 30px;
 }
 
+.auth-form-login {
+  background:
+    radial-gradient(circle at top right, rgba(243, 195, 95, 0.08), transparent 22%),
+    rgba(255, 255, 255, 0.96);
+}
+
+.auth-form-signup {
+  background:
+    radial-gradient(circle at top right, rgba(29, 95, 99, 0.08), transparent 24%),
+    rgba(255, 255, 255, 0.97);
+}
+
+.auth-form-forgot {
+  background:
+    radial-gradient(circle at top right, rgba(57, 112, 163, 0.08), transparent 22%),
+    rgba(255, 255, 255, 0.97);
+}
+
 .auth-form-heading {
   display: grid;
   gap: 8px;
@@ -383,6 +449,13 @@ h3 {
   font-weight: 900;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+.auth-form-note {
+  color: #61706d;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin-top: -4px;
 }
 
 .ghost {
@@ -732,7 +805,7 @@ h3 {
 .flow-guide-note {
   background: #fff8e8;
   border: 1px solid #f2dfad;
-  border-radius: 8px;
+  border-radius: 16px;
   display: grid;
   gap: 5px;
   padding: 14px;
@@ -850,6 +923,34 @@ h3 {
   padding: 8px 12px;
 }
 
+.workspace-onboarding-proof-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workspace-onboarding-proof-card {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(29, 95, 99, 0.12);
+  border-radius: 16px;
+  display: grid;
+  gap: 6px;
+  min-height: 112px;
+  padding: 16px;
+}
+
+.workspace-onboarding-proof-card strong {
+  color: #18201f;
+  font-size: 0.96rem;
+}
+
+.workspace-onboarding-proof-card p {
+  color: #61706d;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  max-width: none;
+}
+
 .workspace-onboarding-highlights {
   display: grid;
   gap: 12px;
@@ -922,6 +1023,24 @@ h3 {
 
 .workspace-onboarding-form-copy p,
 .workspace-onboarding-side-card p {
+  color: #61706d;
+  line-height: 1.5;
+}
+
+.workspace-onboarding-form-note {
+  background: linear-gradient(145deg, rgba(29, 95, 99, 0.08), rgba(243, 195, 95, 0.05));
+  border: 1px solid rgba(29, 95, 99, 0.12);
+  border-radius: 16px;
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+}
+
+.workspace-onboarding-form-note strong {
+  color: #18201f;
+}
+
+.workspace-onboarding-form-note p {
   color: #61706d;
   line-height: 1.5;
 }
@@ -2729,14 +2848,16 @@ h3 {
 .empty-panel {
   align-items: center;
   background:
+    radial-gradient(circle at top right, rgba(243, 195, 95, 0.1), transparent 22%),
     linear-gradient(145deg, rgba(29, 95, 99, 0.05), rgba(243, 195, 95, 0.04)),
     #ffffff;
   border: 1px dashed #cbd8d4;
-  border-radius: 8px;
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
   gap: 14px;
   grid-template-columns: auto minmax(0, 1fr);
   min-height: 180px;
-  padding: 18px;
+  padding: 22px;
 }
 
 .empty-panel svg {
@@ -2746,6 +2867,17 @@ h3 {
   height: 42px;
   padding: 9px;
   width: 42px;
+}
+
+.empty-panel h2,
+.empty-panel strong {
+  color: #18201f;
+  font-size: 1.12rem;
+}
+
+.empty-panel p {
+  color: #61706d;
+  line-height: 1.55;
 }
 
 .message-card-header {
@@ -2793,7 +2925,10 @@ h3 {
 
 .modal-backdrop {
   align-items: center;
-  background: rgba(20, 28, 27, 0.45);
+  backdrop-filter: blur(7px);
+  background:
+    linear-gradient(180deg, rgba(10, 18, 17, 0.62), rgba(10, 18, 17, 0.46)),
+    rgba(20, 28, 27, 0.38);
   display: grid;
   inset: 0;
   padding: 24px;
@@ -2812,10 +2947,12 @@ h3 {
 }
 
 .chat-modal {
-  background: #ffffff;
-  border: 1px solid #d9dfdc;
-  border-radius: 8px;
-  box-shadow: 0 24px 80px rgba(19, 27, 26, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(243, 195, 95, 0.08), transparent 20%),
+    linear-gradient(180deg, rgba(29, 95, 99, 0.03), #ffffff 18%);
+  border: 1px solid rgba(217, 223, 220, 0.96);
+  border-radius: 22px;
+  box-shadow: 0 32px 96px rgba(19, 27, 26, 0.24);
   display: grid;
   gap: 18px;
   margin: 0 auto;
@@ -2852,9 +2989,11 @@ h3 {
 
 .chat-modal-header {
   align-items: start;
+  border-bottom: 1px solid rgba(217, 223, 220, 0.9);
   display: grid;
   gap: 12px;
   grid-template-columns: minmax(0, 1fr) auto;
+  padding-bottom: 16px;
 }
 
 .icon-button {
@@ -3502,12 +3641,14 @@ h3 {
   .operation-summary-grid,
   .operation-message-pair,
   .flow-guide-grid,
+  .auth-signal-grid,
   .fields-summary-grid,
   .fields-grid,
   .leads-summary-grid,
   .leads-grid,
   .workspace-onboarding-hero,
   .workspace-onboarding-grid,
+  .workspace-onboarding-proof-grid,
   .campaign-summary-grid,
   .campaign-grid,
   .campaign-plan-grid,
@@ -3812,7 +3953,9 @@ h3 {
   }
 
   .auth-proof-card,
+  .auth-signal-card,
   .workspace-onboarding-highlight,
+  .workspace-onboarding-proof-card,
   .workspace-onboarding-side-card {
     padding: 14px;
   }

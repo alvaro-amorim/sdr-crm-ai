@@ -521,6 +521,20 @@ function AuthScreen({ authError }: { authError?: string | null }) {
       icon: Bot,
     },
   ] as const;
+  const authSignals = [
+    {
+      value: 'Fluxo guiado',
+      label: 'Cinco etapas claras para demonstrar o CRM sem improviso.',
+    },
+    {
+      value: 'Simulador real',
+      label: 'Cliente, IA e histórico aparecem em tempo real na avaliação.',
+    },
+    {
+      value: 'Setup seguro',
+      label: 'Entrar, criar conta e recuperar senha já ficam prontos para demo.',
+    },
+  ] as const;
 
   useEffect(() => {
     setError(authError ?? null);
@@ -611,8 +625,16 @@ function AuthScreen({ authError }: { authError?: string | null }) {
           <span className="auth-chip">Workspace isolado</span>
           <span className="auth-chip">IA aplicada à prova</span>
         </div>
+        <div className="auth-signal-grid" aria-label="Leitura rápida da experiência">
+          {authSignals.map((item) => (
+            <article key={item.value} className="auth-signal-card">
+              <strong>{item.value}</strong>
+              <p>{item.label}</p>
+            </article>
+          ))}
+        </div>
       </section>
-      <form className="auth-form" onSubmit={submit}>
+      <form className={`auth-form auth-form-${mode}`} onSubmit={submit}>
         <div className="auth-form-heading">
           <span className="auth-form-kicker">
             {mode === 'login' ? 'Acesso ao workspace' : mode === 'signup' ? 'Cadastro inicial' : 'Recuperação segura'}
@@ -689,6 +711,13 @@ function AuthScreen({ authError }: { authError?: string | null }) {
             {busyAction === 'google' ? 'Abrindo Google...' : 'Entrar com Google'}
           </button>
         )}
+        <p className="auth-form-note">
+          {mode === 'login'
+            ? 'Entre por e-mail ou Google e continue exatamente do ponto em que a operação parou.'
+            : mode === 'signup'
+              ? 'Depois do cadastro, você já pode criar o workspace e iniciar a demonstração do funil.'
+              : 'O link de redefinição leva de volta ao app para atualizar a senha sem fluxo paralelo.'}
+        </p>
         <div className="auth-links">
           <button type="button" className="ghost" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} disabled={busy}>
             {mode === 'login' ? 'Criar conta' : 'Já tenho conta'}
@@ -762,6 +791,10 @@ function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
         <KeyRound aria-hidden />
         <h1>Definir nova senha</h1>
         <p>Crie uma nova senha para continuar acessando o SDR Expert.</p>
+        <div className="setup-panel-note">
+          <strong>Recuperação segura</strong>
+          <p>Assim que a nova senha for salva, o acesso volta ao fluxo normal do CRM sem perder a sessão de redefinição.</p>
+        </div>
         <PasswordField
           id="newPassword"
           name="newPassword"
@@ -952,6 +985,20 @@ function WorkspaceOnboarding({
       icon: BookOpen,
     },
   ] as const;
+  const onboardingSignals = [
+    {
+      title: 'Menos de 1 minuto',
+      description: 'Crie o ambiente e siga direto para dashboard, leads e playbooks.',
+    },
+    {
+      title: 'Base pronta para demo',
+      description: 'Funil, mensagens e operação já nascem com narrativa consistente.',
+    },
+    {
+      title: 'Clareza para o avaliador',
+      description: 'O nome do workspace e a estrutura deixam a leitura do produto mais profissional.',
+    },
+  ] as const;
 
   return (
     <section className="workspace-onboarding">
@@ -964,6 +1011,14 @@ function WorkspaceOnboarding({
             <span className="workspace-onboarding-chip">Funil padrão</span>
             <span className="workspace-onboarding-chip">Estrutura pronta para demo</span>
             <span className="workspace-onboarding-chip">Setup rápido</span>
+          </div>
+          <div className="workspace-onboarding-proof-grid">
+            {onboardingSignals.map((item) => (
+              <article key={item.title} className="workspace-onboarding-proof-card">
+                <strong>{item.title}</strong>
+                <p>{item.description}</p>
+              </article>
+            ))}
           </div>
         </div>
         <div className="workspace-onboarding-highlights">
@@ -1001,6 +1056,10 @@ function WorkspaceOnboarding({
             />
             <span className="field-hint">Dê um nome operacional ao ambiente. Ex.: Operação SDR Brasil.</span>
           </label>
+          <div className="workspace-onboarding-form-note">
+            <strong>Leitura premium da demo</strong>
+            <p>Use um nome que soe como operação real. Isso melhora a percepção do dashboard, da navegação e do simulador desde a primeira tela.</p>
+          </div>
           {error && <p className="error">{error}</p>}
           <button type="button" onClick={() => onCreate(name)} disabled={busy || name.trim().length < 2}>
             <Plus aria-hidden />
@@ -1022,6 +1081,11 @@ function WorkspaceOnboarding({
             <span className="section-kicker">Leitura rápida</span>
             <strong>Nomeie como uma operação real</strong>
             <p>Um bom nome melhora a clareza da demo, do dashboard e da navegação desde o primeiro acesso.</p>
+            <ul>
+              <li>Facilita a leitura do cockpit comercial</li>
+              <li>Deixa o simulador parecer parte de uma operação viva</li>
+              <li>Evita sensação de ambiente genérico ou improvisado</li>
+            </ul>
           </article>
         </aside>
       </div>
