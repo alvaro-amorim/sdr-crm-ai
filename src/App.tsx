@@ -472,9 +472,10 @@ function AuthScreen({ authError }: { authError?: string | null }) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<'form' | 'google' | null>(null);
   const [error, setError] = useState<string | null>(authError ?? null);
   const [success, setSuccess] = useState<string | null>(null);
+  const busy = busyAction !== null;
 
   useEffect(() => {
     setError(authError ?? null);
@@ -497,7 +498,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
       return;
     }
 
-    setBusy(true);
+    setBusyAction('form');
     setError(null);
     setSuccess(null);
     try {
@@ -529,13 +530,13 @@ function AuthScreen({ authError }: { authError?: string | null }) {
     } catch (authError) {
       setError(getAuthErrorMessage(authError));
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
   async function signInWithGoogle() {
     if (!supabase) return;
-    setBusy(true);
+    setBusyAction('google');
     setError(null);
     setSuccess(null);
     try {
@@ -548,7 +549,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
       if (oauthError) throw oauthError;
     } catch (googleError) {
       setError(getAuthErrorMessage(googleError));
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
@@ -625,19 +626,19 @@ function AuthScreen({ authError }: { authError?: string | null }) {
         {error && <p className="error">{error}</p>}
         {success && <p className="success-text">{success}</p>}
         <button type="submit" disabled={busy}>
-          {busy ? 'Processando...' : mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Cadastrar' : 'Enviar link'}
+          {busyAction === 'form' ? 'Processando...' : mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Cadastrar' : 'Enviar link'}
         </button>
         {mode !== 'forgot' && (
           <button type="button" className="google-button" onClick={signInWithGoogle} disabled={busy}>
-            Entrar com Google
+            {busyAction === 'google' ? 'Abrindo Google...' : 'Entrar com Google'}
           </button>
         )}
         <div className="auth-links">
-          <button type="button" className="ghost" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}>
+          <button type="button" className="ghost" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} disabled={busy}>
             {mode === 'login' ? 'Criar conta' : 'Já tenho conta'}
           </button>
           {mode !== 'signup' && (
-            <button type="button" className="ghost" onClick={() => setMode(mode === 'forgot' ? 'login' : 'forgot')}>
+            <button type="button" className="ghost" onClick={() => setMode(mode === 'forgot' ? 'login' : 'forgot')} disabled={busy}>
               {mode === 'forgot' ? 'Voltar ao login' : 'Esqueci a senha'}
             </button>
           )}
@@ -806,8 +807,8 @@ function Shell({
           </div>
           <div className="sidebar-actions">
             <button type="button" className="ghost" onClick={handleRefreshClick} disabled={busy}>
-              <RefreshCcw aria-hidden />
-              Atualizar
+              <RefreshCcw className={busy ? 'spin' : undefined} aria-hidden />
+              {busy ? 'Atualizando...' : 'Atualizar'}
             </button>
             <button type="button" className="ghost" onClick={() => void handleSignOut()}>
               <LogOut aria-hidden />
@@ -880,7 +881,7 @@ function WorkspaceOnboarding({
       {error && <p className="error">{error}</p>}
       <button type="button" onClick={() => onCreate(name)} disabled={busy || name.trim().length < 2}>
         <Plus aria-hidden />
-        Criar workspace e funil padrão
+        {busy ? 'Criando workspace...' : 'Criar workspace e funil padrão'}
       </button>
     </section>
   );
@@ -1032,6 +1033,7 @@ function LeadsView({
 }) {
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState(data.leads[0]?.id ?? '');
+  const [movingLeadId, setMovingLeadId] = useState<string | null>(null);
   const stageById = useMemo(() => new Map(data.stages.map((stage) => [stage.id, stage])), [data.stages]);
   const selectedLead = data.leads.find((lead) => lead.id === selectedLeadId) ?? null;
   const selectedLeadStage = selectedLead ? stageById.get(selectedLead.current_stage_id) ?? null : null;
@@ -1077,6 +1079,7 @@ function LeadsView({
 
   async function handleMove(lead: Lead, targetStage: PipelineStage) {
     if (!supabase) return;
+    if (movingLeadId === lead.id) return;
     const missing = findMissingRequiredFields({
       lead,
       targetStage,
@@ -1091,6 +1094,7 @@ function LeadsView({
     }
 
     setError(null);
+    setMovingLeadId(lead.id);
 
     try {
       await moveLead(supabase, data.workspace.id, lead.id, targetStage.id);
@@ -1142,6 +1146,8 @@ function LeadsView({
       await onReload();
     } catch (moveError) {
       setError(getSafeMessage(moveError, 'lead'));
+    } finally {
+      setMovingLeadId(null);
     }
   }
 
@@ -1261,6 +1267,7 @@ function LeadsView({
                 setEditingLead(lead);
               }}
               onMove={handleMove}
+              movingLeadId={movingLeadId}
             />
           </section>
         </div>
@@ -1604,12 +1611,14 @@ function Kanban({
   onSelect,
   onEdit,
   onMove,
+  movingLeadId,
 }: {
   data: CrmData;
   selectedLeadId: string | null;
   onSelect: (leadId: string) => void;
   onEdit: (lead: Lead) => void;
-  onMove: (lead: Lead, stage: PipelineStage) => void;
+  onMove: (lead: Lead, stage: PipelineStage) => Promise<void>;
+  movingLeadId: string | null;
 }) {
   return (
     <section className="kanban" aria-label="Funil de leads">
@@ -1631,6 +1640,7 @@ function Kanban({
                 lead={lead}
                 data={data}
                 selected={selectedLeadId === lead.id}
+                moving={movingLeadId === lead.id}
                 onSelect={() => onSelect(lead.id)}
                 onEdit={() => onEdit(lead)}
                 onMove={onMove}
@@ -1647,6 +1657,7 @@ function LeadCard({
   lead,
   data,
   selected,
+  moving,
   onSelect,
   onEdit,
   onMove,
@@ -1654,9 +1665,10 @@ function LeadCard({
   lead: Lead;
   data: CrmData;
   selected: boolean;
+  moving: boolean;
   onSelect: () => void;
   onEdit: () => void;
-  onMove: (lead: Lead, stage: PipelineStage) => void;
+  onMove: (lead: Lead, stage: PipelineStage) => Promise<void>;
 }) {
   const currentStage = data.stages.find((stage) => stage.id === lead.current_stage_id) ?? null;
   const assignedWorkspaceOwner = getAssignedWorkspaceOwnerLabel(lead, data);
@@ -1700,6 +1712,7 @@ function LeadCard({
       </div>
 
       <div className="lead-tag-row">
+        {moving && <span className="lead-tag lead-tag-busy">Movendo etapa...</span>}
         <span className="lead-tag">{lead.lead_source || 'Origem não informada'}</span>
         <span className="lead-tag">
           {lead.technical_owner_name ? `Resp. técnico: ${lead.technical_owner_name}` : 'Sem responsável técnico'}
@@ -1715,6 +1728,7 @@ function LeadCard({
         <button
           type="button"
           className="ghost compact"
+          disabled={moving}
           onClick={(event) => {
             event.stopPropagation();
             onEdit();
@@ -1726,6 +1740,8 @@ function LeadCard({
           className="lead-stage-select"
           name={`lead-stage-${lead.id}`}
           value={lead.current_stage_id}
+          disabled={moving}
+          aria-busy={moving}
           onClick={(event) => event.stopPropagation()}
           onChange={(event) => {
             const target = data.stages.find((item) => item.id === event.target.value);
@@ -1756,6 +1772,7 @@ function FieldsView({
 }) {
   const [name, setName] = useState('');
   const [type, setType] = useState<'text' | 'number'>('text');
+  const [creatingField, setCreatingField] = useState(false);
   const stagesWithRules = new Set(data.requiredFields.map((rule) => rule.stage_id)).size;
   const standardRules = data.requiredFields.filter((rule) => rule.field_key).length;
   const customRules = data.requiredFields.filter((rule) => rule.custom_field_id).length;
@@ -1763,11 +1780,13 @@ function FieldsView({
   async function createCustomField(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase) return;
+    if (creatingField) return;
     const fieldKey = createFieldKey(name);
     if (!fieldKey) {
       setError('Nome de campo inválido.');
       return;
     }
+    setCreatingField(true);
     try {
       const { error } = await supabase.from('workspace_custom_fields').insert({
         workspace_id: data.workspace.id,
@@ -1782,6 +1801,8 @@ function FieldsView({
       await onReload();
     } catch (fieldError) {
       setError(getSafeMessage(fieldError, 'workspace'));
+    } finally {
+      setCreatingField(false);
     }
   }
 
@@ -1846,9 +1867,9 @@ function FieldsView({
               <span className="field-hint">Escolha número apenas quando o valor precisar ser estritamente quantitativo.</span>
             </label>
             <div className="wide field-form-actions">
-              <button type="submit">
+              <button type="submit" disabled={creatingField}>
                 <Plus aria-hidden />
-                Criar campo
+                {creatingField ? 'Criando campo...' : 'Criar campo'}
               </button>
             </div>
           </form>
@@ -1908,6 +1929,7 @@ function RequiredFieldsPanel({
   const currentRules = data.requiredFields.filter((rule) => rule.stage_id === stageId);
   const [standardKeys, setStandardKeys] = useState<string[]>([]);
   const [customIds, setCustomIds] = useState<string[]>([]);
+  const [savingRules, setSavingRules] = useState(false);
 
   useEffect(() => {
     setStandardKeys(currentRules.flatMap((rule) => (rule.field_key ? [rule.field_key] : [])));
@@ -1921,12 +1943,16 @@ function RequiredFieldsPanel({
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase || !stageId) return;
+    if (savingRules) return;
+    setSavingRules(true);
     try {
       await saveRequiredFields(supabase, data.workspace.id, stageId, standardKeys, customIds);
       setNotice('Regras de etapa salvas.');
       await onReload();
     } catch (ruleError) {
       setError(getSafeMessage(ruleError, 'workspace'));
+    } finally {
+      setSavingRules(false);
     }
   }
 
@@ -2014,7 +2040,7 @@ function RequiredFieldsPanel({
         </section>
       </div>
 
-      <button type="submit">Salvar regras</button>
+      <button type="submit" disabled={savingRules}>{savingRules ? 'Salvando regras...' : 'Salvar regras'}</button>
     </form>
   );
 }
@@ -2184,6 +2210,7 @@ function CampaignForm({
   const [form, setForm] = useState<CampaignInput>(initial);
   const [plan, setPlan] = useState<CampaignStrategyPlan>(derivePlanFromCampaign(campaign));
   const [planningBusy, setPlanningBusy] = useState(false);
+  const [savingCampaign, setSavingCampaign] = useState(false);
   const [planMeta, setPlanMeta] = useState<{ model: string } | null>(null);
 
   useEffect(() => {
@@ -2194,6 +2221,7 @@ function CampaignForm({
 
   async function generatePlan() {
     if (!supabase) return;
+    if (planningBusy || savingCampaign) return;
     if (!form.name.trim() || !form.context_text.trim()) {
       setError('Nome e contexto são obrigatórios para montar o plano da campanha.');
       return;
@@ -2240,6 +2268,7 @@ function CampaignForm({
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase) return;
+    if (savingCampaign) return;
     if (!form.name.trim() || !form.context_text.trim()) {
       setError('Nome e contexto são obrigatórios.');
       return;
@@ -2252,6 +2281,7 @@ function CampaignForm({
       setError('Defina horários diferentes para início e fim do atendimento da IA.');
       return;
     }
+    setSavingCampaign(true);
     try {
       await upsertCampaign(supabase, data.workspace, user, {
         ...form,
@@ -2260,6 +2290,8 @@ function CampaignForm({
       onSaved();
     } catch (campaignError) {
       setError(getSafeMessage(campaignError, 'campaign'));
+    } finally {
+      setSavingCampaign(false);
     }
   }
 
@@ -2272,7 +2304,7 @@ function CampaignForm({
           <p>Defina o briefing comercial e deixe a IA montar o plano da campanha antes de salvar o playbook.</p>
         </div>
         {campaign && (
-          <button type="button" className="ghost compact" onClick={onCancel}>
+          <button type="button" className="ghost compact" onClick={onCancel} disabled={savingCampaign}>
             Cancelar edição
           </button>
         )}
@@ -2365,7 +2397,7 @@ function CampaignForm({
         <span className="field-hint">Descreva rapidamente o cenário, produto e dor comercial que a IA deve considerar.</span>
       </label>
       <div className="wide campaign-plan-actions">
-        <button type="button" className="secondary" onClick={generatePlan} disabled={planningBusy}>
+        <button type="button" className="secondary" onClick={generatePlan} disabled={planningBusy || savingCampaign}>
           {planningBusy ? 'Montando plano com IA...' : plan.final_prompt.trim() ? 'Gerar novo plano com IA' : 'Gerar plano com IA'}
         </button>
         <span className="field-hint">A IA monta o plano da campanha e o prompt final. Você pode aprovar, editar ou gerar novamente antes de salvar.</span>
@@ -2458,7 +2490,9 @@ function CampaignForm({
         </div>
       </section>
       <div className="wide">
-        <button type="submit">Salvar campanha</button>
+        <button type="submit" disabled={savingCampaign || planningBusy}>
+          {savingCampaign ? 'Salvando campanha...' : 'Salvar campanha'}
+        </button>
       </div>
     </form>
   );

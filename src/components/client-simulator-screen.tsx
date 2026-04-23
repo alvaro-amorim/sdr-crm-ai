@@ -197,9 +197,9 @@ export function ClientSimulatorScreen() {
         {error && (
           <div className="status error-box">
             <strong>{error}</strong>
-            <button type="button" className="ghost compact" onClick={() => void loadThread()}>
-              <RefreshCcw aria-hidden />
-              Tentar novamente
+            <button type="button" className="ghost compact" onClick={() => void loadThread()} disabled={busy}>
+              <RefreshCcw className={busy ? 'spin' : undefined} aria-hidden />
+              {busy ? 'Carregando...' : 'Tentar novamente'}
             </button>
           </div>
         )}

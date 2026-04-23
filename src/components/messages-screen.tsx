@@ -630,9 +630,9 @@ export function MessagesScreen({
                   <Clock3 aria-hidden />
                   <span>Gerada em {formatDateTime(message.created_at)}</span>
                 </div>
-                <button type="button" onClick={() => setSimulationMessage(message)}>
+                <button type="button" onClick={() => setSimulationMessage(message)} disabled={simulationBusy}>
                   <MessageSquareText aria-hidden />
-                  {message.generation_status === 'sent' ? 'Ver no chat' : 'Simular no chat'}
+                  {simulationBusy ? 'Abrindo simulação...' : message.generation_status === 'sent' ? 'Ver no chat' : 'Simular no chat'}
                 </button>
               </div>
             </article>
@@ -663,7 +663,9 @@ export function MessagesScreen({
       >
         <MessageCircleReply aria-hidden />
         <span>
-          Abra o simulador para agir como cliente e testar a próxima resposta da IA em outra janela.
+          {simulatorLinkBusy
+            ? 'Abrindo simulador do cliente...'
+            : 'Abra o simulador para agir como cliente e testar a próxima resposta da IA em outra janela.'}
         </span>
       </button>
     </section>
