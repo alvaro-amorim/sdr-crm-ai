@@ -3244,11 +3244,12 @@ h3 {
 
 .chat-modal {
   background:
-    radial-gradient(circle at top right, rgba(243, 195, 95, 0.08), transparent 20%),
-    linear-gradient(180deg, rgba(29, 95, 99, 0.03), #ffffff 18%);
+    radial-gradient(circle at top center, rgba(29, 95, 99, 0.18), transparent 40%),
+    linear-gradient(180deg, rgba(29, 95, 99, 0.12), rgba(255, 255, 255, 0.98) 22%),
+    #ffffff;
   border: 1px solid rgba(217, 223, 220, 0.96);
   border-radius: 22px;
-  box-shadow: 0 32px 96px rgba(19, 27, 26, 0.24);
+  box-shadow: 0 32px 96px rgba(16, 43, 44, 0.2);
   display: grid;
   gap: 18px;
   margin: 0 auto;
@@ -3263,14 +3264,6 @@ h3 {
 .chat-modal.dashboard-diagnostic-modal,
 .chat-modal.dashboard-operation-modal {
   overflow: auto;
-}
-
-.chat-modal.flow-guide-modal,
-.chat-modal.dashboard-diagnostic-modal {
-  background:
-    radial-gradient(circle at top center, rgba(29, 95, 99, 0.18), transparent 40%),
-    linear-gradient(180deg, rgba(29, 95, 99, 0.12), rgba(255, 255, 255, 0.98) 22%),
-    #ffffff;
 }
 
 .chat-modal.lead-confirm-modal {
