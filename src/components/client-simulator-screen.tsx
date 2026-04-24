@@ -5,6 +5,7 @@ import type { Campaign, ConversationMessage, ConversationThread, Lead } from '..
 import { sortConversationMessages } from '../utils/conversation';
 import { formatDateTime } from '../utils/crm-ui';
 import { getErrorMessage } from '../utils/error-messages';
+import { buildLeadStageDecisionNotice, type LeadStageDecision } from '../utils/lead-stage-action';
 
 type SimulatorThread = ConversationThread & {
   leads?: Lead;
@@ -16,6 +17,7 @@ type SimulatorPayload = {
   messages: ConversationMessage[];
   generated_model?: string;
   used_fallback?: boolean;
+  stage_decision?: LeadStageDecision | null;
   pending_message?: {
     id: string;
     scheduled_for: string;
@@ -51,6 +53,23 @@ function randomBetween(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function notifyAuthenticatedApp(data: SimulatorPayload) {
+  try {
+    window.localStorage.setItem(
+      'sdr-simulator-conversation-updated',
+      JSON.stringify({
+        workspaceId: data.thread.workspace_id,
+        leadId: data.thread.lead_id,
+        threadId: data.thread.id,
+        updatedAt: new Date().toISOString(),
+        stageDecision: data.stage_decision ?? null,
+      }),
+    );
+  } catch {
+    // The simulator still works if browser storage is blocked.
+  }
+}
+
 async function invokePublicSimulator(body: { token: string; message?: string }) {
   if (!supabaseEnv) {
     throw new Error('Supabase nao configurado.');
@@ -81,6 +100,7 @@ export function ClientSimulatorScreen() {
   const [busy, setBusy] = useState(false);
   const [typing, setTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stageNotice, setStageNotice] = useState<string | null>(null);
 
   async function applyPayload(data: SimulatorPayload, humanized = false) {
     if (humanized) {
@@ -94,6 +114,7 @@ export function ClientSimulatorScreen() {
       ...data,
       messages: sortConversationMessages(data.messages),
     });
+    setStageNotice(buildLeadStageDecisionNotice(data.stage_decision));
   }
 
   async function loadThread(options: { silent?: boolean } = {}) {
@@ -150,6 +171,7 @@ export function ClientSimulatorScreen() {
       const data = await invokePublicSimulator({ token, message: trimmedReply });
       if (!data?.success || !data.data) throw new Error(data?.error ?? 'Falha ao gerar resposta.');
       await applyPayload(data.data, true);
+      notifyAuthenticatedApp(data.data);
     } catch (replyError) {
       setTyping(false);
       setError(getFriendlySimulatorError(replyError));
@@ -229,6 +251,13 @@ export function ClientSimulatorScreen() {
           <div className="status">
             <strong>Resposta pronta para envio</strong>
             <span>Será disparada automaticamente em {formatDateTime(payload.pending_message.scheduled_for)} no horário de São Paulo.</span>
+          </div>
+        )}
+
+        {stageNotice && (
+          <div className="status">
+            <strong>Atualização automática do lead</strong>
+            <span>{stageNotice}</span>
           </div>
         )}
 

@@ -55,6 +55,7 @@ import type {
 import { getLeadMetaLine } from './utils/crm-ui';
 import { getAuthErrorMessage, getErrorMessage, type ErrorMessageScope } from './utils/error-messages';
 import { isEvaluationPanelEnabled, parseAppNavigation, type AppTab } from './utils/evaluation-panel';
+import { buildLeadStageDecisionNotice, type LeadStageDecision } from './utils/lead-stage-action';
 import { createFieldKey, findMissingRequiredFields, STANDARD_LEAD_FIELDS } from './utils/pipeline';
 import { buildStageAutomationErrorWarning, buildStageAutomationFeedback } from './utils/stage-automation-feedback';
 
@@ -306,6 +307,28 @@ export default function App() {
     if (isEvaluationRoute) return;
     void reloadData();
   }, [isEvaluationRoute, reloadData]);
+
+  useEffect(() => {
+    if (isClientSimulatorRoute || isEvaluationRoute) return;
+
+    function handleSimulatorUpdate(event: StorageEvent) {
+      if (event.key !== 'sdr-simulator-conversation-updated' || !event.newValue) return;
+
+      try {
+        const payload = JSON.parse(event.newValue) as { workspaceId?: string; stageDecision?: LeadStageDecision | null };
+        if (data?.workspace.id && payload.workspaceId !== data.workspace.id) return;
+        const stageNotice = buildLeadStageDecisionNotice(payload.stageDecision);
+        setNotice(stageNotice ?? 'Conversa atualizada pelo simulador do cliente.');
+        void reloadData();
+      } catch {
+        setNotice('Conversa atualizada pelo simulador do cliente.');
+        void reloadData();
+      }
+    }
+
+    window.addEventListener('storage', handleSimulatorUpdate);
+    return () => window.removeEventListener('storage', handleSimulatorUpdate);
+  }, [data?.workspace.id, isClientSimulatorRoute, isEvaluationRoute, reloadData]);
 
   async function handleCreateWorkspace(name: string) {
     if (!supabase || !session?.user) return;

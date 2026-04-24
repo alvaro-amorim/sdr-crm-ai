@@ -441,6 +441,10 @@ serve(async (request) => {
         messages: saved.messages,
         generated_model: generated.model,
         used_fallback: generated.model.startsWith('fallback-rule-engine'),
+        stage_decision: {
+          action: generated.lead_stage_action,
+          scheduled: !businessWindow.isBusinessHours,
+        },
         pending_message: saved.pending_message ?? null,
         scheduled_for: saved.pending_message?.scheduled_for ?? null,
       },
