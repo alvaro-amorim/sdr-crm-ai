@@ -25,6 +25,30 @@ Mini CRM para operacao de SDR com Supabase Auth, isolamento por workspace, pipel
 - simulador publico por token;
 - dashboard operacional com metricas e atalhos.
 
+## Decisoes tecnicas
+
+- Supabase centraliza Auth, Postgres, RLS e Edge Functions para reduzir superficie operacional no MVP.
+- O isolamento multi-tenant usa `workspace_id`, `workspace_members` e politicas RLS nas tabelas principais.
+- As chamadas com privilegio e IA ficam em Edge Functions, mantendo `SUPABASE_SERVICE_ROLE_KEY` e `OPENAI_API_KEY` fora do frontend.
+- O frontend usa React, TypeScript e validacoes locais com Zod para reduzir estados invalidos antes de persistir dados.
+- O painel auxiliar de avaliacao fica separado em `/__evaluation` para nao misturar dados de demo com o fluxo normal do produto.
+
+## Diferenciais implementados
+
+- Workspace inicial com funil padrao pronto para uso.
+- Campo textual `technical_owner_name` para responsavel tecnico quando nao existe usuario interno atribuido.
+- Campo `assigned_user_id` preservado para atribuicao real a membros do workspace.
+- Geracao de campanhas e mensagens com IA via Edge Functions.
+- Envio simulado com persistencia de conversa e simulador publico por token.
+- Painel tecnico de avaliacao e smoke leve para preparar rapidamente um ambiente testavel.
+
+## Limites honestos do MVP
+
+- O envio de mensagens e simulado; nao ha integracao real com WhatsApp, e-mail ou CRM externo.
+- O painel auxiliar existe para avaliacao tecnica e deve ficar restrito por configuracao em ambientes publicos.
+- O cenario pesado de avaliacao pode gerar custo de IA e depende de `OPENAI_API_KEY` configurada no ambiente correto.
+- Permissoes avancadas por perfil ainda estao reduzidas ao modelo de workspace e membership.
+
 ## Edge Functions ativas
 
 - `generate-lead-messages`
@@ -200,6 +224,19 @@ Painel auxiliar:
 - abrir `http://localhost:5173/__evaluation`
 - preparar o cenario com um clique
 - navegar pelos atalhos do app principal no workspace atual da sessao
+
+## Guia rapido para o avaliador
+
+1. Acesse o deploy de referencia ou rode o projeto localmente.
+2. Crie uma conta ou entre com o usuario de teste fornecido fora do repositorio.
+3. Confirme a criacao do workspace inicial.
+4. Abra `/__evaluation` e prepare o cenario basico.
+5. Navegue por Dashboard, Leads, Campanhas, Mensagens IA e Simulador.
+6. Opcionalmente rode `npm run test:smoke:crm` para validar o fluxo minimo automatizado.
+
+Video de apresentacao:
+
+- Link: pendente
 
 ## Deploy
 
