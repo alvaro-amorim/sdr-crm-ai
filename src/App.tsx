@@ -106,6 +106,53 @@ const emptyCampaignStrategyPlan: CampaignStrategyPlan = {
   final_prompt: '',
 };
 
+type CampaignFormDraft = {
+  form?: CampaignInput;
+  plan?: CampaignStrategyPlan;
+  planMeta?: { model: string } | null;
+};
+
+function getCampaignFormInitial(campaign: Campaign | null): CampaignInput {
+  return campaign
+    ? {
+        id: campaign.id,
+        name: campaign.name,
+        context_text: campaign.context_text,
+        generation_prompt: campaign.generation_prompt,
+        trigger_stage_id: campaign.trigger_stage_id,
+        ai_response_mode: campaign.ai_response_mode ?? 'always',
+        ai_response_window_start: campaign.ai_response_window_start?.slice(0, 5) ?? '09:00',
+        ai_response_window_end: campaign.ai_response_window_end?.slice(0, 5) ?? '18:00',
+        is_active: campaign.is_active,
+      }
+    : emptyCampaignInput;
+}
+
+function getCampaignDraftStorageKey(workspaceId: string, campaignId?: string) {
+  return `sdr-expert:campaign-draft:${workspaceId}:${campaignId ?? 'new'}`;
+}
+
+function readCampaignDraft(storageKey: string): CampaignFormDraft | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    return raw ? (JSON.parse(raw) as CampaignFormDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCampaignDraft(storageKey: string, draft: CampaignFormDraft) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(storageKey, JSON.stringify(draft));
+}
+
+function clearCampaignDraft(storageKey: string) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(storageKey);
+}
+
 function derivePlanFromCampaign(campaign: Campaign | null): CampaignStrategyPlan {
   if (!campaign) return emptyCampaignStrategyPlan;
 
@@ -2596,30 +2643,32 @@ function CampaignForm({
   onSaved: () => void;
   setError: (message: string | null) => void;
 }) {
-  const initial = campaign
-    ? {
-        id: campaign.id,
-        name: campaign.name,
-        context_text: campaign.context_text,
-        generation_prompt: campaign.generation_prompt,
-        trigger_stage_id: campaign.trigger_stage_id,
-        ai_response_mode: campaign.ai_response_mode ?? 'always',
-        ai_response_window_start: campaign.ai_response_window_start?.slice(0, 5) ?? '09:00',
-        ai_response_window_end: campaign.ai_response_window_end?.slice(0, 5) ?? '18:00',
-        is_active: campaign.is_active,
-      }
-    : emptyCampaignInput;
-  const [form, setForm] = useState<CampaignInput>(initial);
-  const [plan, setPlan] = useState<CampaignStrategyPlan>(derivePlanFromCampaign(campaign));
+  const draftStorageKey = getCampaignDraftStorageKey(data.workspace.id, campaign?.id);
+  const initial = getCampaignFormInitial(campaign);
+  const [form, setForm] = useState<CampaignInput>(() => readCampaignDraft(draftStorageKey)?.form ?? initial);
+  const [plan, setPlan] = useState<CampaignStrategyPlan>(() => readCampaignDraft(draftStorageKey)?.plan ?? derivePlanFromCampaign(campaign));
   const [planningBusy, setPlanningBusy] = useState(false);
   const [savingCampaign, setSavingCampaign] = useState(false);
-  const [planMeta, setPlanMeta] = useState<{ model: string } | null>(null);
+  const [planMeta, setPlanMeta] = useState<{ model: string } | null>(() => readCampaignDraft(draftStorageKey)?.planMeta ?? null);
+  const [loadedDraftStorageKey, setLoadedDraftStorageKey] = useState(draftStorageKey);
 
   useEffect(() => {
-    setForm(initial);
-    setPlan(derivePlanFromCampaign(campaign));
-    setPlanMeta(null);
-  }, [campaign]);
+    const draft = readCampaignDraft(draftStorageKey);
+    setForm(draft?.form ?? initial);
+    setPlan(draft?.plan ?? derivePlanFromCampaign(campaign));
+    setPlanMeta(draft?.planMeta ?? null);
+    setLoadedDraftStorageKey(draftStorageKey);
+  }, [campaign, draftStorageKey]);
+
+  useEffect(() => {
+    if (loadedDraftStorageKey !== draftStorageKey) return;
+    writeCampaignDraft(draftStorageKey, { form, plan, planMeta });
+  }, [draftStorageKey, form, loadedDraftStorageKey, plan, planMeta]);
+
+  function cancelEditing() {
+    clearCampaignDraft(draftStorageKey);
+    onCancel();
+  }
 
   async function generatePlan() {
     if (!supabase) return;
@@ -2689,6 +2738,7 @@ function CampaignForm({
         ...form,
         generation_prompt: plan.final_prompt,
       });
+      clearCampaignDraft(draftStorageKey);
       onSaved();
     } catch (campaignError) {
       setError(getSafeMessage(campaignError, 'campaign'));
@@ -2706,7 +2756,7 @@ function CampaignForm({
           <p>Defina o briefing comercial e deixe a IA montar o plano da campanha antes de salvar o playbook.</p>
         </div>
         {campaign && (
-          <button type="button" className="ghost compact" onClick={onCancel} disabled={savingCampaign}>
+          <button type="button" className="ghost compact" onClick={cancelEditing} disabled={savingCampaign}>
             Cancelar edição
           </button>
         )}

@@ -45,6 +45,38 @@ function formatDeliveryStatus(status: SentMessageEvent['delivery_status']) {
   }
 }
 
+const MESSAGE_MAX_LENGTH = 2000;
+
+type PersistedMessageSelection = {
+  leadId?: string;
+  campaignId?: string;
+};
+
+function getMessageSelectionStorageKey(workspaceId: string) {
+  return `sdr-expert:messages-selection:${workspaceId}`;
+}
+
+function readMessageSelection(workspaceId: string): PersistedMessageSelection {
+  if (typeof window === 'undefined') return {};
+
+  try {
+    const raw = window.localStorage.getItem(getMessageSelectionStorageKey(workspaceId));
+    return raw ? (JSON.parse(raw) as PersistedMessageSelection) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeMessageSelection(workspaceId: string, selection: PersistedMessageSelection) {
+  if (typeof window === 'undefined') return;
+
+  window.localStorage.setItem(getMessageSelectionStorageKey(workspaceId), JSON.stringify(selection));
+}
+
+function normalizeMessageDraft(text: string) {
+  return text.trim();
+}
+
 async function invokeAuthenticatedFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
   if (!supabase || !supabaseEnv) {
     throw new Error('Supabase não configurado.');
@@ -135,30 +167,38 @@ export function MessagesScreen({
     () => sortByLabel(data.campaigns.filter((campaign) => campaign.is_active), (campaign) => campaign.name),
     [data.campaigns],
   );
-  const [leadId, setLeadId] = useState('');
+  const [leadId, setLeadId] = useState(() => {
+    const selection = readMessageSelection(data.workspace.id);
+    return selection.leadId && data.leads.some((lead) => lead.id === selection.leadId) ? selection.leadId : '';
+  });
   const [leadQuery, setLeadQuery] = useState('');
   const [leadSelectorOpen, setLeadSelectorOpen] = useState(false);
-  const [campaignId, setCampaignId] = useState(activeCampaigns[0]?.id ?? '');
+  const [campaignId, setCampaignId] = useState(() => {
+    const selection = readMessageSelection(data.workspace.id);
+    return selection.campaignId && activeCampaigns.some((campaign) => campaign.id === selection.campaignId)
+      ? selection.campaignId
+      : activeCampaigns[0]?.id ?? '';
+  });
   const [consumedFocusNonce, setConsumedFocusNonce] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [simulationMessage, setSimulationMessage] = useState<GeneratedMessage | null>(null);
   const [simulationBusy, setSimulationBusy] = useState(false);
   const [simulatorLinkBusy, setSimulatorLinkBusy] = useState(false);
+  const [messageDrafts, setMessageDrafts] = useState<Record<string, string>>({});
+  const [loadedSelectionWorkspaceId, setLoadedSelectionWorkspaceId] = useState(data.workspace.id);
   const selectedLead = data.leads.find((lead) => lead.id === leadId) ?? null;
   const selectedCampaign = data.campaigns.find((campaign) => campaign.id === campaignId) ?? null;
   const selectedStage = selectedLead ? data.stages.find((stage) => stage.id === selectedLead.current_stage_id) ?? null : null;
   const targetStage = findStageByName(data.stages, 'Tentando Contato');
   const leadOptions = useMemo(() => rankLeadOptions(leadQuery, data.leads), [data.leads, leadQuery]);
   const leadMessages = data.generatedMessages
-    .filter((message) => message.lead_id === leadId && (!campaignId || message.campaign_id === campaignId))
+    .filter((message) => message.generation_status === 'generated' && message.lead_id === leadId && (!campaignId || message.campaign_id === campaignId))
     .sort((left, right) => left.variation_index - right.variation_index);
   const leadTimeline = data.sentMessageEvents
     .filter((event) => event.lead_id === leadId)
     .sort((left, right) => new Date(left.sent_at).getTime() - new Date(right.sent_at).getTime());
-  const selectedThread =
-    data.conversationThreads.find((thread) => thread.lead_id === leadId && (!campaignId || thread.campaign_id === campaignId)) ??
-    data.conversationThreads.find((thread) => thread.lead_id === leadId) ??
-    null;
+  const selectedCampaignThread = data.conversationThreads.find((thread) => thread.lead_id === leadId && (!campaignId || thread.campaign_id === campaignId)) ?? null;
+  const selectedThread = selectedCampaignThread ?? data.conversationThreads.find((thread) => thread.lead_id === leadId) ?? null;
   const conversationMessageStats = data.conversationMessages.reduce<Record<string, { count: number; lastMessageAt: number }>>((stats, message) => {
     const current = stats[message.thread_id] ?? { count: 0, lastMessageAt: 0 };
     const messageTime = new Date(message.created_at).getTime();
@@ -204,6 +244,25 @@ export function MessagesScreen({
   }, [data.leads, leadId]);
 
   useEffect(() => {
+    const selection = readMessageSelection(data.workspace.id);
+    const storedLeadId = selection.leadId && data.leads.some((lead) => lead.id === selection.leadId) ? selection.leadId : '';
+    const storedCampaignId =
+      selection.campaignId && activeCampaigns.some((campaign) => campaign.id === selection.campaignId)
+        ? selection.campaignId
+        : activeCampaigns[0]?.id ?? '';
+
+    setLeadId(storedLeadId);
+    setCampaignId(storedCampaignId);
+    setLeadSelectorOpen(false);
+    setLoadedSelectionWorkspaceId(data.workspace.id);
+  }, [data.workspace.id]);
+
+  useEffect(() => {
+    if (loadedSelectionWorkspaceId !== data.workspace.id) return;
+    writeMessageSelection(data.workspace.id, { leadId, campaignId });
+  }, [campaignId, data.workspace.id, leadId, loadedSelectionWorkspaceId]);
+
+  useEffect(() => {
     if (!selectedLead) {
       return;
     }
@@ -241,6 +300,27 @@ export function MessagesScreen({
     setCampaignId(activeCampaigns[0]?.id ?? '');
   }, [activeCampaigns, campaignId]);
 
+  useEffect(() => {
+    const pendingMessageIds = new Set(
+      data.generatedMessages.filter((message) => message.generation_status === 'generated').map((message) => message.id),
+    );
+
+    setMessageDrafts((current) => {
+      let changed = false;
+      const next: Record<string, string> = {};
+
+      for (const [messageId, draft] of Object.entries(current)) {
+        if (pendingMessageIds.has(messageId)) {
+          next[messageId] = draft;
+        } else {
+          changed = true;
+        }
+      }
+
+      return changed ? next : current;
+    });
+  }, [data.generatedMessages]);
+
   function handleLeadQueryChange(value: string) {
     setLeadQuery(value);
     setLeadSelectorOpen(true);
@@ -252,10 +332,34 @@ export function MessagesScreen({
     setLeadQuery(toLeadSearchOption(lead).label);
     setLeadSelectorOpen(false);
 
+    const selectedCampaignStillValid = campaignId && data.campaigns.some((campaign) => campaign.id === campaignId && campaign.is_active);
     const leadThread = data.conversationThreads.find((thread) => thread.lead_id === lead.id);
-    if (leadThread && data.campaigns.some((campaign) => campaign.id === leadThread.campaign_id && campaign.is_active)) {
+    if (!selectedCampaignStillValid && leadThread && data.campaigns.some((campaign) => campaign.id === leadThread.campaign_id && campaign.is_active)) {
       setCampaignId(leadThread.campaign_id);
     }
+  }
+
+  function getMessageDraft(message: GeneratedMessage) {
+    return messageDrafts[message.id] ?? message.message_text;
+  }
+
+  function updateMessageDraft(messageId: string, value: string) {
+    setMessageDrafts((current) => ({
+      ...current,
+      [messageId]: value.slice(0, MESSAGE_MAX_LENGTH),
+    }));
+  }
+
+  function openSimulation(message: GeneratedMessage) {
+    const messageText = normalizeMessageDraft(getMessageDraft(message));
+
+    if (!messageText) {
+      setError('Escreva uma mensagem antes de simular o envio.');
+      return;
+    }
+
+    setError(null);
+    setSimulationMessage({ ...message, message_text: messageText });
   }
 
   async function generateMessages() {
@@ -285,6 +389,12 @@ export function MessagesScreen({
 
   async function simulateSend(message: GeneratedMessage) {
     if (!supabase) return;
+    const messageText = normalizeMessageDraft(message.message_text);
+    if (!messageText) {
+      setError('Escreva uma mensagem antes de confirmar o envio.');
+      return;
+    }
+
     if (!targetStage) {
       setError('Etapa Tentando Contato não encontrada.');
       return;
@@ -349,7 +459,7 @@ export function MessagesScreen({
         lead_id: message.lead_id,
         campaign_id: message.campaign_id,
         generated_message_id: message.id,
-        message_text: message.message_text,
+        message_text: messageText,
         sent_by_user_id: user.id,
         is_simulated: true,
         direction: 'outbound',
@@ -362,7 +472,7 @@ export function MessagesScreen({
 
       const { error: messageError } = await supabase
         .from('generated_messages')
-        .update({ generation_status: 'sent' })
+        .update({ message_text: messageText, generation_status: 'sent' })
         .eq('workspace_id', data.workspace.id)
         .eq('id', message.id);
 
@@ -376,7 +486,7 @@ export function MessagesScreen({
         direction: 'outbound',
         sender_type: 'sdr_ai',
         sender_name: 'SDR Expert',
-        message_text: message.message_text,
+        message_text: messageText,
         prompt_purpose: promptPurpose,
         sentiment_tag: 'neutral',
         intent_tag: promptPurpose,
@@ -398,6 +508,18 @@ export function MessagesScreen({
       if (threadUpdateError) throw threadUpdateError;
 
       await moveLead(supabase, data.workspace.id, message.lead_id, targetStage.id);
+
+      const { error: cleanupError } = await supabase
+        .from('generated_messages')
+        .delete()
+        .eq('workspace_id', data.workspace.id)
+        .eq('lead_id', message.lead_id)
+        .eq('campaign_id', message.campaign_id)
+        .eq('generation_status', 'generated')
+        .neq('id', message.id);
+
+      if (cleanupError) throw cleanupError;
+
       let automation: StageTriggerAutomationResult = {
         generatedCampaignNames: [],
         skippedCampaignNames: [],
@@ -424,6 +546,11 @@ export function MessagesScreen({
       }
 
       setSimulationMessage(null);
+      setMessageDrafts((current) => {
+        const next = { ...current };
+        delete next[message.id];
+        return next;
+      });
       const noticeParts = ['Simulação registrada no chat. Lead movido para Tentando Contato.'];
       if (automation.generatedCampaignNames.length === 1) {
         noticeParts.push(`Mensagens geradas automaticamente para ${automation.generatedCampaignNames[0]}.`);
@@ -556,7 +683,7 @@ export function MessagesScreen({
             disabled={busy || !leadId || data.leads.length === 0 || activeCampaigns.length === 0}
           >
             <Sparkles aria-hidden />
-            {busy ? 'Gerando mensagens...' : 'Gerar mensagens'}
+            {busy ? 'Gerando mensagens...' : selectedCampaignThread ? 'Gerar nova retomada' : 'Gerar mensagens'}
           </button>
         </div>
 
@@ -693,32 +820,66 @@ export function MessagesScreen({
           <div className="panel empty-panel">
             <Sparkles aria-hidden />
             <div>
-              <h2>Nenhuma mensagem pronta para este contexto</h2>
-              <p className="empty">Selecione um lead, uma campanha ativa e gere as variações para abrir a simulação de chat.</p>
+              <h2>{selectedLead && selectedCampaign ? 'Nenhuma variação pendente para revisar' : 'Nenhuma mensagem pronta para este contexto'}</h2>
+              <p className="empty">
+                {selectedLead && selectedCampaign
+                  ? selectedCampaignThread
+                    ? 'Este lead já tem conversa nesta campanha. Gere uma nova retomada para continuar a abordagem sem perder o histórico.'
+                    : 'Gere variações para revisar, editar e simular o envio no chat.'
+                  : 'Selecione um lead, uma campanha ativa e gere as variações para abrir a simulação de chat.'}
+              </p>
+              {selectedLead && selectedCampaign && (
+                <button
+                  type="button"
+                  className="secondary message-empty-action"
+                  onClick={generateMessages}
+                  disabled={busy || data.leads.length === 0 || activeCampaigns.length === 0}
+                >
+                  <Sparkles aria-hidden />
+                  {busy ? 'Gerando mensagens...' : selectedCampaignThread ? 'Gerar nova retomada' : 'Gerar variações'}
+                </button>
+              )}
             </div>
           </div>
         ) : (
-          leadMessages.map((message) => (
-            <article className="message-card" key={message.id}>
+          leadMessages.map((message) => {
+            const draftText = getMessageDraft(message);
+            const isDraftEmpty = normalizeMessageDraft(draftText).length === 0;
+
+            return (
+              <article className="message-card" key={message.id}>
               <div className="message-card-header">
                 <span>Variação {message.variation_index}</span>
                 <span className={`message-status message-status-${message.generation_status}`}>
                   {message.generation_status === 'sent' ? 'Enviada no mock' : 'Pronta para envio'}
                 </span>
               </div>
-              <p>{message.message_text}</p>
+              <label className="message-card-editor">
+                Editar variação
+                <textarea
+                  aria-label={`Editar variação ${message.variation_index}`}
+                  maxLength={MESSAGE_MAX_LENGTH}
+                  value={draftText}
+                  onChange={(event) => updateMessageDraft(message.id, event.target.value)}
+                  disabled={simulationBusy}
+                />
+                <span className={`message-card-counter ${isDraftEmpty ? 'message-card-counter-error' : ''}`}>
+                  {isDraftEmpty ? 'Texto vazio' : `${draftText.length}/${MESSAGE_MAX_LENGTH}`}
+                </span>
+              </label>
               <div className="message-card-footer">
                 <div className="message-card-meta">
                   <Clock3 aria-hidden />
                   <span>Gerada em {formatDateTime(message.created_at)}</span>
                 </div>
-                <button type="button" onClick={() => setSimulationMessage(message)} disabled={simulationBusy}>
+                <button type="button" onClick={() => openSimulation(message)} disabled={simulationBusy || isDraftEmpty}>
                   <MessageSquareText aria-hidden />
-                  {simulationBusy ? 'Abrindo simulação...' : message.generation_status === 'sent' ? 'Ver no chat' : 'Simular no chat'}
+                  {simulationBusy ? 'Abrindo simulação...' : 'Simular no chat'}
                 </button>
               </div>
-            </article>
-          ))
+              </article>
+            );
+          })
         )}
       </section>
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterTriggerableCampaigns } from './crm';
+import { collectExistingTriggerCampaignIds, filterTriggerableCampaigns } from './crm';
 import type { Campaign } from '../types/domain';
 
 function createCampaign(id: string, name: string): Campaign {
@@ -36,5 +36,20 @@ describe('filterTriggerableCampaigns', () => {
 
     expect(result.eligible.map((campaign) => campaign.id)).toEqual(['campaign-a']);
     expect(result.skipped.map((campaign) => campaign.id)).toEqual(['campaign-b', 'campaign-c']);
+  });
+});
+
+describe('collectExistingTriggerCampaignIds', () => {
+  it('bloqueia mensagens pendentes, enviadas e threads, mas ignora falhas antigas', () => {
+    const result = collectExistingTriggerCampaignIds({
+      generatedMessages: [
+        { campaign_id: 'campaign-generated', generation_status: 'generated' },
+        { campaign_id: 'campaign-sent', generation_status: 'sent' },
+        { campaign_id: 'campaign-failed', generation_status: 'failed' },
+      ],
+      threads: [{ campaign_id: 'campaign-thread' }],
+    });
+
+    expect([...result].sort()).toEqual(['campaign-generated', 'campaign-sent', 'campaign-thread']);
   });
 });

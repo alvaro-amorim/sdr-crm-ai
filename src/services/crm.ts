@@ -110,6 +110,25 @@ export function filterTriggerableCampaigns(params: {
   return { eligible, skipped };
 }
 
+export function collectExistingTriggerCampaignIds(params: {
+  generatedMessages: Array<{ campaign_id: string | null; generation_status?: string | null }>;
+  threads: Array<{ campaign_id: string | null }>;
+}): Set<string> {
+  const ids = new Set<string>();
+
+  for (const message of params.generatedMessages) {
+    if (!message.campaign_id) continue;
+    if (message.generation_status === 'failed') continue;
+    ids.add(message.campaign_id);
+  }
+
+  for (const thread of params.threads) {
+    if (thread.campaign_id) ids.add(thread.campaign_id);
+  }
+
+  return ids;
+}
+
 export async function createWorkspaceWithDefaults(client: SupabaseClient, user: User, name: string): Promise<Workspace> {
   if (!user.id) throw new Error('Sessão inválida.');
 
@@ -389,7 +408,7 @@ export async function runStageTriggerAutomation(
   const [generatedMessagesResult, threadsResult] = await Promise.all([
     client
       .from('generated_messages')
-      .select('campaign_id')
+      .select('campaign_id, generation_status')
       .eq('workspace_id', params.workspaceId)
       .eq('lead_id', params.leadId)
       .in('campaign_id', campaignIds),
@@ -404,10 +423,10 @@ export async function runStageTriggerAutomation(
   if (generatedMessagesResult.error) throw new Error(generatedMessagesResult.error.message);
   if (threadsResult.error) throw new Error(threadsResult.error.message);
 
-  const existingCampaignIds = new Set<string>([
-    ...(generatedMessagesResult.data ?? []).map((row) => row.campaign_id),
-    ...(threadsResult.data ?? []).map((row) => row.campaign_id),
-  ]);
+  const existingCampaignIds = collectExistingTriggerCampaignIds({
+    generatedMessages: generatedMessagesResult.data ?? [],
+    threads: threadsResult.data ?? [],
+  });
 
   const { eligible, skipped } = filterTriggerableCampaigns({
     campaigns: activeCampaigns,

@@ -3590,6 +3590,36 @@ h3 {
   line-height: 1.55;
 }
 
+.message-empty-action {
+  margin-top: 12px;
+  width: fit-content;
+}
+
+.message-card-editor {
+  color: #3f504d;
+  display: grid;
+  font-size: 0.86rem;
+  font-weight: 800;
+  gap: 8px;
+}
+
+.message-card-editor textarea {
+  line-height: 1.55;
+  min-height: 150px;
+}
+
+.message-card-counter {
+  color: #61706d;
+  font-size: 0.8rem;
+  font-weight: 700;
+  justify-self: end;
+}
+
+.message-card-counter-error {
+  color: #8a3d32;
+  justify-self: start;
+}
+
 .conversation-preview-panel {
   background: linear-gradient(180deg, rgba(16, 42, 45, 0.05), #ffffff 24%, #fbfcfc);
   border-color: rgba(29, 95, 99, 0.12);
