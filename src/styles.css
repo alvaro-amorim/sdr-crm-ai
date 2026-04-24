@@ -4342,8 +4342,10 @@ h3 {
   }
 
   .mobile-shell-bar {
-    align-items: start;
+    align-items: center;
+    display: grid;
     gap: 10px;
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
   .mobile-shell-copy {
@@ -4443,10 +4445,19 @@ h3 {
     display: grid;
   }
 
+  button {
+    min-width: 0;
+  }
+
   button,
   .ghost,
   .compact {
     width: 100%;
+  }
+
+  .mobile-shell-bar .mobile-nav-toggle {
+    white-space: nowrap;
+    width: auto;
   }
 
   .icon-only {
@@ -4467,5 +4478,25 @@ h3 {
   .client-chat-avatar {
     height: 28px;
     width: 28px;
+  }
+
+  .message-card-header,
+  .overview-card-topline,
+  .metric-topline,
+  .chat-bubble-meta,
+  .conversation-preview-bubble-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .client-chat-meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .dashboard-shortcut-card {
+    gap: 10px;
+    padding: 16px 34px 16px 14px;
   }
 }
