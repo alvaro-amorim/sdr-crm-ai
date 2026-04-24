@@ -2,6 +2,7 @@ import { ArrowLeft, Bot, RefreshCcw, Send, UserRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { supabaseEnv } from '../lib/supabase';
 import type { Campaign, ConversationMessage, ConversationThread, Lead } from '../types/domain';
+import { sortConversationMessages } from '../utils/conversation';
 import { formatDateTime } from '../utils/crm-ui';
 import { getErrorMessage } from '../utils/error-messages';
 
@@ -89,7 +90,10 @@ export function ClientSimulatorScreen() {
       setTyping(false);
     }
 
-    setPayload(data);
+    setPayload({
+      ...data,
+      messages: sortConversationMessages(data.messages),
+    });
   }
 
   async function loadThread(options: { silent?: boolean } = {}) {

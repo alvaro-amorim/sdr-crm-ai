@@ -14,6 +14,7 @@ import type {
   PipelineStage,
   SentMessageEvent,
 } from '../types/domain';
+import { sortConversationMessages } from '../utils/conversation';
 import { findStageByName, formatDateTime, getLeadChannel, getLeadMetaLine } from '../utils/crm-ui';
 import { getErrorMessage } from '../utils/error-messages';
 import { rankLeadOptions, toLeadSearchOption } from '../utils/lead-search';
@@ -193,9 +194,7 @@ export function MessagesScreen({
   const activeSimulatorThread =
     selectedThread ?? selectedLeadThreadOptions[0]?.thread ?? null;
   const activeSimulatorThreadMessages = activeSimulatorThread
-    ? data.conversationMessages
-        .filter((message) => message.thread_id === activeSimulatorThread.id)
-        .sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime())
+    ? sortConversationMessages(data.conversationMessages.filter((message) => message.thread_id === activeSimulatorThread.id))
     : [];
 
   useEffect(() => {
@@ -304,9 +303,7 @@ export function MessagesScreen({
       const existingThread =
         data.conversationThreads.find((thread) => thread.lead_id === message.lead_id && thread.campaign_id === message.campaign_id) ?? null;
       const threadMessages = existingThread
-        ? data.conversationMessages
-            .filter((conversationMessage) => conversationMessage.thread_id === existingThread.id)
-            .sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime())
+        ? sortConversationMessages(data.conversationMessages.filter((conversationMessage) => conversationMessage.thread_id === existingThread.id))
         : [];
       const promptPurpose = resolveNextOutboundPurpose({
         history: threadMessages.map((conversationMessage) => ({
