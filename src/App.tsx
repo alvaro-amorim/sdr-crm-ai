@@ -144,38 +144,6 @@ function getAssignedWorkspaceOwnerLabel(lead: Lead, data: CrmData, user?: User):
   return getWorkspaceMemberDisplayName(member, user);
 }
 
-/*
-async function invokeAuthenticatedFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
-  if (!supabase || !supabaseEnv) {
-    throw new Error('Supabase não configurado.');
-  }
-
-  const { data, error } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (error || !token) {
-    throw new Error('Sessão expirada. Entre novamente.');
-  }
-
-  const response = await fetch(`${supabaseEnv.VITE_SUPABASE_URL.replace(/\/$/, '')}/functions/v1/${name}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      apikey: supabaseEnv.VITE_SUPABASE_ANON_KEY,
-      'content-type': 'application/json',
-      'x-sdr-auth-token': token,
-    },
-    body: JSON.stringify(body),
-  });
-
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(payload?.error ?? payload?.message ?? `Falha HTTP ${response.status}.`);
-  }
-
-  return payload as T;
-}
-*/
-
 function getAuthRedirectTo(): string {
   return window.location.origin;
 }

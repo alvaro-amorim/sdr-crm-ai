@@ -59,9 +59,9 @@ async function invokeAuthenticatedFunction<T>(name: string, body: Record<string,
   const response = await fetch(`${supabaseEnv.VITE_SUPABASE_URL.replace(/\/$/, '')}/functions/v1/${name}`, {
     method: 'POST',
     headers: {
+      Authorization: `Bearer ${token}`,
       apikey: supabaseEnv.VITE_SUPABASE_ANON_KEY,
       'content-type': 'application/json',
-      'x-sdr-auth-token': token,
     },
     body: JSON.stringify(body),
   });

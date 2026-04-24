@@ -77,7 +77,6 @@ export async function invokeAuthenticatedFunction<T>(
       Authorization: `Bearer ${token}`,
       apikey: supabaseEnv.VITE_SUPABASE_ANON_KEY,
       'content-type': 'application/json',
-      'x-sdr-auth-token': token,
     },
     body: JSON.stringify(body),
   });
