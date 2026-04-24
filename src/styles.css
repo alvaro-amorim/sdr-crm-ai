@@ -3260,6 +3260,10 @@ h3 {
   width: min(100%, 980px);
 }
 
+.chat-simulation-modal {
+  grid-template-rows: auto auto minmax(160px, 1fr) auto;
+}
+
 .chat-modal.flow-guide-modal,
 .chat-modal.dashboard-diagnostic-modal,
 .chat-modal.dashboard-operation-modal {
@@ -3323,6 +3327,11 @@ h3 {
   overflow: auto;
   padding: 16px;
   -webkit-overflow-scrolling: touch;
+}
+
+.chat-simulation-modal .chat-thread {
+  max-height: none;
+  min-height: 0;
 }
 
 .chat-row {

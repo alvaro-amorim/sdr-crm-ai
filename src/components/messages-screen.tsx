@@ -198,41 +198,7 @@ export function MessagesScreen({
     .filter((event) => event.lead_id === leadId)
     .sort((left, right) => new Date(left.sent_at).getTime() - new Date(right.sent_at).getTime());
   const selectedCampaignThread = data.conversationThreads.find((thread) => thread.lead_id === leadId && (!campaignId || thread.campaign_id === campaignId)) ?? null;
-  const selectedThread = selectedCampaignThread ?? data.conversationThreads.find((thread) => thread.lead_id === leadId) ?? null;
-  const conversationMessageStats = data.conversationMessages.reduce<Record<string, { count: number; lastMessageAt: number }>>((stats, message) => {
-    const current = stats[message.thread_id] ?? { count: 0, lastMessageAt: 0 };
-    const messageTime = new Date(message.created_at).getTime();
-    stats[message.thread_id] = {
-      count: current.count + 1,
-      lastMessageAt: Math.max(current.lastMessageAt, Number.isNaN(messageTime) ? 0 : messageTime),
-    };
-    return stats;
-  }, {});
-  const simulatorThreadOptions = useMemo(
-    () =>
-      data.conversationThreads
-        .map((thread) => ({
-          thread,
-          lead: data.leads.find((lead) => lead.id === thread.lead_id) ?? null,
-          campaign: data.campaigns.find((campaign) => campaign.id === thread.campaign_id) ?? null,
-          messageCount: conversationMessageStats[thread.id]?.count ?? 0,
-          lastMessageAt: conversationMessageStats[thread.id]?.lastMessageAt ?? 0,
-        }))
-        .sort((left, right) => {
-          const leadDiff = (left.lead?.name ?? '').localeCompare(right.lead?.name ?? '', 'pt-BR');
-          if (leadDiff !== 0) return leadDiff;
-          const campaignDiff = (left.campaign?.name ?? '').localeCompare(right.campaign?.name ?? '', 'pt-BR');
-          if (campaignDiff !== 0) return campaignDiff;
-          return left.thread.created_at.localeCompare(right.thread.created_at, 'pt-BR');
-        }),
-    [conversationMessageStats, data.campaigns, data.conversationThreads, data.leads],
-  );
-  const selectedLeadThreadOptions = useMemo(
-    () => simulatorThreadOptions.filter((option) => option.thread.lead_id === leadId),
-    [leadId, simulatorThreadOptions],
-  );
-  const activeSimulatorThread =
-    selectedThread ?? selectedLeadThreadOptions[0]?.thread ?? null;
+  const activeSimulatorThread = selectedCampaignThread;
   const activeSimulatorThreadMessages = activeSimulatorThread
     ? sortConversationMessages(data.conversationMessages.filter((message) => message.thread_id === activeSimulatorThread.id))
     : [];
@@ -705,11 +671,13 @@ export function MessagesScreen({
 
         <article className={`message-simulator-cta ${activeSimulatorThread ? 'message-simulator-cta-ready' : ''}`}>
           <span className="section-kicker">Janela do cliente</span>
-          <strong>{activeSimulatorThread ? 'Simulador pronto para demonstração' : 'Abra o chat assim que houver uma thread simulável'}</strong>
+          <strong>{activeSimulatorThread ? 'Simulador pronto para demonstração' : 'Confirme uma variação para abrir o simulador'}</strong>
           <p>
             {activeSimulatorThread
               ? 'Use esta janela para agir como cliente, validar o tempo de resposta da IA e mostrar a conversa em tempo real.'
-              : 'Gere mensagens ou use uma conversa existente para abrir a experiência do cliente em outra janela.'}
+              : selectedLead && selectedCampaign
+                ? `A janela do cliente será criada para ${selectedCampaign.name} depois que uma variação for confirmada no mock.`
+                : 'Selecione lead e campanha para preparar a experiência do cliente.'}
           </p>
           <button
             type="button"
@@ -808,8 +776,10 @@ export function MessagesScreen({
           <div className="empty-panel">
             <MessageCircleReply aria-hidden />
             <div>
-              <h2>Nenhuma conversa simulável criada</h2>
-              <p className="empty">Rode o cenário de avaliação para popular threads, respostas de clientes e links de simulação.</p>
+              <h2>Nenhuma conversa criada para esta campanha</h2>
+              <p className="empty">
+                Simule uma variação e confirme o envio no mock para criar a conversa operacional da campanha selecionada.
+              </p>
             </div>
           </div>
         )}
@@ -998,7 +968,7 @@ function ChatSimulationModal({
   return (
     <div className="modal-backdrop" onClick={onClose} role="presentation">
       <section
-        className="chat-modal"
+        className="chat-modal chat-simulation-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="chat-simulation-title"
