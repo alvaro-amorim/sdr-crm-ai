@@ -6,6 +6,7 @@ export type StandardLeadField =
   | 'job_title'
   | 'lead_source'
   | 'notes'
+  | 'technical_owner_name'
   | 'assigned_user_id';
 
 export type Workspace = {
@@ -21,6 +22,7 @@ export type WorkspaceMember = {
   user_id: string;
   role: 'owner' | 'member';
   created_at: string;
+  profile_full_name?: string | null;
   workspaces?: Workspace;
 };
 
@@ -56,6 +58,7 @@ export type Lead = {
   workspace_id: string;
   current_stage_id: string;
   assigned_user_id: string | null;
+  technical_owner_name: string | null;
   name: string;
   email: string | null;
   phone: string | null;
@@ -85,6 +88,9 @@ export type Campaign = {
   context_text: string;
   generation_prompt: string;
   trigger_stage_id: string | null;
+  ai_response_mode: 'always' | 'business_hours';
+  ai_response_window_start: string;
+  ai_response_window_end: string;
   is_active: boolean;
   created_by: string;
   created_at: string;
@@ -155,6 +161,7 @@ export type ConversationMessage = {
 
 export type CrmData = {
   workspace: Workspace;
+  workspaceMembers: WorkspaceMember[];
   stages: PipelineStage[];
   requiredFields: StageRequiredField[];
   customFields: WorkspaceCustomField[];

@@ -48,6 +48,8 @@ type OperationLeadRow = {
   campaign: Campaign | null;
   thread: ConversationThread | null;
   latestMessage: ConversationMessage | null;
+  latestInboundMessage: ConversationMessage | null;
+  latestOutboundMessage: ConversationMessage | null;
   sortAt: string;
 };
 
@@ -83,6 +85,12 @@ function sortByNewest<T extends { sortAt: string }>(items: T[]) {
 function getMessagePreview(message: ConversationMessage | null) {
   if (!message) return 'Sem mensagem registrada nesta conversa.';
   return message.message_text.length > 180 ? `${message.message_text.slice(0, 180)}...` : message.message_text;
+}
+
+function getLatestMessageByDirection(messages: ConversationMessage[], direction: ConversationMessage['direction']) {
+  return messages
+    .filter((message) => message.direction === direction)
+    .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())[0] ?? null;
 }
 
 function getThreadLabel(thread: ConversationThread | null) {
@@ -128,7 +136,13 @@ function getStageNextAction(stage: PipelineStage | null, leads: Lead[], hasCampa
   return 'Revise os dados da etapa e defina o próximo playbook comercial.';
 }
 
-export function DashboardScreen({ data }: { data: CrmData }) {
+export function DashboardScreen({
+  data,
+  onOpenLeadConversation,
+}: {
+  data: CrmData;
+  onOpenLeadConversation: (leadId: string, campaignId?: string | null) => void;
+}) {
   const [selectedStageId, setSelectedStageId] = useState(data.stages[0]?.id ?? '');
   const [insightsCollapsed, setInsightsCollapsed] = useState(false);
   const [diagnosticOpen, setDiagnosticOpen] = useState(false);
@@ -206,6 +220,7 @@ export function DashboardScreen({ data }: { data: CrmData }) {
       const lead = leadsById.get(thread.lead_id);
       if (!lead) return null;
       const latestMessage = latestConversationMessageByThread.get(thread.id) ?? null;
+      const threadMessages = messagesByThread.get(thread.id) ?? [];
       return {
         id: thread.id,
         lead,
@@ -213,6 +228,8 @@ export function DashboardScreen({ data }: { data: CrmData }) {
         campaign: campaignsById.get(thread.campaign_id) ?? null,
         thread,
         latestMessage,
+        latestInboundMessage: getLatestMessageByDirection(threadMessages, 'inbound'),
+        latestOutboundMessage: getLatestMessageByDirection(threadMessages, 'outbound'),
         sortAt: latestMessage?.created_at ?? thread.updated_at,
       };
     })
@@ -224,6 +241,8 @@ export function DashboardScreen({ data }: { data: CrmData }) {
     campaign: null,
     thread: null,
     latestMessage: null,
+    latestInboundMessage: null,
+    latestOutboundMessage: null,
     sortAt: lead.updated_at,
   }));
   const mostRecentConversation = [...data.conversationMessages].sort(
@@ -419,6 +438,32 @@ export function DashboardScreen({ data }: { data: CrmData }) {
   }, [activeCampaigns, leadOnlyRows, meetingStage?.id, messagesByThread, operationalRows, qualifiedStage?.id]);
 
   const activeShortcut = operationalShortcuts.find((shortcut) => shortcut.key === activeShortcutKey) ?? null;
+  const previewRow = activeShortcut?.rows[0] ?? null;
+  const primaryInsight = strategicInsights[2] ?? null;
+  const secondaryInsights = strategicInsights.slice(0, 2);
+  const shortcutGroups = [
+    {
+      id: 'act-now',
+      title: 'Agir agora',
+      description: 'Pendências e sinais que devem orientar a próxima ação comercial do SDR.',
+      items: operationalShortcuts.filter((shortcut) =>
+        ['no_response', 'secondary_follow_up', 'risk', 'positive'].includes(shortcut.key),
+      ),
+    },
+    {
+      id: 'pipeline',
+      title: 'Pipeline e aprendizado',
+      description: 'Leituras para avançar oportunidades, revisar playbooks e consolidar o funil.',
+      items: operationalShortcuts.filter((shortcut) =>
+        ['qualified', 'meeting', 'active_campaigns', 'negative'].includes(shortcut.key),
+      ),
+    },
+  ];
+
+  function openLeadConversation(row: OperationLeadRow) {
+    setActiveShortcutKey(null);
+    onOpenLeadConversation(row.lead.id, row.campaign?.id ?? row.thread?.campaign_id ?? null);
+  }
 
   return (
     <section className="stack">
@@ -430,6 +475,11 @@ export function DashboardScreen({ data }: { data: CrmData }) {
             {data.workspace.name} mostra volume, gargalos, respostas e sinais de conversão para orientar o próximo bloco de
             operação do SDR.
           </p>
+          <div className="dashboard-context-row">
+            <span className="dashboard-context-chip">{formatLeadCount(data.leads.length)} no workspace</span>
+            <span className="dashboard-context-chip">{data.conversationThreads.length} conversa(s) monitoradas</span>
+            <span className="dashboard-context-chip">{activeCampaigns} campanha(s) ativa(s)</span>
+          </div>
           <div className="dashboard-hero-actions">
             <button type="button" onClick={() => setDiagnosticOpen(true)}>
               <BookOpen aria-hidden />
@@ -441,25 +491,38 @@ export function DashboardScreen({ data }: { data: CrmData }) {
             </button>
           </div>
         </div>
-        <div className="dashboard-hero-highlights">
-          <div>
-            <small>Próxima leitura útil</small>
-            <strong>{bottleneck ? `Priorizar ${bottleneck.stage.name}` : 'Crie leads para iniciar a leitura'}</strong>
-          </div>
-          <div>
-            <small>Status do contato</small>
-            <strong>{leadsInContact} lead(s) em tentativa ativa</strong>
-          </div>
-          <div>
-            <small>Último sinal de conversa</small>
-            <strong>{mostRecentConversation ? formatDateTime(mostRecentConversation.created_at) : 'Sem conversa registrada'}</strong>
+        <div className="dashboard-hero-side">
+          {primaryInsight && (
+            <article className="dashboard-priority-card">
+              <div className="dashboard-priority-head">
+                <span className="dashboard-priority-kicker">{primaryInsight.title}</span>
+                <Sparkles aria-hidden />
+              </div>
+              <strong>{primaryInsight.value}</strong>
+              <p>{primaryInsight.detail}</p>
+              <span className="dashboard-priority-note">Decisão principal do cockpit para a próxima rodada da demo.</span>
+            </article>
+          )}
+          <div className="dashboard-hero-highlights">
+            <div className="dashboard-highlight-card dashboard-highlight-card-focus">
+              <small>Próxima leitura útil</small>
+              <strong>{bottleneck ? `Priorizar ${bottleneck.stage.name}` : 'Crie leads para iniciar a leitura'}</strong>
+            </div>
+            <div className="dashboard-highlight-card dashboard-highlight-card-contact">
+              <small>Status do contato</small>
+              <strong>{leadsInContact} lead(s) em tentativa ativa</strong>
+            </div>
+            <div className="dashboard-highlight-card dashboard-highlight-card-timeline">
+              <small>Último sinal de conversa</small>
+              <strong>{mostRecentConversation ? formatDateTime(mostRecentConversation.created_at) : 'Sem conversa registrada'}</strong>
+            </div>
           </div>
         </div>
       </section>
 
       {!insightsCollapsed && (
         <section className="dashboard-insight-strip">
-          {strategicInsights.map((insight) => (
+          {secondaryInsights.map((insight) => (
             <article key={insight.title} className="strategic-insight-card">
               <span>{insight.title}</span>
               <strong>{insight.value}</strong>
@@ -469,32 +532,45 @@ export function DashboardScreen({ data }: { data: CrmData }) {
         </section>
       )}
 
-      <div className="metric-grid metric-grid-large">
-        <Metric
-          icon={Users}
-          label="Leads no workspace"
-          value={data.leads.length}
-          helper="Volume total disponível para qualificação."
-        />
-        <Metric
-          icon={Send}
-          label="Envios do SDR"
-          value={realOutboundCount}
-          helper={`${outboundMessages} mensagem(ns) outbound no histórico conversacional.`}
-        />
-        <Metric
-          icon={MessageCircleReply}
-          label="Respostas do cliente"
-          value={realInboundCount}
-          helper={`${threadsWithInbound} conversa(s) com resposta e ${followUpPendingThreads} aguardando follow-up ou retorno.`}
-        />
-        <Metric
-          icon={Target}
-          label="Conversas com avanço"
-          value={formatPercent(positiveRate)}
-          helper={`${meetings + qualified} lead(s) já chegaram em qualificação ou reunião (${formatPercent(advancedRate)} do volume total).`}
-        />
-      </div>
+      <section className="panel dashboard-metrics-panel">
+        <div className="panel-heading">
+          <div>
+            <span className="section-kicker">Pulso do workspace</span>
+            <h2>Métricas de acompanhamento</h2>
+          </div>
+          <span className="panel-meta">Leitura secundária para validar volume, resposta e avanço real.</span>
+        </div>
+        <div className="metric-grid metric-grid-large">
+          <Metric
+            icon={Users}
+            label="Leads no workspace"
+            value={data.leads.length}
+            helper="Volume total disponível para qualificação."
+            className="metric-subtle"
+          />
+          <Metric
+            icon={Send}
+            label="Envios do SDR"
+            value={realOutboundCount}
+            helper={`${outboundMessages} mensagem(ns) outbound no histórico conversacional.`}
+            className="metric-subtle"
+          />
+          <Metric
+            icon={MessageCircleReply}
+            label="Respostas do cliente"
+            value={realInboundCount}
+            helper={`${threadsWithInbound} conversa(s) com resposta e ${followUpPendingThreads} aguardando follow-up ou retorno.`}
+            className="metric-subtle"
+          />
+          <Metric
+            icon={Target}
+            label="Conversas com avanço"
+            value={formatPercent(positiveRate)}
+            helper={`${meetings + qualified} lead(s) já chegaram em qualificação ou reunião (${formatPercent(advancedRate)} do volume total).`}
+            className="metric-subtle"
+          />
+        </div>
+      </section>
 
       <section className="panel dashboard-shortcuts-panel">
         <div className="panel-heading">
@@ -504,29 +580,44 @@ export function DashboardScreen({ data }: { data: CrmData }) {
           </div>
           <span className="panel-meta">Abra uma categoria para ver leads, campanhas, última mensagem e ação recomendada.</span>
         </div>
-        <div className="dashboard-shortcut-grid">
-          {operationalShortcuts.map((shortcut) => {
-            const Icon = shortcut.icon;
-            return (
-              <button
-                key={shortcut.key}
-                type="button"
-                className={`dashboard-shortcut-card dashboard-shortcut-card-${shortcut.tone}`}
-                onClick={() => setActiveShortcutKey(shortcut.key)}
-              >
-                <span className="dashboard-shortcut-icon" aria-hidden>
-                  <Icon />
-                </span>
-                <span className="dashboard-shortcut-copy">
-                  <small>{shortcut.meta}</small>
-                  <strong>{shortcut.title}</strong>
-                  <span>{shortcut.description}</span>
-                </span>
-                <span className="dashboard-shortcut-total">{shortcut.value}</span>
-                <ChevronRight className="dashboard-shortcut-chevron" aria-hidden />
-              </button>
-            );
-          })}
+        <div className="dashboard-shortcut-groups">
+          {shortcutGroups.map((group) => (
+            <section
+              key={group.id}
+              className={`dashboard-shortcut-group ${group.id === 'act-now' ? 'dashboard-shortcut-group-urgent' : 'dashboard-shortcut-group-pipeline'}`}
+            >
+              <div className="dashboard-shortcut-group-heading">
+                <div>
+                  <strong>{group.title}</strong>
+                  <p>{group.description}</p>
+                </div>
+              </div>
+              <div className="dashboard-shortcut-grid">
+                {group.items.map((shortcut) => {
+                  const Icon = shortcut.icon;
+                  return (
+                    <button
+                      key={shortcut.key}
+                      type="button"
+                      className={`dashboard-shortcut-card dashboard-shortcut-card-${shortcut.tone}`}
+                      onClick={() => setActiveShortcutKey(shortcut.key)}
+                    >
+                      <span className="dashboard-shortcut-icon" aria-hidden>
+                        <Icon />
+                      </span>
+                      <span className="dashboard-shortcut-copy">
+                        <small>{shortcut.meta}</small>
+                        <strong>{shortcut.title}</strong>
+                        <span>{shortcut.description}</span>
+                      </span>
+                      <span className="dashboard-shortcut-total">{shortcut.value}</span>
+                      <ChevronRight className="dashboard-shortcut-chevron" aria-hidden />
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
       </section>
 
@@ -553,7 +644,7 @@ export function DashboardScreen({ data }: { data: CrmData }) {
           </label>
         </div>
         <div className="selected-stage-grid">
-          <article className="selected-stage-card">
+          <article className="selected-stage-card selected-stage-card-primary">
             <span className="section-kicker">Etapa selecionada</span>
             <strong>{selectedStage?.name ?? 'Sem etapa'}</strong>
             <p>{getStageNextAction(selectedStage, selectedStageLeads, selectedStageCampaigns.length > 0)}</p>
@@ -582,7 +673,7 @@ export function DashboardScreen({ data }: { data: CrmData }) {
       </section>
 
       <div className="dashboard-grid">
-        <section className="panel dashboard-funnel-panel">
+        <section className="panel dashboard-funnel-panel dashboard-funnel-panel-primary">
           <div className="panel-heading">
             <div>
               <span className="section-kicker">Funil atual</span>
@@ -611,7 +702,7 @@ export function DashboardScreen({ data }: { data: CrmData }) {
           </div>
         </section>
 
-        <section className="panel activity-panel">
+        <section className="panel activity-panel dashboard-activity-panel">
           <div className="panel-heading">
             <div>
               <span className="section-kicker">Narrativa da operação</span>
@@ -641,7 +732,7 @@ export function DashboardScreen({ data }: { data: CrmData }) {
       </div>
 
       {diagnosticOpen && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="dashboard-diagnostic-title">
+        <div className="modal-backdrop dashboard-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="dashboard-diagnostic-title">
           <section className="chat-modal dashboard-diagnostic-modal">
             <div className="chat-modal-header">
               <div>
@@ -673,7 +764,7 @@ export function DashboardScreen({ data }: { data: CrmData }) {
       )}
 
       {activeShortcut && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="dashboard-operation-title">
+        <div className="modal-backdrop dashboard-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="dashboard-operation-title">
           <section className="chat-modal dashboard-operation-modal">
             <div className="chat-modal-header">
               <div>
@@ -712,9 +803,28 @@ export function DashboardScreen({ data }: { data: CrmData }) {
             <section className="operation-modal-preview">
               <div>
                 <span className="section-kicker">Prévia da conversa</span>
-                <h3>{activeShortcut.rows[0]?.lead.name ?? 'Sem lead para prévia'}</h3>
+                <h3>{previewRow?.lead.name ?? 'Sem lead para prévia'}</h3>
               </div>
-              <p>{getMessagePreview(activeShortcut.rows[0]?.latestMessage ?? null)}</p>
+              {previewRow ? (
+                <>
+                  <div className="operation-message-pair">
+                    <article>
+                      <span>Cliente</span>
+                      <p>{getMessagePreview(previewRow.latestInboundMessage)}</p>
+                    </article>
+                    <article>
+                      <span>SDR</span>
+                      <p>{getMessagePreview(previewRow.latestOutboundMessage)}</p>
+                    </article>
+                  </div>
+                  <button type="button" className="secondary compact" onClick={() => openLeadConversation(previewRow)}>
+                    <MessageCircleReply aria-hidden />
+                    Ver conversa deste lead
+                  </button>
+                </>
+              ) : (
+                <p>Sem conversa registrada nesta categoria.</p>
+              )}
             </section>
 
             {activeShortcut.rows.length === 0 ? (
@@ -732,14 +842,22 @@ export function DashboardScreen({ data }: { data: CrmData }) {
                     <div className="operation-row-main">
                       <strong>{row.lead.name}</strong>
                       <span>{getLeadMetaLine(row.lead)}</span>
-                      <p>{getMessagePreview(row.latestMessage)}</p>
+                      <div className="operation-row-messages">
+                        <p><strong>Cliente:</strong> {getMessagePreview(row.latestInboundMessage)}</p>
+                        <p><strong>SDR:</strong> {getMessagePreview(row.latestOutboundMessage)}</p>
+                      </div>
                     </div>
                     <div className="operation-row-tags">
                       <span>{row.stage?.name ?? 'Sem etapa'}</span>
                       <span>{row.campaign?.name ?? 'Sem campanha'}</span>
                       <span>{getThreadLabel(row.thread)}</span>
                     </div>
-                    <time dateTime={row.sortAt}>{formatDateTime(row.sortAt)}</time>
+                    <div className="operation-row-actions">
+                      <time dateTime={row.sortAt}>{formatDateTime(row.sortAt)}</time>
+                      <button type="button" className="ghost compact" onClick={() => openLeadConversation(row)}>
+                        Ver conversa
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -756,14 +874,16 @@ function Metric({
   label,
   value,
   helper,
+  className,
 }: {
   icon: LucideIcon;
   label: string;
   value: number | string;
   helper: string;
+  className?: string;
 }) {
   return (
-    <article className="metric">
+    <article className={className ? `metric ${className}` : 'metric'}>
       <div className="metric-topline">
         <span>{label}</span>
         <Icon aria-hidden />

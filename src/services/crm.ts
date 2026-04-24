@@ -1,4 +1,5 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
+import { supabaseEnv } from '../lib/supabase';
 import type {
   Campaign,
   ConversationMessage,
@@ -14,6 +15,7 @@ import type {
   WorkspaceCustomField,
   WorkspaceMember,
 } from '../types/domain';
+import { getErrorMessage } from '../utils/error-messages';
 
 export type LeadInput = {
   id?: string;
@@ -24,6 +26,7 @@ export type LeadInput = {
   job_title: string;
   lead_source: string;
   notes: string;
+  technical_owner_name: string;
   assigned_user_id: string | null;
   current_stage_id: string;
   customValues: Record<string, string>;
@@ -35,13 +38,77 @@ export type CampaignInput = {
   context_text: string;
   generation_prompt: string;
   trigger_stage_id: string | null;
+  ai_response_mode: 'always' | 'business_hours';
+  ai_response_window_start: string;
+  ai_response_window_end: string;
   is_active: boolean;
+};
+
+export type StageTriggerAutomationResult = {
+  generatedCampaignNames: string[];
+  skippedCampaignNames: string[];
+  failedCampaigns: Array<{ name: string; error: string }>;
 };
 
 function assertData<T>(data: T | null, error: { message: string } | null): T {
   if (error) throw new Error(error.message);
   if (!data) throw new Error('Operação sem retorno do banco.');
   return data;
+}
+
+export async function invokeAuthenticatedFunction<T>(
+  client: SupabaseClient,
+  name: string,
+  body: Record<string, unknown>,
+): Promise<T> {
+  if (!supabaseEnv) {
+    throw new Error('Supabase não configurado.');
+  }
+
+  const { data, error } = await client.auth.getSession();
+  const token = data.session?.access_token;
+  if (error || !token) {
+    throw new Error('Sessão expirada. Entre novamente.');
+  }
+
+  const response = await fetch(`${supabaseEnv.VITE_SUPABASE_URL.replace(/\/$/, '')}/functions/v1/${name}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      apikey: supabaseEnv.VITE_SUPABASE_ANON_KEY,
+      'content-type': 'application/json',
+      'x-sdr-auth-token': token,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(payload?.error ?? payload?.message ?? `Falha HTTP ${response.status}.`);
+  }
+
+  return payload as T;
+}
+
+export function filterTriggerableCampaigns(params: {
+  campaigns: Campaign[];
+  existingCampaignIds: Set<string>;
+  skipCampaignIds?: string[];
+}): { eligible: Campaign[]; skipped: Campaign[] } {
+  const skipSet = new Set(params.skipCampaignIds ?? []);
+  const eligible: Campaign[] = [];
+  const skipped: Campaign[] = [];
+
+  for (const campaign of params.campaigns) {
+    if (skipSet.has(campaign.id) || params.existingCampaignIds.has(campaign.id)) {
+      skipped.push(campaign);
+      continue;
+    }
+
+    eligible.push(campaign);
+  }
+
+  return { eligible, skipped };
 }
 
 export async function createWorkspaceWithDefaults(client: SupabaseClient, user: User, name: string): Promise<Workspace> {
@@ -67,8 +134,28 @@ export async function getFirstWorkspace(client: SupabaseClient): Promise<Workspa
   return Array.isArray(workspace) ? (workspace[0] ?? null) : (workspace ?? null);
 }
 
+export async function getAccessibleWorkspace(client: SupabaseClient, preferredWorkspaceId?: string | null): Promise<Workspace | null> {
+  if (preferredWorkspaceId) {
+    const { data, error } = await client
+      .from('workspace_members')
+      .select('id, workspace_id, user_id, role, created_at, workspaces(*)')
+      .eq('workspace_id', preferredWorkspaceId)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    const member = data as unknown as WorkspaceMember | null;
+    const workspace = member?.workspaces;
+    const resolved = Array.isArray(workspace) ? (workspace[0] ?? null) : (workspace ?? null);
+    if (resolved) return resolved;
+  }
+
+  return getFirstWorkspace(client);
+}
+
 export async function loadCrmData(client: SupabaseClient, workspace: Workspace): Promise<CrmData> {
   const [
+    workspaceMembersResult,
     stagesResult,
     requiredFieldsResult,
     customFieldsResult,
@@ -80,6 +167,7 @@ export async function loadCrmData(client: SupabaseClient, workspace: Workspace):
     conversationThreadsResult,
     conversationMessagesResult,
   ] = await Promise.all([
+    client.from('workspace_members').select('*').eq('workspace_id', workspace.id).order('created_at', { ascending: true }),
     client.from('pipeline_stages').select('*').eq('workspace_id', workspace.id).order('position', { ascending: true }),
     client.from('stage_required_fields').select('*').eq('workspace_id', workspace.id),
     client.from('workspace_custom_fields').select('*').eq('workspace_id', workspace.id).order('created_at', { ascending: true }),
@@ -93,6 +181,7 @@ export async function loadCrmData(client: SupabaseClient, workspace: Workspace):
   ]);
 
   for (const result of [
+    workspaceMembersResult,
     stagesResult,
     requiredFieldsResult,
     customFieldsResult,
@@ -107,8 +196,25 @@ export async function loadCrmData(client: SupabaseClient, workspace: Workspace):
     if (result.error) throw new Error(result.error.message);
   }
 
+  const workspaceMembers = (workspaceMembersResult.data ?? []) as WorkspaceMember[];
+  const memberIds = [...new Set(workspaceMembers.map((member) => member.user_id))];
+  const profilesById = new Map<string, string | null>();
+
+  if (memberIds.length > 0) {
+    const { data: profiles, error: profilesError } = await client.from('profiles').select('id, full_name').in('id', memberIds);
+    if (profilesError) throw new Error(profilesError.message);
+
+    for (const profile of profiles ?? []) {
+      profilesById.set(profile.id, profile.full_name ?? null);
+    }
+  }
+
   return {
     workspace,
+    workspaceMembers: workspaceMembers.map((member) => ({
+      ...member,
+      profile_full_name: profilesById.get(member.user_id) ?? null,
+    })),
     stages: (stagesResult.data ?? []) as PipelineStage[],
     requiredFields: (requiredFieldsResult.data ?? []) as StageRequiredField[],
     customFields: (customFieldsResult.data ?? []) as WorkspaceCustomField[],
@@ -132,6 +238,7 @@ export async function upsertLead(
     workspace_id: workspace.id,
     current_stage_id: input.current_stage_id,
     assigned_user_id: input.assigned_user_id || null,
+    technical_owner_name: input.technical_owner_name.trim() || null,
     name: input.name.trim(),
     email: input.email.trim() || null,
     phone: input.phone.trim() || null,
@@ -226,6 +333,9 @@ export async function upsertCampaign(
     context_text: input.context_text.trim(),
     generation_prompt: input.generation_prompt.trim(),
     trigger_stage_id: input.trigger_stage_id || null,
+    ai_response_mode: input.ai_response_mode,
+    ai_response_window_start: input.ai_response_window_start,
+    ai_response_window_end: input.ai_response_window_end,
     is_active: input.is_active,
     created_by: user.id,
     updated_at: new Date().toISOString(),
@@ -246,4 +356,88 @@ export async function moveLead(client: SupabaseClient, workspaceId: string, lead
     .eq('workspace_id', workspaceId)
     .eq('id', leadId);
   if (error) throw new Error(error.message);
+}
+
+export async function runStageTriggerAutomation(
+  client: SupabaseClient,
+  params: {
+    workspaceId: string;
+    leadId: string;
+    stageId: string;
+    skipCampaignIds?: string[];
+  },
+): Promise<StageTriggerAutomationResult> {
+  const { data: campaigns, error: campaignsError } = await client
+    .from('campaigns')
+    .select('*')
+    .eq('workspace_id', params.workspaceId)
+    .eq('trigger_stage_id', params.stageId)
+    .eq('is_active', true)
+    .order('updated_at', { ascending: false });
+
+  if (campaignsError) throw new Error(campaignsError.message);
+
+  const activeCampaigns = (campaigns ?? []) as Campaign[];
+  if (activeCampaigns.length === 0) {
+    return {
+      generatedCampaignNames: [],
+      skippedCampaignNames: [],
+      failedCampaigns: [],
+    };
+  }
+
+  const campaignIds = activeCampaigns.map((campaign) => campaign.id);
+  const [generatedMessagesResult, threadsResult] = await Promise.all([
+    client
+      .from('generated_messages')
+      .select('campaign_id')
+      .eq('workspace_id', params.workspaceId)
+      .eq('lead_id', params.leadId)
+      .in('campaign_id', campaignIds),
+    client
+      .from('conversation_threads')
+      .select('campaign_id')
+      .eq('workspace_id', params.workspaceId)
+      .eq('lead_id', params.leadId)
+      .in('campaign_id', campaignIds),
+  ]);
+
+  if (generatedMessagesResult.error) throw new Error(generatedMessagesResult.error.message);
+  if (threadsResult.error) throw new Error(threadsResult.error.message);
+
+  const existingCampaignIds = new Set<string>([
+    ...(generatedMessagesResult.data ?? []).map((row) => row.campaign_id),
+    ...(threadsResult.data ?? []).map((row) => row.campaign_id),
+  ]);
+
+  const { eligible, skipped } = filterTriggerableCampaigns({
+    campaigns: activeCampaigns,
+    existingCampaignIds,
+    skipCampaignIds: params.skipCampaignIds,
+  });
+
+  const generatedCampaignNames: string[] = [];
+  const failedCampaigns: Array<{ name: string; error: string }> = [];
+
+  for (const campaign of eligible) {
+    try {
+      await invokeAuthenticatedFunction(client, 'generate-lead-messages', {
+        workspace_id: params.workspaceId,
+        lead_id: params.leadId,
+        campaign_id: campaign.id,
+      });
+      generatedCampaignNames.push(campaign.name);
+    } catch (error) {
+      failedCampaigns.push({
+        name: campaign.name,
+        error: getErrorMessage(error, 'ai'),
+      });
+    }
+  }
+
+  return {
+    generatedCampaignNames,
+    skippedCampaignNames: skipped.map((campaign) => campaign.name),
+    failedCampaigns,
+  };
 }

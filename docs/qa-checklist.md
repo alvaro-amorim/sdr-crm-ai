@@ -2,98 +2,118 @@
 
 ## Fase atual
 
-Base funcional do MVP criada com frontend React, schema Supabase, RLS, Edge Functions de IA, simulador público por token e testes de regras puras.
+Base funcional do MVP criada com frontend React, schema Supabase, RLS, Edge Functions de IA, simulador publico por token e seeds tecnicos separados por finalidade.
 
 ## Testes automatizados
 
 - `npm run test`
-  - valida erro seguro quando env pública está ausente
-  - valida env pública correta
-  - valida `field_key` seguro
-  - valida bloqueio por campo padrão obrigatório ausente
-  - valida bloqueio por campo personalizado obrigatório ausente
-  - valida transição quando obrigatórios estão preenchidos
+  - valida utilitarios, regras puras e leitura de cenarios;
 - `npm run test:smoke:crm`
-  - autentica com um usuário real de teste
-  - cria ou reutiliza o workspace dedicado `Operação SDR Demo`
-  - limpa o workspace demo antes de reseedar
-  - cria campos personalizados e regras por etapa
-  - cria 100 leads com nomes, empresas, cargos, canais e estágios variados
-  - cria 4 campanhas oficiais da demonstração
-  - executa Onda 1 e Onda 2 com conversas geradas por OpenAI real
-  - semeia `conversation_threads`, `conversation_messages`, `generated_messages`, `sent_message_events` e tokens do simulador
-  - valida volume mínimo de 75 conversas e pelo menos 220 mensagens quando `SMOKE_WAVE=all`
-  - deixa a interface pronta para avaliação com múltiplos estados operacionais
+  - autentica um usuario real de teste;
+  - cria ou reutiliza um workspace leve e reexecutavel;
+  - limpa apenas os dados do workspace do smoke;
+  - cria 3 leads fixos, 1 campanha fixa e 1 conversa seeded sem IA;
+  - deixa o app pronto para navegacao minima do avaliador;
+- `npm run scenario:evaluation:crm`
+  - autentica um usuario real de teste;
+  - cria ou reutiliza um workspace pesado de avaliacao;
+  - cria 100 leads, 4 campanhas e ate 75 conversas com IA real;
+  - persiste `conversation_threads`, `conversation_messages`, `generated_messages`, `sent_message_events` e tokens do simulador.
+
+## Painel auxiliar do avaliador
+
+- rota: `/__evaluation`
+- uso previsto:
+  - preparar rapidamente o workspace atual do avaliador para navegacao;
+  - evitar cadastro manual durante a avaliacao;
+  - resetar apenas os dados seeded de apoio do avaliador.
+- isolamento:
+  - fora da navegacao principal;
+  - visivel localmente por padrao;
+  - em ambiente remoto, so com `VITE_ENABLE_EVALUATION_PANEL=true`.
+- acoes disponiveis:
+  - gerar leads de exemplo
+  - criar campanha de exemplo
+  - popular cenario basico de avaliacao
+  - resetar dados de avaliacao
+- o painel nao usa IA para gerar os dados.
+
+## Convencao dos seeds
+
+### Smoke real
+
+- usa um workspace leve dedicado;
+- nome padrao: `Operacao SDR Smoke`;
+- nao depende de IA;
+- serve para subir um ambiente minimo e rapido.
+
+### Cenario de avaliacao
+
+- usa um workspace pesado dedicado;
+- nome padrao: `Operacao SDR Avaliacao`;
+- pode usar OpenAI local ou a Edge Function autenticada `generate-evaluation-conversation`;
+- serve para avaliacao tecnica com volume operacional alto.
+
+## Variaveis locais
+
+Minimo obrigatorio:
+
+- `TEST_USER_EMAIL`
+- `TEST_USER_PASSWORD`
+
+Opcionais do smoke leve:
+
+- `SMOKE_WORKSPACE_NAME`
+- `SMOKE_PUBLIC_BASE_URL`
+
+Opcionais do cenario pesado:
+
+- `OPENAI_API_KEY`
+- `EVALUATION_WORKSPACE_NAME`
+- `EVALUATION_PUBLIC_BASE_URL`
+- `EVALUATION_WAVE`
+- `EVALUATION_THREAD_LIMIT`
+- `EVALUATION_AI_DELAY_MS`
 
 ## Testes manuais previstos
 
 1. Auth
-   - Criar conta com e-mail fictício.
-   - Confirmar que o cadastro exige senha e confirmação de senha iguais.
-   - Confirmar que os campos de senha permitem revelar/ocultar o valor digitado.
-   - Confirmar que o app exibe orientação de verificação de e-mail após cadastro.
-   - Usar `Esqueci a senha` e confirmar envio de link seguro.
-   - Abrir link de recuperação e definir nova senha.
-   - Entrar com Google OAuth após configurar provider no Supabase.
-   - Entrar e sair.
-   - Confirmar que rota interna não aparece sem sessão.
-
+   - criar conta;
+   - validar login tradicional;
+   - validar Google OAuth;
+   - validar recuperacao de senha.
 2. Workspace
-   - Criar workspace.
-   - Confirmar criação das etapas padrão.
-   - Confirmar que a RPC `create_workspace_with_defaults` foi aplicada.
-   - Confirmar que dados carregados pertencem ao workspace atual.
-
+   - criar workspace;
+   - confirmar funil padrao e membership do owner.
 3. Leads
-   - Criar lead com nome mínimo.
-   - Editar lead sem perder dados.
-   - Criar campo personalizado e salvar valor no lead.
-
+   - criar e editar lead;
+   - validar campos personalizados.
 4. Pipeline
-   - Marcar e-mail como obrigatório para `Qualificado`.
-   - Tentar mover lead sem e-mail e confirmar bloqueio.
-   - Preencher e-mail e confirmar movimentação.
-
+   - validar bloqueio por obrigatoriedade;
+   - validar mudanca de etapa.
 5. Campanhas e IA
-   - Criar campanha ativa.
-   - Selecionar lead e campanha.
-   - Gerar mensagens com Edge Function configurada.
-   - Simular envio e confirmar mudança para `Tentando Contato`.
-
+   - criar campanha;
+   - gerar mensagens;
+   - validar envio simulado.
 6. Dashboard
-   - Confirmar contagens reais de leads por etapa.
-   - Confirmar estado vazio sem erro.
+   - validar contagens reais por etapa;
+   - validar estados vazios.
+7. Simulador do cliente
+   - abrir o link do simulador;
+   - responder como cliente;
+   - validar persistencia da conversa.
+8. Painel auxiliar
+   - abrir `/__evaluation`;
+   - preparar o cenario basico;
+   - validar que os atalhos abrem o app principal no workspace atual da sessao;
+   - validar que o atalho `Abrir chat como cliente` aparece quando a conversa seeded existir;
+   - resetar apenas os dados seeded sem afetar outros dados do workspace.
 
-7. Navegação mobile
-   - Confirmar que o menu lateral abre via botão `Menu`.
-   - Confirmar que o menu fecha ao tocar fora, ao fechar manualmente e ao trocar de aba.
-   - Confirmar que campos de senha mantêm reveal sem quebrar a largura do input.
+## Revisao de seguranca
 
-8. Simulador do cliente
-   - Entrar em `Mensagens IA`.
-   - Abrir o atalho `Abrir janela do cliente`.
-   - Responder como cliente na nova janela.
-   - Confirmar que a próxima resposta da IA aparece no chat.
-   - Voltar ao CRM, atualizar e confirmar que a conversa foi persistida.
-
-## Convenção do smoke realista
-
-- O smoke usa um workspace dedicado para demonstração.
-- O nome padrão é `Operação SDR Demo`, mas pode ser sobrescrito por `SMOKE_WORKSPACE_NAME`.
-- O script foi desenhado para ser reexecutável no mesmo perfil de teste sem contaminar outros workspaces.
-- Para a validação final, use um usuário limpo e confirmado no Supabase Auth antes de rodar `npm run test:smoke:crm`.
-- As credenciais do usuário de teste e a chave OpenAI local devem ficar apenas no `.env.local`:
-  - `TEST_USER_EMAIL`
-  - `TEST_USER_PASSWORD`
-  - `OPENAI_API_KEY` local opcional; se ausente, o smoke usa a Edge Function autenticada `generate-smoke-conversation`.
-- Não use aspas nos valores do `.env.local`; o script lê os valores literalmente.
-
-## Revisão de segurança
-
-- `.env*` ignorados no Git.
-- `.env.example` não contém segredos reais.
-- Service role restrita a Edge Functions.
-- RLS adicionada nas tabelas funcionais.
-- Edge Functions autenticadas validam usuário e membership antes de acessar dados internos.
-- O simulador público acessa apenas uma conversa específica via token temporário, sem expor o workspace inteiro.
-- O simulador público resolve e grava mensagens por RPC `security definer` usando o hash do token como autorização, sem depender de service role no cliente público.
+- `.env*` ignorados no Git;
+- `.env.example` sem segredos reais;
+- service role restrita a Edge Functions;
+- RLS ativa nas tabelas principais;
+- simulador publico limitado a thread especifica por token;
+- seeds limpam apenas dados marcados como avaliacao/smoke e nao removem workspaces normais inteiros.

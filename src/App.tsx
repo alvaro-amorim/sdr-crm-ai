@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  ExternalLink,
   KeyRound,
   LayoutDashboard,
   LogOut,
@@ -28,18 +29,22 @@ import {
 } from 'lucide-react';
 import { DashboardScreen } from './components/dashboard-screen';
 import { ClientSimulatorScreen } from './components/client-simulator-screen';
-import { MessagesScreen } from './components/messages-screen';
+import { EvaluationPanelScreen } from './components/evaluation-panel-screen';
+import { MessagesScreen, type MessageFocusTarget } from './components/messages-screen';
 import { envError, supabase, supabaseEnv } from './lib/supabase';
 import {
   createWorkspaceWithDefaults,
-  getFirstWorkspace,
+  getAccessibleWorkspace,
+  invokeAuthenticatedFunction as invokeEdgeFunction,
   loadCrmData,
   moveLead,
+  runStageTriggerAutomation,
   saveRequiredFields,
   upsertCampaign,
   upsertLead,
   type CampaignInput,
   type LeadInput,
+  type StageTriggerAutomationResult,
 } from './services/crm';
 import type {
   Campaign,
@@ -48,9 +53,11 @@ import type {
   PipelineStage,
 } from './types/domain';
 import { getLeadMetaLine } from './utils/crm-ui';
+import { getAuthErrorMessage, getErrorMessage, type ErrorMessageScope } from './utils/error-messages';
+import { isEvaluationPanelEnabled, parseAppNavigation, type AppTab } from './utils/evaluation-panel';
+import { buildLeadStageDecisionNotice, type LeadStageDecision } from './utils/lead-stage-action';
 import { createFieldKey, findMissingRequiredFields, STANDARD_LEAD_FIELDS } from './utils/pipeline';
-
-type Tab = 'dashboard' | 'leads' | 'fields' | 'campaigns' | 'messages';
+import { buildStageAutomationErrorWarning, buildStageAutomationFeedback } from './utils/stage-automation-feedback';
 
 const emptyLeadInput: LeadInput = {
   name: '',
@@ -60,6 +67,7 @@ const emptyLeadInput: LeadInput = {
   job_title: '',
   lead_source: '',
   notes: '',
+  technical_owner_name: '',
   assigned_user_id: null,
   current_stage_id: '',
   customValues: {},
@@ -70,6 +78,9 @@ const emptyCampaignInput: CampaignInput = {
   context_text: '',
   generation_prompt: '',
   trigger_stage_id: null,
+  ai_response_mode: 'always',
+  ai_response_window_start: '09:00',
+  ai_response_window_end: '18:00',
   is_active: true,
 };
 
@@ -110,10 +121,30 @@ function derivePlanFromCampaign(campaign: Campaign | null): CampaignStrategyPlan
   };
 }
 
-function getSafeMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Falha inesperada. Tente novamente.';
+function getSafeMessage(error: unknown, scope: ErrorMessageScope = 'general'): string {
+  return getErrorMessage(error, scope);
 }
 
+function getWorkspaceMemberDisplayName(member: CrmData['workspaceMembers'][number], user?: User): string {
+  const profileName = member.profile_full_name?.trim();
+  if (profileName) return profileName;
+
+  const metadataName = typeof user?.user_metadata?.full_name === 'string' ? user.user_metadata.full_name.trim() : '';
+  if (user && member.user_id === user.id) {
+    return metadataName || user.email || 'Você';
+  }
+
+  return member.role === 'owner' ? 'Owner do workspace' : 'Membro do workspace';
+}
+
+function getAssignedWorkspaceOwnerLabel(lead: Lead, data: CrmData, user?: User): string | null {
+  if (!lead.assigned_user_id) return null;
+  const member = data.workspaceMembers.find((item) => item.user_id === lead.assigned_user_id);
+  if (!member) return 'Usuário do workspace';
+  return getWorkspaceMemberDisplayName(member, user);
+}
+
+/*
 async function invokeAuthenticatedFunction<T>(name: string, body: Record<string, unknown>): Promise<T> {
   if (!supabase || !supabaseEnv) {
     throw new Error('Supabase não configurado.');
@@ -143,6 +174,7 @@ async function invokeAuthenticatedFunction<T>(name: string, body: Record<string,
 
   return payload as T;
 }
+*/
 
 function getAuthRedirectTo(): string {
   return window.location.origin;
@@ -172,16 +204,29 @@ function clearAuthCallbackUrl() {
 }
 
 export default function App() {
+  const navigation = useMemo(() => parseAppNavigation(window.location.search), []);
   const [session, setSession] = useState<Session | null>(null);
   const [data, setData] = useState<CrmData | null>(null);
-  const [tab, setTab] = useState<Tab>('dashboard');
+  const [tab, setTab] = useState<AppTab>(navigation.tab);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [messageFocusTarget, setMessageFocusTarget] = useState<MessageFocusTarget | null>(null);
+  const isClientSimulatorRoute = window.location.pathname === '/client-simulator';
+  const isEvaluationRoute = window.location.pathname === '/__evaluation';
+  const evaluationPanelEnabled = isEvaluationPanelEnabled(
+    supabaseEnv?.VITE_ENABLE_EVALUATION_PANEL ?? false,
+    window.location.hostname,
+  );
 
   useEffect(() => {
+    if (isClientSimulatorRoute) {
+      setLoading(false);
+      return;
+    }
+
     if (!supabase) {
       setLoading(false);
       return;
@@ -193,7 +238,7 @@ export default function App() {
     async function initializeSession() {
       const callbackError = readAuthCallbackError();
       if (callbackError) {
-        setError(`Falha no login OAuth: ${callbackError}`);
+        setError(getAuthErrorMessage(new Error(callbackError)));
         clearAuthCallbackUrl();
       }
 
@@ -202,7 +247,7 @@ export default function App() {
         const { data: exchangedData, error: exchangeError } = await supabaseClient.auth.exchangeCodeForSession(code);
         clearAuthCallbackUrl();
         if (exchangeError) {
-          setError(`Falha ao concluir login OAuth: ${exchangeError.message}`);
+          setError(getAuthErrorMessage(exchangeError));
         } else if (!cancelled) {
           setSession(exchangedData.session);
         }
@@ -217,7 +262,7 @@ export default function App() {
 
     void initializeSession().catch((sessionError: unknown) => {
       if (!cancelled) {
-        setError(getSafeMessage(sessionError));
+        setError(getAuthErrorMessage(sessionError));
         setLoading(false);
       }
     });
@@ -238,29 +283,52 @@ export default function App() {
       cancelled = true;
       subscription.subscription.unsubscribe();
     };
-  }, []);
+  }, [isClientSimulatorRoute]);
 
   const reloadData = useCallback(async () => {
-    if (!supabase || !session?.user) return;
+    if (isClientSimulatorRoute || isEvaluationRoute || !supabase || !session?.user) return;
     setBusy(true);
     setError(null);
     try {
-      const workspace = await getFirstWorkspace(supabase);
+      const workspace = await getAccessibleWorkspace(supabase, navigation.workspaceId);
       if (!workspace) {
         setData(null);
         return;
       }
       setData(await loadCrmData(supabase, workspace));
     } catch (loadError) {
-      setError(getSafeMessage(loadError));
+      setError(getSafeMessage(loadError, 'workspace'));
     } finally {
       setBusy(false);
     }
-  }, [session?.user]);
+  }, [isClientSimulatorRoute, isEvaluationRoute, navigation.workspaceId, session?.user]);
 
   useEffect(() => {
+    if (isEvaluationRoute) return;
     void reloadData();
-  }, [reloadData]);
+  }, [isEvaluationRoute, reloadData]);
+
+  useEffect(() => {
+    if (isClientSimulatorRoute || isEvaluationRoute) return;
+
+    function handleSimulatorUpdate(event: StorageEvent) {
+      if (event.key !== 'sdr-simulator-conversation-updated' || !event.newValue) return;
+
+      try {
+        const payload = JSON.parse(event.newValue) as { workspaceId?: string; stageDecision?: LeadStageDecision | null };
+        if (data?.workspace.id && payload.workspaceId !== data.workspace.id) return;
+        const stageNotice = buildLeadStageDecisionNotice(payload.stageDecision);
+        setNotice(stageNotice ?? 'Conversa atualizada pelo simulador do cliente.');
+        void reloadData();
+      } catch {
+        setNotice('Conversa atualizada pelo simulador do cliente.');
+        void reloadData();
+      }
+    }
+
+    window.addEventListener('storage', handleSimulatorUpdate);
+    return () => window.removeEventListener('storage', handleSimulatorUpdate);
+  }, [data?.workspace.id, isClientSimulatorRoute, isEvaluationRoute, reloadData]);
 
   async function handleCreateWorkspace(name: string) {
     if (!supabase || !session?.user) return;
@@ -271,13 +339,22 @@ export default function App() {
       setData(await loadCrmData(supabase, workspace));
       setNotice('Workspace criado com funil padrão.');
     } catch (workspaceError) {
-      setError(getSafeMessage(workspaceError));
+      setError(getSafeMessage(workspaceError, 'workspace'));
     } finally {
       setBusy(false);
     }
   }
 
-  if (window.location.pathname === '/client-simulator') {
+  function openLeadConversation(leadId: string, campaignId?: string | null) {
+    setMessageFocusTarget({
+      leadId,
+      campaignId: campaignId ?? null,
+      nonce: Date.now(),
+    });
+    setTab('messages');
+  }
+
+  if (isClientSimulatorRoute) {
     return <ClientSimulatorScreen />;
   }
 
@@ -289,12 +366,22 @@ export default function App() {
     return <FullPageState title="Carregando sessão" />;
   }
 
+  if (isEvaluationRoute && !evaluationPanelEnabled) {
+    return (
+      <SetupError message="O painel auxiliar de avaliação está desabilitado neste ambiente. Ative VITE_ENABLE_EVALUATION_PANEL=true ou use localhost." />
+    );
+  }
+
   if (!session) {
     return <AuthScreen authError={error} />;
   }
 
   if (passwordRecovery) {
     return <PasswordRecoveryScreen onDone={() => setPasswordRecovery(false)} />;
+  }
+
+  if (isEvaluationRoute) {
+    return <EvaluationPanelScreen user={session.user} preferredWorkspaceId={navigation.workspaceId} />;
   }
 
   if (!data) {
@@ -318,9 +405,9 @@ export default function App() {
         setNotice(null);
         setError(null);
       }} />
-      <OperationGuide tab={tab} />
+      <OperationGuide tab={tab} userId={session.user.id} workspaceId={data.workspace.id} />
 
-      {tab === 'dashboard' && <Dashboard data={data} />}
+      {tab === 'dashboard' && <Dashboard data={data} onOpenLeadConversation={openLeadConversation} />}
       {tab === 'leads' && (
         <LeadsView
           data={data}
@@ -349,6 +436,7 @@ export default function App() {
           onReload={reloadData}
           setError={setError}
           setNotice={setNotice}
+          focusTarget={messageFocusTarget}
         />
       )}
     </Shell>
@@ -376,6 +464,17 @@ function FullPageState({ title }: { title: string }) {
         <h1>{title}</h1>
       </section>
     </main>
+  );
+}
+
+function GoogleIcon() {
+  return (
+    <svg className="google-mark" viewBox="0 0 24 24" aria-hidden>
+      <path fill="#4285F4" d="M21.6 12.23c0-.74-.07-1.45-.19-2.13H12v4.03h5.38a4.6 4.6 0 0 1-1.99 3.02v2.51h3.22c1.89-1.74 2.99-4.3 2.99-7.43Z" />
+      <path fill="#34A853" d="M12 22c2.7 0 4.96-.89 6.61-2.34l-3.22-2.51c-.9.6-2.04.95-3.39.95-2.6 0-4.81-1.76-5.6-4.12H3.07v2.59A9.98 9.98 0 0 0 12 22Z" />
+      <path fill="#FBBC05" d="M6.4 13.98a6 6 0 0 1 0-3.96V7.43H3.07a10.01 10.01 0 0 0 0 9.14l3.33-2.59Z" />
+      <path fill="#EA4335" d="M12 5.9c1.47 0 2.78.5 3.82 1.5l2.86-2.86A9.6 9.6 0 0 0 12 2a9.98 9.98 0 0 0-8.93 5.43l3.33 2.59C7.19 7.66 9.4 5.9 12 5.9Z" />
+    </svg>
   );
 }
 
@@ -442,9 +541,41 @@ function AuthScreen({ authError }: { authError?: string | null }) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<'form' | 'google' | null>(null);
   const [error, setError] = useState<string | null>(authError ?? null);
   const [success, setSuccess] = useState<string | null>(null);
+  const busy = busyAction !== null;
+  const authHighlights = [
+    {
+      title: 'Workspace isolado',
+      description: 'Leads, campanhas e mensagens separados por operação para demonstrar controle real do CRM.',
+      icon: Building2,
+    },
+    {
+      title: 'Funil orientado à ação',
+      description: 'Qualifique leads, mova etapas com regra e acompanhe a cadência comercial em um só lugar.',
+      icon: Workflow,
+    },
+    {
+      title: 'Mensagens e simulador',
+      description: 'Gere mensagens com IA, simule o cliente e mostre o fluxo completo da prova técnica.',
+      icon: Bot,
+    },
+  ] as const;
+  const authSignals = [
+    {
+      value: 'Fluxo guiado',
+      label: 'Cinco etapas claras para demonstrar o CRM sem improviso.',
+    },
+    {
+      value: 'Simulador real',
+      label: 'Cliente, IA e histórico aparecem em tempo real na avaliação.',
+    },
+    {
+      value: 'Setup seguro',
+      label: 'Entrar, criar conta e recuperar senha já ficam prontos para demo.',
+    },
+  ] as const;
 
   useEffect(() => {
     setError(authError ?? null);
@@ -467,7 +598,7 @@ function AuthScreen({ authError }: { authError?: string | null }) {
       return;
     }
 
-    setBusy(true);
+    setBusyAction('form');
     setError(null);
     setSuccess(null);
     try {
@@ -497,15 +628,15 @@ function AuthScreen({ authError }: { authError?: string | null }) {
         if (result.error) throw result.error;
       }
     } catch (authError) {
-      setError(getSafeMessage(authError));
+      setError(getAuthErrorMessage(authError));
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
   async function signInWithGoogle() {
     if (!supabase) return;
-    setBusy(true);
+    setBusyAction('google');
     setError(null);
     setSuccess(null);
     try {
@@ -517,20 +648,38 @@ function AuthScreen({ authError }: { authError?: string | null }) {
       });
       if (oauthError) throw oauthError;
     } catch (googleError) {
-      setError(getSafeMessage(googleError));
-      setBusy(false);
+      setError(getAuthErrorMessage(googleError));
+      setBusyAction(null);
     }
   }
 
   return (
     <main className="auth-screen">
       <section className="auth-copy">
-        <span className="eyebrow">SDR Expert</span>
-        <h1>Mini CRM para SDR com mensagens geradas por IA.</h1>
-        <p>Gerencie leads, funil, campanhas e simule abordagens personalizadas com isolamento por workspace.</p>
+        <div className="auth-copy-main">
+          <span className="eyebrow">SDR Expert</span>
+          <h1>Mini CRM para SDR com mensagens geradas por IA.</h1>
+          <p>Gerencie leads, funil, campanhas e simule abordagens personalizadas com isolamento por workspace.</p>
+        </div>
+        <div className="auth-chip-row" aria-label="Destaques do produto">
+          <span className="auth-chip">CRM operacional</span>
+          <span className="auth-chip">Workspace isolado</span>
+          <span className="auth-chip">IA aplicada à prova</span>
+        </div>
+        <div className="auth-signal-grid" aria-label="Leitura rápida da experiência">
+          {authSignals.map((item) => (
+            <article key={item.value} className="auth-signal-card">
+              <strong>{item.value}</strong>
+              <p>{item.label}</p>
+            </article>
+          ))}
+        </div>
       </section>
-      <form className="auth-form" onSubmit={submit}>
-        <div>
+      <form className={`auth-form auth-form-${mode}`} onSubmit={submit}>
+        <div className="auth-form-heading">
+          <span className="auth-form-kicker">
+            {mode === 'login' ? 'Acesso ao workspace' : mode === 'signup' ? 'Cadastro inicial' : 'Recuperação segura'}
+          </span>
           <h2>{mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Criar conta' : 'Recuperar senha'}</h2>
           <p>
             {mode === 'login'
@@ -549,9 +698,9 @@ function AuthScreen({ authError }: { authError?: string | null }) {
               autoComplete="name"
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
-              placeholder="Ex.: Álvaro Amorim ou Marina Teixeira"
+              placeholder="Ex.: Responsável comercial"
             />
-            <span className="field-hint">Use o nome que deve aparecer no perfil. Ex.: Álvaro Amorim ou Marina Teixeira.</span>
+            <span className="field-hint">Use o nome que deve aparecer no perfil. Ex.: Responsável comercial.</span>
           </label>
         )}
         <label htmlFor="email">
@@ -563,10 +712,10 @@ function AuthScreen({ authError }: { authError?: string | null }) {
             autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="Ex.: alvaro@empresa.com ou marina.sdr@startup.com.br"
+            placeholder="Ex.: contato@empresa.com.br"
             required
           />
-          <span className="field-hint">Informe um e-mail válido. Ex.: alvaro@empresa.com ou marina.sdr@startup.com.br.</span>
+          <span className="field-hint">Informe um e-mail válido. Ex.: contato@empresa.com.br.</span>
         </label>
         {mode !== 'forgot' && (
           <PasswordField
@@ -576,8 +725,8 @@ function AuthScreen({ authError }: { authError?: string | null }) {
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="Ex.: Vendas2026! ou Sdr#Operacao9"
-            hint="Crie uma senha forte. Ex.: Vendas2026! ou Sdr#Operacao9."
+            placeholder="Ex.: AcessoSeguro2026!"
+            hint="Crie uma senha forte. Ex.: AcessoSeguro2026!."
           />
         )}
         {mode === 'signup' && (
@@ -588,31 +737,55 @@ function AuthScreen({ authError }: { authError?: string | null }) {
             autoComplete="new-password"
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
-            placeholder="Ex.: Vendas2026! ou Sdr#Operacao9"
-            hint="Repita exatamente a senha criada acima. Ex.: Vendas2026! ou Sdr#Operacao9."
+            placeholder="Ex.: AcessoSeguro2026!"
+            hint="Repita exatamente a senha criada acima. Ex.: AcessoSeguro2026!."
           />
         )}
         {error && <p className="error">{error}</p>}
         {success && <p className="success-text">{success}</p>}
         <button type="submit" disabled={busy}>
-          {busy ? 'Processando...' : mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Cadastrar' : 'Enviar link'}
+          {busyAction === 'form' ? 'Processando...' : mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Cadastrar' : 'Enviar link'}
         </button>
         {mode !== 'forgot' && (
           <button type="button" className="google-button" onClick={signInWithGoogle} disabled={busy}>
-            Entrar com Google
+            <GoogleIcon />
+            {busyAction === 'google' ? 'Abrindo Google...' : 'Entrar com Google'}
           </button>
         )}
+        <p className="auth-form-note">
+          {mode === 'login'
+            ? 'Entre por e-mail ou Google e continue exatamente do ponto em que a operação parou.'
+            : mode === 'signup'
+              ? 'Depois do cadastro, você já pode criar o workspace e iniciar a demonstração do funil.'
+              : 'O link de redefinição leva de volta ao app para atualizar a senha sem fluxo paralelo.'}
+        </p>
         <div className="auth-links">
-          <button type="button" className="ghost" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}>
+          <button type="button" className="ghost" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} disabled={busy}>
             {mode === 'login' ? 'Criar conta' : 'Já tenho conta'}
           </button>
           {mode !== 'signup' && (
-            <button type="button" className="ghost" onClick={() => setMode(mode === 'forgot' ? 'login' : 'forgot')}>
+            <button type="button" className="ghost" onClick={() => setMode(mode === 'forgot' ? 'login' : 'forgot')} disabled={busy}>
               {mode === 'forgot' ? 'Voltar ao login' : 'Esqueci a senha'}
             </button>
           )}
         </div>
       </form>
+      <div className="auth-proof-grid">
+        {authHighlights.map((item) => {
+          const Icon = item.icon;
+          return (
+            <article key={item.title} className="auth-proof-card">
+              <span className="auth-proof-icon" aria-hidden>
+                <Icon />
+              </span>
+              <div>
+                <strong>{item.title}</strong>
+                <p>{item.description}</p>
+              </div>
+            </article>
+          );
+        })}
+      </div>
     </main>
   );
 }
@@ -647,7 +820,7 @@ function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
       setSuccess('Senha atualizada com sucesso.');
       window.setTimeout(onDone, 900);
     } catch (updateError) {
-      setError(getSafeMessage(updateError));
+      setError(getAuthErrorMessage(updateError));
     } finally {
       setBusy(false);
     }
@@ -659,6 +832,10 @@ function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
         <KeyRound aria-hidden />
         <h1>Definir nova senha</h1>
         <p>Crie uma nova senha para continuar acessando o SDR Expert.</p>
+        <div className="setup-panel-note">
+          <strong>Recuperação segura</strong>
+          <p>Assim que a nova senha for salva, o acesso volta ao fluxo normal do CRM sem perder a sessão de redefinição.</p>
+        </div>
         <PasswordField
           id="newPassword"
           name="newPassword"
@@ -666,8 +843,8 @@ function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
           autoComplete="new-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          placeholder="Ex.: NovaSenha2026! ou SDR#AcessoSeguro7"
-          hint="Escolha uma senha nova e forte. Ex.: NovaSenha2026! ou SDR#AcessoSeguro7."
+          placeholder="Ex.: NovaSenhaSegura2026!"
+          hint="Escolha uma senha nova e forte. Ex.: NovaSenhaSegura2026!."
         />
         <PasswordField
           id="confirmNewPassword"
@@ -676,8 +853,8 @@ function PasswordRecoveryScreen({ onDone }: { onDone: () => void }) {
           autoComplete="new-password"
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
-          placeholder="Ex.: NovaSenha2026! ou SDR#AcessoSeguro7"
-          hint="Repita a mesma senha digitada acima. Ex.: NovaSenha2026! ou SDR#AcessoSeguro7."
+          placeholder="Ex.: NovaSenhaSegura2026!"
+          hint="Repita a mesma senha digitada acima. Ex.: NovaSenhaSegura2026!."
         />
         {error && <p className="error">{error}</p>}
         {success && <p className="success-text">{success}</p>}
@@ -702,8 +879,8 @@ function Shell({
   children: React.ReactNode;
   user: User;
   workspaceName: string | null;
-  tab: Tab;
-  onTabChange: (tab: Tab) => void;
+  tab: AppTab;
+  onTabChange: (tab: AppTab) => void;
   onRefresh: () => void;
   busy: boolean;
 }) {
@@ -727,7 +904,7 @@ function Shell({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  function handleTabSelect(nextTab: Tab) {
+  function handleTabSelect(nextTab: AppTab) {
     onTabChange(nextTab);
     setMobileNavOpen(false);
   }
@@ -776,8 +953,8 @@ function Shell({
           </div>
           <div className="sidebar-actions">
             <button type="button" className="ghost" onClick={handleRefreshClick} disabled={busy}>
-              <RefreshCcw aria-hidden />
-              Atualizar
+              <RefreshCcw className={busy ? 'spin' : undefined} aria-hidden />
+              {busy ? 'Atualizando...' : 'Atualizar'}
             </button>
             <button type="button" className="ghost" onClick={() => void handleSignOut()}>
               <LogOut aria-hidden />
@@ -832,26 +1009,127 @@ function WorkspaceOnboarding({
   error: string | null;
 }) {
   const [name, setName] = useState(`Workspace ${user.email?.split('@')[0] ?? 'SDR'}`);
+  const onboardingHighlights = [
+    {
+      title: 'Funil padrão pronto',
+      description: 'Etapas iniciais já configuradas para você sair do zero rapidamente.',
+      icon: Route,
+    },
+    {
+      title: 'Base de operação organizada',
+      description: 'Leads, campos, campanhas e mensagens passam a operar com isolamento por workspace.',
+      icon: Workflow,
+    },
+    {
+      title: 'Demo mais forte',
+      description: 'Você consegue mostrar o fluxo completo do CRM sem setup manual disperso.',
+      icon: BookOpen,
+    },
+  ] as const;
+  const onboardingSignals = [
+    {
+      title: 'Menos de 1 minuto',
+      description: 'Crie o ambiente e siga direto para dashboard, leads e playbooks.',
+    },
+    {
+      title: 'Base pronta para demo',
+      description: 'Funil, mensagens e operação já nascem com narrativa consistente.',
+    },
+    {
+      title: 'Clareza para o avaliador',
+      description: 'O nome do workspace e a estrutura deixam a leitura do produto mais profissional.',
+    },
+  ] as const;
 
   return (
-    <section className="panel narrow">
-      <h1>Criar workspace</h1>
-      <p>O workspace isola funil, leads, campos, campanhas e mensagens.</p>
-      <label>
-        Nome do workspace
-        <input
-          name="workspaceName"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Ex.: Operação SDR Brasil ou Pré-vendas Enterprise"
-        />
-        <span className="field-hint">Dê um nome operacional ao ambiente. Ex.: Operação SDR Brasil ou Pré-vendas Enterprise.</span>
-      </label>
-      {error && <p className="error">{error}</p>}
-      <button type="button" onClick={() => onCreate(name)} disabled={busy || name.trim().length < 2}>
-        <Plus aria-hidden />
-        Criar workspace e funil padrão
-      </button>
+    <section className="workspace-onboarding">
+      <div className="workspace-onboarding-hero">
+        <div className="workspace-onboarding-copy">
+          <span className="eyebrow">Primeira configuração</span>
+          <h1>Criar workspace</h1>
+          <p>O workspace isola funil, leads, campos, campanhas e mensagens para manter a operação organizada desde a primeira demonstração.</p>
+          <div className="workspace-onboarding-chip-row">
+            <span className="workspace-onboarding-chip">Funil padrão</span>
+            <span className="workspace-onboarding-chip">Estrutura pronta para demo</span>
+            <span className="workspace-onboarding-chip">Setup rápido</span>
+          </div>
+          <div className="workspace-onboarding-proof-grid">
+            {onboardingSignals.map((item) => (
+              <article key={item.title} className="workspace-onboarding-proof-card">
+                <strong>{item.title}</strong>
+                <p>{item.description}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+        <div className="workspace-onboarding-highlights">
+          {onboardingHighlights.map((item) => {
+            const Icon = item.icon;
+            return (
+              <article key={item.title} className="workspace-onboarding-highlight">
+                <span className="workspace-onboarding-highlight-icon" aria-hidden>
+                  <Icon />
+                </span>
+                <div>
+                  <strong>{item.title}</strong>
+                  <p>{item.description}</p>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="workspace-onboarding-grid">
+        <section className="panel workspace-onboarding-form">
+          <div className="workspace-onboarding-form-copy">
+            <span className="section-kicker">Dados do ambiente</span>
+            <h2>Nome do workspace</h2>
+            <p>Dê um nome operacional claro para o ambiente que será usado na avaliação e nos fluxos internos.</p>
+          </div>
+          <label>
+            Nome do workspace
+            <input
+              name="workspaceName"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Ex.: Operação SDR Brasil"
+            />
+            <span className="field-hint">Dê um nome operacional ao ambiente. Ex.: Operação SDR Brasil.</span>
+          </label>
+          <div className="workspace-onboarding-form-note">
+            <strong>Leitura premium da demo</strong>
+            <p>Use um nome que soe como operação real. Isso melhora a percepção do dashboard, da navegação e do simulador desde a primeira tela.</p>
+          </div>
+          {error && <p className="error">{error}</p>}
+          <button type="button" onClick={() => onCreate(name)} disabled={busy || name.trim().length < 2}>
+            <Plus aria-hidden />
+            {busy ? 'Criando workspace...' : 'Criar workspace e funil padrão'}
+          </button>
+        </section>
+
+        <aside className="workspace-onboarding-side">
+          <article className="workspace-onboarding-side-card">
+            <span className="section-kicker">Ao criar agora</span>
+            <strong>Você ativa a base do CRM</strong>
+            <ul>
+              <li>Funil inicial pronto para cadastrar e mover leads</li>
+              <li>Estrutura preparada para campanhas e Mensagens IA</li>
+              <li>Ambiente separado para demonstração sem mistura de dados</li>
+            </ul>
+          </article>
+          <article className="workspace-onboarding-side-card workspace-onboarding-side-card-accent">
+            <span className="section-kicker">Leitura rápida</span>
+            <strong>Nomeie como uma operação real</strong>
+            <p>Um bom nome melhora a clareza da demo, do dashboard e da navegação desde o primeiro acesso.</p>
+            <ul>
+              <li>Facilita a leitura do cockpit comercial</li>
+              <li>Deixa o simulador parecer parte de uma operação viva</li>
+              <li>Evita sensação de ambiente genérico ou improvisado</li>
+            </ul>
+          </article>
+        </aside>
+      </div>
     </section>
   );
 }
@@ -875,10 +1153,16 @@ function StatusBar({ notice, error, onClear }: { notice: string | null; error: s
   );
 }
 
-function OperationGuide({ tab }: { tab: Tab }) {
-  const [collapsed, setCollapsed] = useState(false);
+function OperationGuide({ tab, userId, workspaceId }: { tab: AppTab; userId: string; workspaceId: string }) {
+  const [collapsed, setCollapsed] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const steps: Array<{ id: Tab; title: string; description: string }> = [
+  const flowGuideStorageKey = `sdr-expert:flow-guide-shown:${userId}`;
+  const evaluationPanelUrl = useMemo(() => {
+    const url = new URL('/__evaluation', window.location.origin);
+    url.searchParams.set('workspace', workspaceId);
+    return url.toString();
+  }, [workspaceId]);
+  const steps: Array<{ id: AppTab; title: string; description: string }> = [
     {
       id: 'dashboard',
       title: 'Ler a operação',
@@ -906,6 +1190,27 @@ function OperationGuide({ tab }: { tab: Tab }) {
     },
   ];
   const activeStep = steps.find((step) => step.id === tab) ?? steps[0];
+  const openFlowGuide = () => {
+    try {
+      window.localStorage.setItem(flowGuideStorageKey, 'true');
+    } catch {
+      // The guide can still be opened manually if browser storage is unavailable.
+    }
+    setModalOpen(true);
+  };
+
+  useEffect(() => {
+    if (tab !== 'dashboard') return;
+
+    try {
+      if (window.localStorage.getItem(flowGuideStorageKey)) return;
+      window.localStorage.setItem(flowGuideStorageKey, 'true');
+    } catch {
+      // If storage is blocked, keep the dashboard entry behavior for this session.
+    }
+
+    setModalOpen(true);
+  }, [flowGuideStorageKey, tab]);
 
   return (
     <>
@@ -930,7 +1235,7 @@ function OperationGuide({ tab }: { tab: Tab }) {
           </div>
         )}
         <div className="operation-guide-actions">
-          <button type="button" className="ghost compact" onClick={() => setModalOpen(true)}>
+          <button type="button" className="ghost compact" onClick={openFlowGuide}>
             <BookOpen aria-hidden />
             Ver lógica
           </button>
@@ -969,6 +1274,10 @@ function OperationGuide({ tab }: { tab: Tab }) {
                 </article>
               ))}
             </div>
+            <a className="flow-guide-evaluation-link" href={evaluationPanelUrl} target="_blank" rel="noreferrer">
+              <ExternalLink aria-hidden />
+              Abrir painel do avaliador
+            </a>
             <div className="flow-guide-note">
               <strong>Fluxo principal:</strong>
               <span>
@@ -983,8 +1292,14 @@ function OperationGuide({ tab }: { tab: Tab }) {
   );
 }
 
-function Dashboard({ data }: { data: CrmData }) {
-  return <DashboardScreen data={data} />;
+function Dashboard({
+  data,
+  onOpenLeadConversation,
+}: {
+  data: CrmData;
+  onOpenLeadConversation: (leadId: string, campaignId?: string | null) => void;
+}) {
+  return <DashboardScreen data={data} onOpenLeadConversation={onOpenLeadConversation} />;
 }
 
 function LeadsView({
@@ -1002,9 +1317,11 @@ function LeadsView({
 }) {
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState(data.leads[0]?.id ?? '');
+  const [movingLeadId, setMovingLeadId] = useState<string | null>(null);
   const stageById = useMemo(() => new Map(data.stages.map((stage) => [stage.id, stage])), [data.stages]);
   const selectedLead = data.leads.find((lead) => lead.id === selectedLeadId) ?? null;
   const selectedLeadStage = selectedLead ? stageById.get(selectedLead.current_stage_id) ?? null : null;
+  const selectedLeadWorkspaceOwner = selectedLead ? getAssignedWorkspaceOwnerLabel(selectedLead, data, user) : null;
   const selectedLeadMissing = selectedLead && selectedLeadStage
     ? findMissingRequiredFields({
         lead: selectedLead,
@@ -1029,6 +1346,11 @@ function LeadsView({
     );
   }).length;
   const leadsInContact = data.leads.filter((lead) => stageById.get(lead.current_stage_id)?.name === 'Tentando Contato').length;
+  const selectedLeadReadinessLabel = !selectedLead
+    ? 'Selecione um lead no funil'
+    : selectedLeadMissing.length > 0
+      ? `${selectedLeadMissing.length} pendência(s) antes do próximo movimento`
+      : 'Lead pronto para avançar';
 
   useEffect(() => {
     if (!data.leads.length) {
@@ -1046,6 +1368,7 @@ function LeadsView({
 
   async function handleMove(lead: Lead, targetStage: PipelineStage) {
     if (!supabase) return;
+    if (movingLeadId === lead.id) return;
     const missing = findMissingRequiredFields({
       lead,
       targetStage,
@@ -1059,12 +1382,61 @@ function LeadsView({
       return;
     }
 
+    setError(null);
+    setMovingLeadId(lead.id);
+
     try {
       await moveLead(supabase, data.workspace.id, lead.id, targetStage.id);
-      setNotice(`Lead movido para ${targetStage.name}.`);
+      const successMessage = `Lead movido para ${targetStage.name}`;
+      let automation: StageTriggerAutomationResult = {
+        generatedCampaignNames: [],
+        skippedCampaignNames: [],
+        failedCampaigns: [],
+      };
+      let feedback = {
+        notice: `${successMessage}.`,
+        warning: null as string | null,
+      };
+
+      try {
+        automation = await runStageTriggerAutomation(supabase, {
+          workspaceId: data.workspace.id,
+          leadId: lead.id,
+          stageId: targetStage.id,
+        });
+
+        feedback = buildStageAutomationFeedback({
+          successMessage,
+          failurePrefix: 'Lead movido, mas o gatilho automatico falhou em',
+          automation,
+        });
+      } catch (automationError) {
+        feedback = {
+          notice: `${successMessage}.`,
+          warning: buildStageAutomationErrorWarning(
+            'Lead movido, mas o gatilho automatico nao pode ser concluido',
+            automationError,
+          ),
+        };
+      }
+
+      setNotice(feedback.notice);
+
+      if (feedback.warning && automation.failedCampaigns.length > 0) {
+        setError(
+          `Lead movido, mas o gatilho automático falhou em: ${automation.failedCampaigns.map((item) => item.name).join(', ')}.`,
+        );
+      }
+
+      if (feedback.warning && automation.failedCampaigns.length === 0) {
+        setError(feedback.warning);
+      }
+
       await onReload();
     } catch (moveError) {
-      setError(getSafeMessage(moveError));
+      setError(getSafeMessage(moveError, 'lead'));
+    } finally {
+      setMovingLeadId(null);
     }
   }
 
@@ -1072,8 +1444,57 @@ function LeadsView({
     <section className="stack">
       <Header title="Leads e funil" subtitle="Cadastro, edição e movimentação por etapa." />
 
+      <section className="panel page-command-panel page-command-panel-leads">
+        <div className="page-command-copy">
+          <span className="section-kicker">Cockpit de qualificação</span>
+          <h2>{selectedLead ? `${selectedLead.name} está no foco da operação` : 'Monte contexto, destaque um lead e conduza o funil com clareza'}</h2>
+          <p>
+            Use o formulário para registrar o essencial, traga um lead para o foco do time e mova a operação sem perder consistência
+            dos dados nem a narrativa da prova.
+          </p>
+          <div className="page-command-chip-row">
+            <span className="page-command-chip">{data.leads.length} lead(s) ativos</span>
+            <span className="page-command-chip">{leadsWithPendingFields} com revisão obrigatória</span>
+            <span className="page-command-chip">{leadsInContact} em contato</span>
+          </div>
+        </div>
+        <div className="page-command-side">
+          <article className="page-command-card page-command-card-primary">
+            <div className="page-command-card-topline">
+              <span className="section-kicker">Lead em foco</span>
+              <Users aria-hidden />
+            </div>
+            <strong>{selectedLead ? selectedLead.name : 'Nenhum lead selecionado'}</strong>
+            <p>
+              {selectedLead
+                ? `${getLeadMetaLine(selectedLead)} • Etapa atual: ${selectedLeadStage?.name ?? 'Sem etapa definida'}`
+                : 'Clique em um card do kanban para trazer um lead para a leitura principal da tela.'}
+            </p>
+            <span className="page-command-note">
+              {selectedLead
+                ? selectedLeadMissing.length > 0
+                  ? `Bloqueios ativos: ${selectedLeadMissing.join(', ')}.`
+                  : 'Sem bloqueios ativos para a etapa atual.'
+                : 'O kanban vira a cena principal quando um lead é escolhido explicitamente.'}
+            </span>
+          </article>
+          <div className="page-command-mini-grid">
+            <article className="page-command-card">
+              <span className="section-kicker">Prontidão</span>
+              <strong>{selectedLeadReadinessLabel}</strong>
+              <p>Use essa leitura para decidir se vale editar dados antes de mover a etapa.</p>
+            </article>
+            <article className="page-command-card">
+              <span className="section-kicker">Responsável do workspace</span>
+              <strong>{selectedLeadWorkspaceOwner ?? 'A definir'}</strong>
+              <p>Quando existir dono claro, a demonstração fica mais crível e operacional.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <div className="leads-summary-grid">
-        <article className="overview-card">
+        <article className="overview-card lead-summary-card lead-summary-card-primary">
           <div className="overview-card-topline">
             <span className="section-kicker">Leads no funil</span>
             <Users aria-hidden />
@@ -1081,7 +1502,7 @@ function LeadsView({
           <strong>{data.leads.length}</strong>
           <p>Volume total de oportunidades acompanhadas neste workspace.</p>
         </article>
-        <article className="overview-card">
+        <article className="overview-card lead-summary-card lead-summary-card-contact">
           <div className="overview-card-topline">
             <span className="section-kicker">Com contato válido</span>
             <Mail aria-hidden />
@@ -1089,7 +1510,7 @@ function LeadsView({
           <strong>{leadsWithContact}</strong>
           <p>Leads com e-mail ou telefone já prontos para abordagem.</p>
         </article>
-        <article className="overview-card overview-card-accent">
+        <article className="overview-card overview-card-accent lead-summary-card lead-summary-card-warning">
           <div className="overview-card-topline">
             <span className="section-kicker">Precisam de revisão</span>
             <CircleAlert aria-hidden />
@@ -1097,7 +1518,7 @@ function LeadsView({
           <strong>{leadsWithPendingFields}</strong>
           <p>Leads com campos obrigatórios faltando na etapa atual.</p>
         </article>
-        <article className="overview-card">
+        <article className="overview-card lead-summary-card lead-summary-card-progress">
           <div className="overview-card-topline">
             <span className="section-kicker">Em contato</span>
             <CheckCircle2 aria-hidden />
@@ -1113,9 +1534,9 @@ function LeadsView({
           user={user}
           lead={editingLead}
           onCancel={() => setEditingLead(null)}
-          onSaved={() => {
+          onSaved={(noticeMessage) => {
             setEditingLead(null);
-            setNotice('Lead salvo.');
+            setNotice(noticeMessage ?? 'Lead salvo.');
             void onReload();
           }}
           setError={setError}
@@ -1150,6 +1571,11 @@ function LeadsView({
                   <span>Origem: {selectedLead.lead_source || 'Não informada'}</span>
                 </article>
                 <article className="chat-summary-card">
+                  <strong>Responsáveis</strong>
+                  <p>{selectedLead.technical_owner_name || 'Sem responsável técnico'}</p>
+                  <span>{selectedLeadWorkspaceOwner ? `Workspace: ${selectedLeadWorkspaceOwner}` : 'Sem responsável do workspace'}</span>
+                </article>
+                <article className="chat-summary-card">
                   <strong>Checklist da etapa</strong>
                   <p>
                     {selectedLeadMissing.length > 0
@@ -1179,6 +1605,7 @@ function LeadsView({
                 setEditingLead(lead);
               }}
               onMove={handleMove}
+              movingLeadId={movingLeadId}
             />
           </section>
         </div>
@@ -1199,7 +1626,7 @@ function LeadForm({
   user: User;
   lead: Lead | null;
   onCancel: () => void;
-  onSaved: () => void;
+  onSaved: (noticeMessage?: string) => void;
   setError: (message: string | null) => void;
 }) {
   const initial = useMemo(() => {
@@ -1220,6 +1647,7 @@ function LeadForm({
       job_title: lead.job_title ?? '',
       lead_source: lead.lead_source ?? '',
       notes: lead.notes ?? '',
+      technical_owner_name: lead.technical_owner_name ?? '',
       assigned_user_id: lead.assigned_user_id,
       current_stage_id: lead.current_stage_id,
       customValues,
@@ -1227,8 +1655,84 @@ function LeadForm({
   }, [data.customValues, data.stages, lead]);
 
   const [form, setForm] = useState<LeadInput>(initial);
+  const [confirmUnassignedOpen, setConfirmUnassignedOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const workspaceMemberOptions = useMemo(
+    () =>
+      [...data.workspaceMembers]
+        .sort((left, right) =>
+          getWorkspaceMemberDisplayName(left, user).localeCompare(getWorkspaceMemberDisplayName(right, user), 'pt-BR', {
+            sensitivity: 'base',
+          }),
+        )
+        .map((member) => ({
+          value: member.user_id,
+          label: getWorkspaceMemberDisplayName(member, user),
+          role: member.role,
+        })),
+    [data.workspaceMembers, user],
+  );
 
   useEffect(() => setForm(initial), [initial]);
+
+  async function saveLead() {
+    if (!supabase) return;
+
+    try {
+      setSaving(true);
+      setError(null);
+      const savedLead = await upsertLead(supabase, data.workspace, user, form);
+      setConfirmUnassignedOpen(false);
+      const successMessage = lead ? 'Lead atualizado' : 'Lead cadastrado';
+      let automation: StageTriggerAutomationResult = {
+        generatedCampaignNames: [],
+        skippedCampaignNames: [],
+        failedCampaigns: [],
+      };
+      let feedback = {
+        notice: `${successMessage}.`,
+        warning: null as string | null,
+      };
+
+      try {
+        automation = await runStageTriggerAutomation(supabase, {
+          workspaceId: data.workspace.id,
+          leadId: savedLead.id,
+          stageId: savedLead.current_stage_id,
+        });
+
+        feedback = buildStageAutomationFeedback({
+          successMessage,
+          failurePrefix: 'Lead salvo, mas o gatilho automatico falhou em',
+          automation,
+        });
+      } catch (automationError) {
+        feedback = {
+          notice: `${successMessage}.`,
+          warning: buildStageAutomationErrorWarning(
+            'Lead salvo, mas o gatilho automatico nao pode ser concluido',
+            automationError,
+          ),
+        };
+      }
+
+      if (feedback.warning && automation.failedCampaigns.length > 0) {
+        setError(
+          `Lead salvo, mas o gatilho automático falhou em: ${automation.failedCampaigns.map((item) => item.name).join(', ')}.`,
+        );
+      }
+
+      if (feedback.warning && automation.failedCampaigns.length === 0) {
+        setError(feedback.warning);
+      }
+
+      onSaved(feedback.notice);
+    } catch (saveError) {
+      setError(getSafeMessage(saveError, 'lead'));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1240,15 +1744,16 @@ function LeadForm({
       return;
     }
 
-    try {
-      await upsertLead(supabase, data.workspace, user, form);
-      onSaved();
-    } catch (saveError) {
-      setError(getSafeMessage(saveError));
+    if (!form.technical_owner_name.trim()) {
+      setConfirmUnassignedOpen(true);
+      return;
     }
+
+    await saveLead();
   }
 
   return (
+    <>
     <form className="panel form-grid lead-form" onSubmit={submit}>
       <div className="form-heading">
         <div className="lead-form-heading">
@@ -1268,10 +1773,10 @@ function LeadForm({
           name="leadName"
           value={form.name}
           onChange={(event) => setForm({ ...form, name: event.target.value })}
-          placeholder="Ex.: Priscila Amaral ou Bruno Accioly"
+          placeholder="Ex.: Contato comercial"
           required
         />
-        <span className="field-hint">Digite o nome completo do contato. Ex.: Priscila Amaral ou Bruno Accioly.</span>
+        <span className="field-hint">Digite o nome do contato. Ex.: Contato comercial.</span>
       </label>
       <label>
         E-mail
@@ -1280,9 +1785,9 @@ function LeadForm({
           type="email"
           value={form.email}
           onChange={(event) => setForm({ ...form, email: event.target.value })}
-          placeholder="Ex.: priscila@loghub.com.br ou bruno@fasthaul.com"
+          placeholder="Ex.: contato@empresa.com.br"
         />
-        <span className="field-hint">Use um e-mail profissional do lead. Ex.: priscila@loghub.com.br ou bruno@fasthaul.com.</span>
+        <span className="field-hint">Use um e-mail profissional do lead. Ex.: contato@empresa.com.br.</span>
       </label>
       <label>
         Telefone
@@ -1290,9 +1795,9 @@ function LeadForm({
           name="leadPhone"
           value={form.phone}
           onChange={(event) => setForm({ ...form, phone: event.target.value })}
-          placeholder="Ex.: 11987654321 ou 2133345566"
+          placeholder="Ex.: 11987654321"
         />
-        <span className="field-hint">Informe telefone com DDD. Ex.: 11987654321 ou 2133345566.</span>
+        <span className="field-hint">Informe telefone com DDD. Ex.: 11987654321.</span>
       </label>
       <label>
         Empresa
@@ -1300,9 +1805,9 @@ function LeadForm({
           name="leadCompany"
           value={form.company}
           onChange={(event) => setForm({ ...form, company: event.target.value })}
-          placeholder="Ex.: LogHub ou Escola Integra"
+          placeholder="Ex.: Empresa alvo"
         />
-        <span className="field-hint">Use o nome comercial da conta. Ex.: LogHub ou Escola Integra.</span>
+        <span className="field-hint">Use o nome comercial da conta. Ex.: Empresa alvo.</span>
       </label>
       <label>
         Cargo
@@ -1310,9 +1815,9 @@ function LeadForm({
           name="leadJobTitle"
           value={form.job_title}
           onChange={(event) => setForm({ ...form, job_title: event.target.value })}
-          placeholder="Ex.: Head de Revenue ou Diretora Comercial"
+          placeholder="Ex.: Head de Receita"
         />
-        <span className="field-hint">Registre o papel do lead no processo. Ex.: Head de Revenue ou Diretora Comercial.</span>
+        <span className="field-hint">Registre o papel do lead no processo. Ex.: Head de Receita.</span>
       </label>
       <label>
         Origem
@@ -1320,9 +1825,9 @@ function LeadForm({
           name="leadSource"
           value={form.lead_source}
           onChange={(event) => setForm({ ...form, lead_source: event.target.value })}
-          placeholder="Ex.: Lista ICP 2026 ou Inbound orgânico"
+          placeholder="Ex.: Lista ICP 2026"
         />
-        <span className="field-hint">Explique de onde esse lead veio. Ex.: Lista ICP 2026 ou Inbound orgânico.</span>
+        <span className="field-hint">Explique de onde esse lead veio. Ex.: Lista ICP 2026.</span>
       </label>
       <label>
         Etapa
@@ -1335,15 +1840,35 @@ function LeadForm({
         </select>
       </label>
       <label>
-        Responsável
+        Responsável técnico
+        <input
+          name="leadTechnicalOwner"
+          value={form.technical_owner_name}
+          onChange={(event) => setForm({ ...form, technical_owner_name: event.target.value })}
+          placeholder="Ex.: Especialista técnico"
+        />
+        <span className="field-hint">
+          Informe quem acompanha tecnicamente este lead. Ex.: Especialista técnico. Se ficar em branco, o lead será salvo sem responsável técnico.
+        </span>
+      </label>
+      <label>
+        Responsável do workspace
         <select
-          name="leadAssignee"
+          name="leadAssignedWorkspaceUser"
           value={form.assigned_user_id ?? ''}
           onChange={(event) => setForm({ ...form, assigned_user_id: event.target.value || null })}
         >
-          <option value="">Sem responsável</option>
-          <option value={user.id}>Eu</option>
+          <option value="">Sem responsável do workspace</option>
+          {workspaceMemberOptions.map((member) => (
+            <option key={member.value} value={member.value}>
+              {member.label}
+              {member.role === 'owner' ? ' (owner)' : ''}
+            </option>
+          ))}
         </select>
+        <span className="field-hint">
+          Atribua o lead a um usuário do workspace quando fizer sentido operacional. Ex.: Owner do workspace.
+        </span>
       </label>
       <label className="wide">
         Observações
@@ -1351,9 +1876,9 @@ function LeadForm({
           name="leadNotes"
           value={form.notes}
           onChange={(event) => setForm({ ...form, notes: event.target.value })}
-          placeholder="Ex.: Quer reduzir tempo de resposta do time. ou Ex.: Pediu contato na próxima terça após 10h."
+          placeholder="Ex.: Quer reduzir tempo de resposta do time."
         />
-        <span className="field-hint">Anote contexto útil para a próxima abordagem. Ex.: quer reduzir tempo de resposta do time ou pediu contato na próxima terça após 10h.</span>
+        <span className="field-hint">Anote contexto útil para a próxima abordagem. Ex.: quer reduzir tempo de resposta do time.</span>
       </label>
       {data.customFields.map((field) => (
         <label key={field.id}>
@@ -1362,7 +1887,7 @@ function LeadForm({
             name={`customField-${field.id}`}
             type={field.field_type === 'number' ? 'number' : 'text'}
             value={form.customValues[field.id] ?? ''}
-            placeholder={field.field_type === 'number' ? 'Ex.: 12 ou 45' : 'Ex.: Operação outbound ou Ticket enterprise'}
+            placeholder={field.field_type === 'number' ? 'Ex.: 12' : 'Ex.: Operação outbound'}
             onChange={(event) =>
               setForm({
                 ...form,
@@ -1372,15 +1897,49 @@ function LeadForm({
           />
           <span className="field-hint">
             {field.field_type === 'number'
-              ? 'Preencha com valor quantitativo. Ex.: 12 ou 45.'
-              : 'Preencha com um contexto objetivo. Ex.: Operação outbound ou Ticket enterprise.'}
+              ? 'Preencha com valor quantitativo. Ex.: 12.'
+              : 'Preencha com um contexto objetivo. Ex.: Operação outbound.'}
           </span>
         </label>
       ))}
       <div className="wide">
-        <button type="submit">{lead ? 'Salvar lead' : 'Cadastrar lead'}</button>
+        <button type="submit" disabled={saving}>{saving ? 'Salvando...' : lead ? 'Salvar lead' : 'Cadastrar lead'}</button>
       </div>
     </form>
+    {confirmUnassignedOpen && (
+      <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="lead-unassigned-title">
+        <section className="chat-modal lead-confirm-modal">
+          <div className="chat-modal-header">
+            <div>
+              <span className="section-kicker">Confirmação</span>
+              <h2 id="lead-unassigned-title">Salvar sem responsável técnico?</h2>
+              <p>Este lead ficará sem responsável técnico definido. Você poderá preencher esse campo depois ao editar o lead.</p>
+            </div>
+            <button
+              type="button"
+              className="ghost icon-button"
+              aria-label="Fechar confirmação"
+              onClick={() => setConfirmUnassignedOpen(false)}
+              disabled={saving}
+            >
+              <X aria-hidden />
+            </button>
+          </div>
+          <div className="chat-modal-footer">
+            <p>Você quer mesmo cadastrar esse lead sem um responsável técnico?</p>
+            <div className="chat-modal-actions">
+              <button type="button" className="secondary" onClick={() => setConfirmUnassignedOpen(false)} disabled={saving}>
+                Voltar e preencher
+              </button>
+              <button type="button" onClick={saveLead} disabled={saving}>
+                {saving ? 'Salvando...' : 'Salvar sem responsável'}
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -1390,12 +1949,14 @@ function Kanban({
   onSelect,
   onEdit,
   onMove,
+  movingLeadId,
 }: {
   data: CrmData;
   selectedLeadId: string | null;
   onSelect: (leadId: string) => void;
   onEdit: (lead: Lead) => void;
-  onMove: (lead: Lead, stage: PipelineStage) => void;
+  onMove: (lead: Lead, stage: PipelineStage) => Promise<void>;
+  movingLeadId: string | null;
 }) {
   return (
     <section className="kanban" aria-label="Funil de leads">
@@ -1417,6 +1978,7 @@ function Kanban({
                 lead={lead}
                 data={data}
                 selected={selectedLeadId === lead.id}
+                moving={movingLeadId === lead.id}
                 onSelect={() => onSelect(lead.id)}
                 onEdit={() => onEdit(lead)}
                 onMove={onMove}
@@ -1433,6 +1995,7 @@ function LeadCard({
   lead,
   data,
   selected,
+  moving,
   onSelect,
   onEdit,
   onMove,
@@ -1440,11 +2003,13 @@ function LeadCard({
   lead: Lead;
   data: CrmData;
   selected: boolean;
+  moving: boolean;
   onSelect: () => void;
   onEdit: () => void;
-  onMove: (lead: Lead, stage: PipelineStage) => void;
+  onMove: (lead: Lead, stage: PipelineStage) => Promise<void>;
 }) {
   const currentStage = data.stages.find((stage) => stage.id === lead.current_stage_id) ?? null;
+  const assignedWorkspaceOwner = getAssignedWorkspaceOwnerLabel(lead, data);
   const missing = currentStage
     ? findMissingRequiredFields({
         lead,
@@ -1485,8 +2050,14 @@ function LeadCard({
       </div>
 
       <div className="lead-tag-row">
+        {moving && <span className="lead-tag lead-tag-busy">Movendo etapa...</span>}
         <span className="lead-tag">{lead.lead_source || 'Origem não informada'}</span>
-        {lead.assigned_user_id ? <span className="lead-tag">Responsável definido</span> : <span className="lead-tag">Sem responsável</span>}
+        <span className="lead-tag">
+          {lead.technical_owner_name ? `Resp. técnico: ${lead.technical_owner_name}` : 'Sem responsável técnico'}
+        </span>
+        <span className="lead-tag">
+          {assignedWorkspaceOwner ? `Resp. workspace: ${assignedWorkspaceOwner}` : 'Sem responsável do workspace'}
+        </span>
       </div>
 
       {missing.length > 0 && <p className="lead-card-warning">Campos faltando: {missing.join(', ')}.</p>}
@@ -1495,6 +2066,7 @@ function LeadCard({
         <button
           type="button"
           className="ghost compact"
+          disabled={moving}
           onClick={(event) => {
             event.stopPropagation();
             onEdit();
@@ -1506,6 +2078,8 @@ function LeadCard({
           className="lead-stage-select"
           name={`lead-stage-${lead.id}`}
           value={lead.current_stage_id}
+          disabled={moving}
+          aria-busy={moving}
           onClick={(event) => event.stopPropagation()}
           onChange={(event) => {
             const target = data.stages.find((item) => item.id === event.target.value);
@@ -1536,18 +2110,27 @@ function FieldsView({
 }) {
   const [name, setName] = useState('');
   const [type, setType] = useState<'text' | 'number'>('text');
+  const [creatingField, setCreatingField] = useState(false);
   const stagesWithRules = new Set(data.requiredFields.map((rule) => rule.stage_id)).size;
   const standardRules = data.requiredFields.filter((rule) => rule.field_key).length;
   const customRules = data.requiredFields.filter((rule) => rule.custom_field_id).length;
+  const mostProtectedStage = data.stages
+    .map((stage) => ({
+      name: stage.name,
+      rules: data.requiredFields.filter((rule) => rule.stage_id === stage.id).length,
+    }))
+    .sort((left, right) => right.rules - left.rules)[0] ?? null;
 
   async function createCustomField(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase) return;
+    if (creatingField) return;
     const fieldKey = createFieldKey(name);
     if (!fieldKey) {
       setError('Nome de campo inválido.');
       return;
     }
+    setCreatingField(true);
     try {
       const { error } = await supabase.from('workspace_custom_fields').insert({
         workspace_id: data.workspace.id,
@@ -1561,7 +2144,9 @@ function FieldsView({
       setNotice('Campo personalizado criado.');
       await onReload();
     } catch (fieldError) {
-      setError(getSafeMessage(fieldError));
+      setError(getSafeMessage(fieldError, 'workspace'));
+    } finally {
+      setCreatingField(false);
     }
   }
 
@@ -1569,8 +2154,51 @@ function FieldsView({
     <section className="stack">
       <Header title="Campos e regras" subtitle="Campos personalizados e obrigatoriedade por etapa." />
 
+      <section className="panel page-command-panel page-command-panel-fields">
+        <div className="page-command-copy">
+          <span className="section-kicker">Governança de qualidade</span>
+          <h2>Defina só o que protege a operação e deixe o restante fora do caminho</h2>
+          <p>
+            Campos extras e bloqueios por etapa devem reforçar a leitura comercial, não transformar o CRM em um cadastro pesado.
+            A ideia aqui é parecer criterioso, rápido e seguro.
+          </p>
+          <div className="page-command-chip-row">
+            <span className="page-command-chip">{data.customFields.length} campo(s) extras</span>
+            <span className="page-command-chip">{stagesWithRules} etapa(s) com trava ativa</span>
+            <span className="page-command-chip">{data.requiredFields.length} regra(s) publicadas</span>
+          </div>
+        </div>
+        <div className="page-command-side">
+          <article className="page-command-card page-command-card-primary">
+            <div className="page-command-card-topline">
+              <span className="section-kicker">Etapa mais protegida</span>
+              <ShieldAlert aria-hidden />
+            </div>
+            <strong>{mostProtectedStage && mostProtectedStage.rules > 0 ? mostProtectedStage.name : 'Base livre para primeira leitura'}</strong>
+            <p>
+              {mostProtectedStage && mostProtectedStage.rules > 0
+                ? `${mostProtectedStage.rules} regra(s) fazem essa etapa exigir mais consistência antes do avanço.`
+                : 'Ainda não existe uma etapa com volume relevante de validações obrigatórias.'}
+            </p>
+            <span className="page-command-note">Use isso para mostrar critério sem travar a operação cedo demais.</span>
+          </article>
+          <div className="page-command-mini-grid">
+            <article className="page-command-card">
+              <span className="section-kicker">Regras padrão</span>
+              <strong>{standardRules}</strong>
+              <p>Dados base do lead que garantem leitura mínima antes de qualquer avanço importante.</p>
+            </article>
+            <article className="page-command-card">
+              <span className="section-kicker">Regras personalizadas</span>
+              <strong>{customRules}</strong>
+              <p>Critérios específicos do workspace para qualificação mais precisa da abordagem.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <div className="fields-summary-grid">
-        <article className="overview-card">
+        <article className="overview-card field-summary-card field-summary-card-library">
           <div className="overview-card-topline">
             <span className="section-kicker">Campos personalizados</span>
             <Plus aria-hidden />
@@ -1578,7 +2206,7 @@ function FieldsView({
           <strong>{data.customFields.length}</strong>
           <p>Campos extras que enriquecem o contexto do lead sem mudar a estrutura base do CRM.</p>
         </article>
-        <article className="overview-card">
+        <article className="overview-card field-summary-card field-summary-card-rules">
           <div className="overview-card-topline">
             <span className="section-kicker">Etapas com regra</span>
             <Workflow aria-hidden />
@@ -1586,7 +2214,7 @@ function FieldsView({
           <strong>{stagesWithRules}</strong>
           <p>Etapas do funil que já têm bloqueios explícitos para manter integridade operacional.</p>
         </article>
-        <article className="overview-card overview-card-accent">
+        <article className="overview-card overview-card-accent field-summary-card field-summary-card-coverage">
           <div className="overview-card-topline">
             <span className="section-kicker">Cobertura de validação</span>
             <CircleAlert aria-hidden />
@@ -1612,10 +2240,10 @@ function FieldsView({
                 name="customFieldName"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="Ex.: Segmento ou Número de vendedores"
+                placeholder="Ex.: Segmento"
                 required
               />
-              <span className="field-hint">Exemplo: segmento, ICP, ticket médio, número de vendedores.</span>
+              <span className="field-hint">Exemplo: segmento.</span>
             </label>
             <label>
               Tipo
@@ -1626,9 +2254,9 @@ function FieldsView({
               <span className="field-hint">Escolha número apenas quando o valor precisar ser estritamente quantitativo.</span>
             </label>
             <div className="wide field-form-actions">
-              <button type="submit">
+              <button type="submit" disabled={creatingField}>
                 <Plus aria-hidden />
-                Criar campo
+                {creatingField ? 'Criando campo...' : 'Criar campo'}
               </button>
             </div>
           </form>
@@ -1688,6 +2316,7 @@ function RequiredFieldsPanel({
   const currentRules = data.requiredFields.filter((rule) => rule.stage_id === stageId);
   const [standardKeys, setStandardKeys] = useState<string[]>([]);
   const [customIds, setCustomIds] = useState<string[]>([]);
+  const [savingRules, setSavingRules] = useState(false);
 
   useEffect(() => {
     setStandardKeys(currentRules.flatMap((rule) => (rule.field_key ? [rule.field_key] : [])));
@@ -1701,12 +2330,16 @@ function RequiredFieldsPanel({
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase || !stageId) return;
+    if (savingRules) return;
+    setSavingRules(true);
     try {
       await saveRequiredFields(supabase, data.workspace.id, stageId, standardKeys, customIds);
       setNotice('Regras de etapa salvas.');
       await onReload();
     } catch (ruleError) {
-      setError(getSafeMessage(ruleError));
+      setError(getSafeMessage(ruleError, 'workspace'));
+    } finally {
+      setSavingRules(false);
     }
   }
 
@@ -1794,7 +2427,7 @@ function RequiredFieldsPanel({
         </section>
       </div>
 
-      <button type="submit">Salvar regras</button>
+      <button type="submit" disabled={savingRules}>{savingRules ? 'Salvando regras...' : 'Salvar regras'}</button>
     </form>
   );
 }
@@ -1815,6 +2448,8 @@ function CampaignsView({
   const [editing, setEditing] = useState<Campaign | null>(null);
   const activeCampaigns = data.campaigns.filter((campaign) => campaign.is_active).length;
   const campaignsWithTrigger = data.campaigns.filter((campaign) => campaign.trigger_stage_id).length;
+  const alwaysOnCampaigns = data.campaigns.filter((campaign) => campaign.ai_response_mode !== 'business_hours').length;
+  const businessHoursCampaigns = data.campaigns.filter((campaign) => campaign.ai_response_mode === 'business_hours').length;
   const stageNameById = new Map(data.stages.map((stage) => [stage.id, stage.name]));
   const summarize = (text: string, limit = 150) => (text.length > limit ? `${text.slice(0, limit).trim()}...` : text);
 
@@ -1822,8 +2457,53 @@ function CampaignsView({
     <section className="stack">
       <Header title="Campanhas" subtitle="Playbooks de abordagem, contexto e gatilhos usados pela Edge Function de IA." />
 
+      <section className="panel page-command-panel page-command-panel-campaigns">
+        <div className="page-command-copy">
+          <span className="section-kicker">Orquestração da IA</span>
+          <h2>{editing ? `Refinando o playbook ${editing.name}` : 'Transforme contexto comercial em um playbook convincente para a demo'}</h2>
+          <p>
+            Conecte campanha, etapa gatilho e comportamento de atendimento para que a IA pareça parte do processo, não um bloco isolado
+            de geração de texto.
+          </p>
+          <div className="page-command-chip-row">
+            <span className="page-command-chip">{activeCampaigns} campanha(s) ativa(s)</span>
+            <span className="page-command-chip">{campaignsWithTrigger} gatilho(s) automáticos</span>
+            <span className="page-command-chip">{alwaysOnCampaigns} playbook(s) em resposta 24h</span>
+          </div>
+        </div>
+        <div className="page-command-side">
+          <article className="page-command-card page-command-card-primary">
+            <div className="page-command-card-topline">
+              <span className="section-kicker">Cobertura do simulador</span>
+              <Bot aria-hidden />
+            </div>
+            <strong>
+              {editing ? editing.name : activeCampaigns > 0 ? `${activeCampaigns} playbook(s) prontos para gerar mensagem` : 'Nenhum playbook ativo'}
+            </strong>
+            <p>
+              {editing
+                ? 'Você está em uma edição ativa. Revise contexto, plano e prompt final antes de salvar.'
+                : 'Campanhas bem configuradas fazem o fluxo parecer guiado, previsível e operacional.'}
+            </p>
+            <span className="page-command-note">A janela do cliente fica mais crível quando o playbook já nasce com objetivo e timing claros.</span>
+          </article>
+          <div className="page-command-mini-grid">
+            <article className="page-command-card">
+              <span className="section-kicker">Resposta 24h</span>
+              <strong>{alwaysOnCampaigns}</strong>
+              <p>Playbooks com resposta contínua, ideais para demo fluida sem depender de horário comercial.</p>
+            </article>
+            <article className="page-command-card">
+              <span className="section-kicker">Horário de atendimento</span>
+              <strong>{businessHoursCampaigns}</strong>
+              <p>Playbooks com janela controlada para simular operação mais realista quando necessário.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <div className="campaign-summary-grid">
-        <article className="overview-card">
+        <article className="overview-card campaign-summary-card campaign-summary-card-library">
           <div className="overview-card-topline">
             <span className="section-kicker">Playbooks cadastrados</span>
             <Megaphone aria-hidden />
@@ -1831,7 +2511,7 @@ function CampaignsView({
           <strong>{data.campaigns.length}</strong>
           <p>Campanhas disponíveis para orientar a abordagem comercial do avaliador.</p>
         </article>
-        <article className="overview-card">
+        <article className="overview-card campaign-summary-card campaign-summary-card-active">
           <div className="overview-card-topline">
             <span className="section-kicker">Campanhas ativas</span>
             <CheckCircle2 aria-hidden />
@@ -1839,7 +2519,7 @@ function CampaignsView({
           <strong>{activeCampaigns}</strong>
           <p>Playbooks já prontos para geração imediata de mensagens pela IA.</p>
         </article>
-        <article className="overview-card overview-card-accent">
+        <article className="overview-card overview-card-accent campaign-summary-card campaign-summary-card-trigger">
           <div className="overview-card-topline">
             <span className="section-kicker">Gatilhos automáticos</span>
             <Workflow aria-hidden />
@@ -1908,6 +2588,15 @@ function CampaignsView({
                       <p>{summarize(campaign.generation_prompt)}</p>
                     </div>
 
+                    <div className="campaign-card-section">
+                      <span className="section-kicker">Atendimento IA</span>
+                      <p>
+                        {campaign.ai_response_mode === 'business_hours'
+                          ? `Responde das ${campaign.ai_response_window_start.slice(0, 5)} às ${campaign.ai_response_window_end.slice(0, 5)} no horário de São Paulo.`
+                          : 'Responde automaticamente 24h no simulador.'}
+                      </p>
+                    </div>
+
                     <div className="campaign-card-actions">
                       <button type="button" className="ghost compact" onClick={() => setEditing(campaign)}>
                         Editar playbook
@@ -1946,12 +2635,16 @@ function CampaignForm({
         context_text: campaign.context_text,
         generation_prompt: campaign.generation_prompt,
         trigger_stage_id: campaign.trigger_stage_id,
+        ai_response_mode: campaign.ai_response_mode ?? 'always',
+        ai_response_window_start: campaign.ai_response_window_start?.slice(0, 5) ?? '09:00',
+        ai_response_window_end: campaign.ai_response_window_end?.slice(0, 5) ?? '18:00',
         is_active: campaign.is_active,
       }
     : emptyCampaignInput;
   const [form, setForm] = useState<CampaignInput>(initial);
   const [plan, setPlan] = useState<CampaignStrategyPlan>(derivePlanFromCampaign(campaign));
   const [planningBusy, setPlanningBusy] = useState(false);
+  const [savingCampaign, setSavingCampaign] = useState(false);
   const [planMeta, setPlanMeta] = useState<{ model: string } | null>(null);
 
   useEffect(() => {
@@ -1961,20 +2654,23 @@ function CampaignForm({
   }, [campaign]);
 
   async function generatePlan() {
+    if (!supabase) return;
+    if (planningBusy || savingCampaign) return;
     if (!form.name.trim() || !form.context_text.trim()) {
       setError('Nome e contexto são obrigatórios para montar o plano da campanha.');
       return;
     }
 
+    const supabaseClient = supabase;
     setPlanningBusy(true);
     setError(null);
 
     try {
-      const result = await invokeAuthenticatedFunction<{
+      const result = await invokeEdgeFunction<{
         success: boolean;
         error?: string;
         data?: CampaignStrategyPlan & { model: string };
-      }>('plan-campaign-strategy', {
+      }>(supabaseClient, 'plan-campaign-strategy', {
         workspace_id: data.workspace.id,
         name: form.name,
         context_text: form.context_text,
@@ -1997,7 +2693,7 @@ function CampaignForm({
       });
       setPlanMeta({ model: result.data.model });
     } catch (planError) {
-      setError(getSafeMessage(planError));
+      setError(getSafeMessage(planError, 'ai'));
     } finally {
       setPlanningBusy(false);
     }
@@ -2006,6 +2702,7 @@ function CampaignForm({
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase) return;
+    if (savingCampaign) return;
     if (!form.name.trim() || !form.context_text.trim()) {
       setError('Nome e contexto são obrigatórios.');
       return;
@@ -2014,6 +2711,11 @@ function CampaignForm({
       setError('Gere ou revise o plano da campanha antes de salvar.');
       return;
     }
+    if (form.ai_response_mode === 'business_hours' && form.ai_response_window_start === form.ai_response_window_end) {
+      setError('Defina horários diferentes para início e fim do atendimento da IA.');
+      return;
+    }
+    setSavingCampaign(true);
     try {
       await upsertCampaign(supabase, data.workspace, user, {
         ...form,
@@ -2021,7 +2723,9 @@ function CampaignForm({
       });
       onSaved();
     } catch (campaignError) {
-      setError(getSafeMessage(campaignError));
+      setError(getSafeMessage(campaignError, 'campaign'));
+    } finally {
+      setSavingCampaign(false);
     }
   }
 
@@ -2034,7 +2738,7 @@ function CampaignForm({
           <p>Defina o briefing comercial e deixe a IA montar o plano da campanha antes de salvar o playbook.</p>
         </div>
         {campaign && (
-          <button type="button" className="ghost compact" onClick={onCancel}>
+          <button type="button" className="ghost compact" onClick={onCancel} disabled={savingCampaign}>
             Cancelar edição
           </button>
         )}
@@ -2045,10 +2749,10 @@ function CampaignForm({
           name="campaignName"
           value={form.name}
           onChange={(event) => setForm({ ...form, name: event.target.value })}
-          placeholder="Ex.: Outbound ICP Operações ou Reativação de pipeline"
+          placeholder="Ex.: Outbound ICP Operações"
           required
         />
-        <span className="field-hint">Use um nome claro. Ex.: Outbound ICP Operações ou Reativação de pipeline.</span>
+        <span className="field-hint">Use um nome claro. Ex.: Outbound ICP Operações.</span>
       </label>
       <label>
         Etapa gatilho
@@ -2075,20 +2779,59 @@ function CampaignForm({
         />
         Campanha ativa
       </label>
+      <label>
+        Resposta da IA
+        <select
+          name="campaignAiResponseMode"
+          value={form.ai_response_mode}
+          onChange={(event) =>
+            setForm({
+              ...form,
+              ai_response_mode: event.target.value === 'business_hours' ? 'business_hours' : 'always',
+            })
+          }
+        >
+          <option value="always">Responder 24h</option>
+          <option value="business_hours">Responder apenas em horário de atendimento</option>
+        </select>
+        <span className="field-hint">O fuso usado no simulador é sempre São Paulo.</span>
+      </label>
+      <div className="campaign-hours-row">
+        <label>
+          Início do atendimento
+          <input
+            name="campaignAiResponseWindowStart"
+            type="time"
+            value={form.ai_response_window_start}
+            onChange={(event) => setForm({ ...form, ai_response_window_start: event.target.value })}
+            disabled={form.ai_response_mode === 'always'}
+          />
+        </label>
+        <label>
+          Fim do atendimento
+          <input
+            name="campaignAiResponseWindowEnd"
+            type="time"
+            value={form.ai_response_window_end}
+            onChange={(event) => setForm({ ...form, ai_response_window_end: event.target.value })}
+            disabled={form.ai_response_mode === 'always'}
+          />
+        </label>
+      </div>
       <label className="wide">
-        Contexto do briefing
+	        Contexto do briefing
         <textarea
           name="campaignContext"
           value={form.context_text}
           onChange={(event) => setForm({ ...form, context_text: event.target.value })}
-          placeholder="Ex.: SaaS B2B com time SDR travado por baixa cadência. ou Ex.: Operação logística com dificuldade para qualificar leads."
+          placeholder="Ex.: SaaS B2B com time SDR travado por baixa cadência."
           required
         />
-        <span className="field-hint">Ex.: SaaS B2B com time SDR travado por baixa cadência ou operação logística com dificuldade para qualificar leads.</span>
+        <span className="field-hint">Ex.: SaaS B2B com time SDR travado por baixa cadência.</span>
         <span className="field-hint">Descreva rapidamente o cenário, produto e dor comercial que a IA deve considerar.</span>
       </label>
       <div className="wide campaign-plan-actions">
-        <button type="button" className="secondary" onClick={generatePlan} disabled={planningBusy}>
+        <button type="button" className="secondary" onClick={generatePlan} disabled={planningBusy || savingCampaign}>
           {planningBusy ? 'Montando plano com IA...' : plan.final_prompt.trim() ? 'Gerar novo plano com IA' : 'Gerar plano com IA'}
         </button>
         <span className="field-hint">A IA monta o plano da campanha e o prompt final. Você pode aprovar, editar ou gerar novamente antes de salvar.</span>
@@ -2181,7 +2924,9 @@ function CampaignForm({
         </div>
       </section>
       <div className="wide">
-        <button type="submit">Salvar campanha</button>
+        <button type="submit" disabled={savingCampaign || planningBusy}>
+          {savingCampaign ? 'Salvando campanha...' : 'Salvar campanha'}
+        </button>
       </div>
     </form>
   );
@@ -2193,12 +2938,14 @@ function MessagesView({
   onReload,
   setError,
   setNotice,
+  focusTarget,
 }: {
   data: CrmData;
   user: User;
   onReload: () => void;
   setError: (message: string | null) => void;
   setNotice: (message: string | null) => void;
+  focusTarget?: MessageFocusTarget | null;
 }) {
   return (
     <MessagesScreen
@@ -2207,6 +2954,7 @@ function MessagesView({
       onReload={onReload}
       setError={setError}
       setNotice={setNotice}
+      focusTarget={focusTarget}
     />
   );
 }

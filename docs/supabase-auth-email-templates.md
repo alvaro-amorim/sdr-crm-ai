@@ -2,6 +2,21 @@
 
 Use estes textos no painel do Supabase em `Authentication > Emails`. Eles sao templates operacionais para o MVP e nao contem secrets.
 
+## SMTP de envio
+
+O ambiente de producao usa SMTP customizado do Resend no Supabase Auth Email.
+
+- Dominio validado no Resend: `auth.comercias.com.br`.
+- Remetente configurado: `no-reply@auth.comercias.com.br`.
+- Host SMTP: `smtp.resend.com`.
+- Porta: `465`.
+- Usuario SMTP: `resend`.
+- Senha SMTP: API key do Resend configurada apenas no painel do Supabase.
+
+Nao versionar API key do Resend, senha SMTP ou qualquer segredo real. A hospedagem do frontend permanece na Vercel; esta configuracao altera somente o provedor de envio dos e-mails transacionais do Supabase Auth.
+
+Validacao operacional em 23/04/2026: cadastro e recuperacao de senha foram conferidos manualmente com o SMTP customizado ativo, sem reproduzir o erro anterior de `email rate limit exceeded`.
+
 ## Confirm signup
 
 Assunto:

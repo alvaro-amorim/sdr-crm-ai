@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { resolveNextOutboundPurpose } from '../lib/conversation-verdict';
 import { supabase, supabaseEnv } from '../lib/supabase';
-import { moveLead } from '../services/crm';
+import { moveLead, runStageTriggerAutomation, type StageTriggerAutomationResult } from '../services/crm';
 import type {
   Campaign,
   ConversationMessage,
@@ -14,7 +14,17 @@ import type {
   PipelineStage,
   SentMessageEvent,
 } from '../types/domain';
+import { sortConversationMessages } from '../utils/conversation';
 import { findStageByName, formatDateTime, getLeadChannel, getLeadMetaLine } from '../utils/crm-ui';
+import { getErrorMessage } from '../utils/error-messages';
+import { rankLeadOptions, toLeadSearchOption } from '../utils/lead-search';
+import { buildStageAutomationErrorWarning } from '../utils/stage-automation-feedback';
+
+export type MessageFocusTarget = {
+  leadId: string;
+  campaignId?: string | null;
+  nonce: number;
+};
 
 function formatDeliveryStatus(status: SentMessageEvent['delivery_status']) {
   switch (status) {
@@ -112,21 +122,24 @@ export function MessagesScreen({
   onReload,
   setError,
   setNotice,
+  focusTarget,
 }: {
   data: CrmData;
   user: User;
   onReload: () => void;
   setError: (message: string | null) => void;
   setNotice: (message: string | null) => void;
+  focusTarget?: MessageFocusTarget | null;
 }) {
-  const sortedLeads = useMemo(() => sortByLabel(data.leads, (lead) => lead.name), [data.leads]);
   const activeCampaigns = useMemo(
     () => sortByLabel(data.campaigns.filter((campaign) => campaign.is_active), (campaign) => campaign.name),
     [data.campaigns],
   );
-  const [leadId, setLeadId] = useState(sortedLeads[0]?.id ?? '');
+  const [leadId, setLeadId] = useState('');
   const [leadQuery, setLeadQuery] = useState('');
+  const [leadSelectorOpen, setLeadSelectorOpen] = useState(false);
   const [campaignId, setCampaignId] = useState(activeCampaigns[0]?.id ?? '');
+  const [consumedFocusNonce, setConsumedFocusNonce] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [simulationMessage, setSimulationMessage] = useState<GeneratedMessage | null>(null);
   const [simulationBusy, setSimulationBusy] = useState(false);
@@ -135,14 +148,7 @@ export function MessagesScreen({
   const selectedCampaign = data.campaigns.find((campaign) => campaign.id === campaignId) ?? null;
   const selectedStage = selectedLead ? data.stages.find((stage) => stage.id === selectedLead.current_stage_id) ?? null : null;
   const targetStage = findStageByName(data.stages, 'Tentando Contato');
-  const leadOptions = useMemo(
-    () =>
-      sortedLeads.map((lead) => ({
-        id: lead.id,
-        label: lead.company ? `${lead.name} · ${lead.company}` : lead.name,
-      })),
-    [sortedLeads],
-  );
+  const leadOptions = useMemo(() => rankLeadOptions(leadQuery, data.leads), [data.leads, leadQuery]);
   const leadMessages = data.generatedMessages
     .filter((message) => message.lead_id === leadId && (!campaignId || message.campaign_id === campaignId))
     .sort((left, right) => left.variation_index - right.variation_index);
@@ -188,25 +194,47 @@ export function MessagesScreen({
   const activeSimulatorThread =
     selectedThread ?? selectedLeadThreadOptions[0]?.thread ?? null;
   const activeSimulatorThreadMessages = activeSimulatorThread
-    ? data.conversationMessages
-        .filter((message) => message.thread_id === activeSimulatorThread.id)
-        .sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime())
+    ? sortConversationMessages(data.conversationMessages.filter((message) => message.thread_id === activeSimulatorThread.id))
     : [];
 
   useEffect(() => {
-    if (leadId && data.leads.some((lead) => lead.id === leadId)) return;
-    setLeadId(sortedLeads[0]?.id ?? '');
-  }, [data.leads, leadId, sortedLeads]);
+    if (!leadId || data.leads.some((lead) => lead.id === leadId)) return;
+    setLeadId('');
+    setLeadQuery('');
+  }, [data.leads, leadId]);
 
   useEffect(() => {
     if (!selectedLead) {
-      setLeadQuery('');
       return;
     }
 
-    const selectedOption = leadOptions.find((option) => option.id === selectedLead.id);
-    setLeadQuery(selectedOption?.label ?? selectedLead.name);
-  }, [leadOptions, selectedLead]);
+    setLeadQuery(toLeadSearchOption(selectedLead).label);
+  }, [selectedLead]);
+
+  useEffect(() => {
+    if (!focusTarget) return;
+    if (consumedFocusNonce === focusTarget.nonce) return;
+
+    const focusedLead = data.leads.find((lead) => lead.id === focusTarget.leadId);
+    if (!focusedLead) return;
+
+    setLeadId(focusedLead.id);
+    setLeadQuery(toLeadSearchOption(focusedLead).label);
+    setLeadSelectorOpen(false);
+
+    if (focusTarget.campaignId && data.campaigns.some((campaign) => campaign.id === focusTarget.campaignId)) {
+      setCampaignId(focusTarget.campaignId);
+      setConsumedFocusNonce(focusTarget.nonce);
+      return;
+    }
+
+    const leadThread = data.conversationThreads.find((thread) => thread.lead_id === focusedLead.id);
+    if (leadThread && data.campaigns.some((campaign) => campaign.id === leadThread.campaign_id)) {
+      setCampaignId(leadThread.campaign_id);
+    }
+
+    setConsumedFocusNonce(focusTarget.nonce);
+  }, [consumedFocusNonce, data.campaigns, data.conversationThreads, data.leads, focusTarget]);
 
   useEffect(() => {
     if (campaignId && activeCampaigns.some((campaign) => campaign.id === campaignId)) return;
@@ -215,19 +243,18 @@ export function MessagesScreen({
 
   function handleLeadQueryChange(value: string) {
     setLeadQuery(value);
+    setLeadSelectorOpen(true);
+    setLeadId('');
+  }
 
-    const exactMatch = leadOptions.find((option) => option.label === value);
-    if (exactMatch) {
-      setLeadId(exactMatch.id);
-      return;
-    }
+  function selectLead(lead: Lead) {
+    setLeadId(lead.id);
+    setLeadQuery(toLeadSearchOption(lead).label);
+    setLeadSelectorOpen(false);
 
-    const normalizedValue = value.trim().toLocaleLowerCase('pt-BR');
-    if (!normalizedValue) return;
-
-    const includesMatch = leadOptions.find((option) => option.label.toLocaleLowerCase('pt-BR').includes(normalizedValue));
-    if (includesMatch) {
-      setLeadId(includesMatch.id);
+    const leadThread = data.conversationThreads.find((thread) => thread.lead_id === lead.id);
+    if (leadThread && data.campaigns.some((campaign) => campaign.id === leadThread.campaign_id && campaign.is_active)) {
+      setCampaignId(leadThread.campaign_id);
     }
   }
 
@@ -250,7 +277,7 @@ export function MessagesScreen({
       setNotice('Mensagens geradas e salvas.');
       await onReload();
     } catch (generateError) {
-      setError(generateError instanceof Error ? generateError.message : 'Falha inesperada ao gerar mensagens.');
+      setError(getErrorMessage(generateError, 'ai'));
     } finally {
       setBusy(false);
     }
@@ -269,14 +296,14 @@ export function MessagesScreen({
       return;
     }
 
+    setError(null);
+
     try {
       setSimulationBusy(true);
       const existingThread =
         data.conversationThreads.find((thread) => thread.lead_id === message.lead_id && thread.campaign_id === message.campaign_id) ?? null;
       const threadMessages = existingThread
-        ? data.conversationMessages
-            .filter((conversationMessage) => conversationMessage.thread_id === existingThread.id)
-            .sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime())
+        ? sortConversationMessages(data.conversationMessages.filter((conversationMessage) => conversationMessage.thread_id === existingThread.id))
         : [];
       const promptPurpose = resolveNextOutboundPurpose({
         history: threadMessages.map((conversationMessage) => ({
@@ -371,11 +398,50 @@ export function MessagesScreen({
       if (threadUpdateError) throw threadUpdateError;
 
       await moveLead(supabase, data.workspace.id, message.lead_id, targetStage.id);
+      let automation: StageTriggerAutomationResult = {
+        generatedCampaignNames: [],
+        skippedCampaignNames: [],
+        failedCampaigns: [],
+      };
+      let automationErrorWarning: string | null = null;
+
+      try {
+        automation = await runStageTriggerAutomation(supabase, {
+          workspaceId: data.workspace.id,
+          leadId: message.lead_id,
+          stageId: targetStage.id,
+          skipCampaignIds: [message.campaign_id],
+        });
+      } catch (automationError) {
+        automationErrorWarning = buildStageAutomationErrorWarning(
+          'Simulacao salva, mas o gatilho automatico nao pode ser concluido',
+          automationError,
+        );
+      }
+
+      if (automationErrorWarning) {
+        setError(automationErrorWarning);
+      }
+
       setSimulationMessage(null);
-      setNotice('Simulação registrada no chat. Lead movido para Tentando Contato.');
+      const noticeParts = ['Simulação registrada no chat. Lead movido para Tentando Contato.'];
+      if (automation.generatedCampaignNames.length === 1) {
+        noticeParts.push(`Mensagens geradas automaticamente para ${automation.generatedCampaignNames[0]}.`);
+      } else if (automation.generatedCampaignNames.length > 1) {
+        noticeParts.push(`${automation.generatedCampaignNames.length} campanhas geraram mensagens automaticamente.`);
+      }
+
+      setNotice(noticeParts.join(' '));
+
+      if (automation.failedCampaigns.length > 0) {
+        setError(
+          `Simulação salva, mas o gatilho automático falhou em: ${automation.failedCampaigns.map((item) => item.name).join(', ')}.`,
+        );
+      }
+
       await onReload();
     } catch (sendError) {
-      setError(sendError instanceof Error ? sendError.message : 'Falha inesperada ao simular envio.');
+      setError(getErrorMessage(sendError, 'simulator'));
     } finally {
       setSimulationBusy(false);
     }
@@ -401,7 +467,7 @@ export function MessagesScreen({
 
       window.open(result.data.url, '_blank', 'noopener,noreferrer,width=430,height=760');
     } catch (linkError) {
-      setError(linkError instanceof Error ? linkError.message : 'Falha inesperada ao abrir simulador.');
+      setError(getErrorMessage(linkError, 'simulator'));
     } finally {
       setSimulatorLinkBusy(false);
     }
@@ -416,26 +482,61 @@ export function MessagesScreen({
 
       <section className="panel message-workbench">
         <div className="message-toolbar">
-          <label className="autocomplete-field">
-            Lead
+          <div className="lead-selector-field">
+            <div className="lead-selector-heading">
+              <label htmlFor="messageLead">Lead</label>
+              <button
+                type="button"
+                className="ghost compact"
+                onClick={() => {
+                  setLeadQuery('');
+                  setLeadSelectorOpen((current) => !current);
+                }}
+              >
+                {leadSelectorOpen && !leadQuery ? 'Ocultar lista' : 'Ver todos'}
+              </button>
+            </div>
             <div className="autocomplete-input-shell">
               <Search aria-hidden />
               <input
+                id="messageLead"
                 name="messageLead"
-                list="messageLeadOptions"
                 value={leadQuery}
                 onChange={(event) => handleLeadQueryChange(event.target.value)}
-                placeholder="Ex.: Paula Martins ou Bruno Accioly"
+                onFocus={() => setLeadSelectorOpen(true)}
+                placeholder="Ex.: Contato comercial"
                 autoComplete="off"
               />
             </div>
-            <datalist id="messageLeadOptions">
-              {leadOptions.map((option) => (
-                <option key={option.id} value={option.label} />
-              ))}
-            </datalist>
-            <span className="field-hint">Busque pelo nome do lead. Ex.: Paula Martins ou Bruno Accioly.</span>
-          </label>
+            {leadSelectorOpen && (
+              <div className="lead-selector-menu" role="listbox" aria-label="Selecionar lead para conversa">
+                {leadOptions.length === 0 ? (
+                  <div className="lead-selector-empty">Nenhum lead encontrado para esta busca.</div>
+                ) : (
+                  leadOptions.map((option) => (
+                    <button
+                      key={option.lead.id}
+                      type="button"
+                      className={`lead-selector-option ${option.lead.id === leadId ? 'lead-selector-option-active' : ''}`}
+                      onClick={() => selectLead(option.lead)}
+                      role="option"
+                      aria-selected={option.lead.id === leadId}
+                    >
+                      <span className="lead-selector-option-main">
+                        <strong>{option.label}</strong>
+                        <span>{option.subtitle}</span>
+                      </span>
+                      <span className="lead-selector-option-meta">
+                        <small>{option.matchLabel}</small>
+                        <span>{option.contact}</span>
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+            <span className="field-hint">Digite para filtrar ou abra a lista e selecione explicitamente o lead.</span>
+          </div>
 
           <label>
             Campanha ativa
@@ -448,7 +549,12 @@ export function MessagesScreen({
             </select>
           </label>
 
-          <button type="button" onClick={generateMessages} disabled={busy || data.leads.length === 0 || activeCampaigns.length === 0}>
+          <button
+            type="button"
+            className="message-primary-action"
+            onClick={generateMessages}
+            disabled={busy || !leadId || data.leads.length === 0 || activeCampaigns.length === 0}
+          >
             <Sparkles aria-hidden />
             {busy ? 'Gerando mensagens...' : 'Gerar mensagens'}
           </button>
@@ -470,8 +576,27 @@ export function MessagesScreen({
           </span>
         </div>
 
+        <article className={`message-simulator-cta ${activeSimulatorThread ? 'message-simulator-cta-ready' : ''}`}>
+          <span className="section-kicker">Janela do cliente</span>
+          <strong>{activeSimulatorThread ? 'Simulador pronto para demonstração' : 'Abra o chat assim que houver uma thread simulável'}</strong>
+          <p>
+            {activeSimulatorThread
+              ? 'Use esta janela para agir como cliente, validar o tempo de resposta da IA e mostrar a conversa em tempo real.'
+              : 'Gere mensagens ou use uma conversa existente para abrir a experiência do cliente em outra janela.'}
+          </p>
+          <button
+            type="button"
+            className="secondary message-launch-button"
+            onClick={() => void openClientSimulator(activeSimulatorThread)}
+            disabled={!activeSimulatorThread || simulatorLinkBusy}
+          >
+            <ExternalLink aria-hidden />
+            {simulatorLinkBusy ? 'Abrindo simulador...' : 'Abrir simulador'}
+          </button>
+        </article>
+
         <div className="message-overview-grid">
-          <article className="overview-card">
+          <article className="overview-card message-overview-card message-overview-card-lead">
             <div className="overview-card-topline">
               <span className="section-kicker">Lead selecionado</span>
               <Building2 aria-hidden />
@@ -491,7 +616,7 @@ export function MessagesScreen({
             )}
           </article>
 
-          <article className="overview-card">
+          <article className="overview-card message-overview-card message-overview-card-campaign">
             <div className="overview-card-topline">
               <span className="section-kicker">Campanha em uso</span>
               <Workflow aria-hidden />
@@ -510,7 +635,7 @@ export function MessagesScreen({
             )}
           </article>
 
-          <article className="overview-card overview-card-accent">
+          <article className="overview-card overview-card-accent message-overview-card message-overview-card-evaluation">
             <div className="overview-card-topline">
               <span className="section-kicker">Leitura da avaliação</span>
               <Activity aria-hidden />
@@ -534,7 +659,7 @@ export function MessagesScreen({
           </div>
           <button
             type="button"
-            className="ghost compact"
+            className="ghost compact message-launch-button-inline"
             onClick={() => void openClientSimulator(activeSimulatorThread)}
             disabled={!activeSimulatorThread || simulatorLinkBusy}
           >
@@ -557,7 +682,7 @@ export function MessagesScreen({
             <MessageCircleReply aria-hidden />
             <div>
               <h2>Nenhuma conversa simulável criada</h2>
-              <p className="empty">Rode o smoke realista para popular threads, respostas de clientes e links de simulação.</p>
+              <p className="empty">Rode o cenário de avaliação para popular threads, respostas de clientes e links de simulação.</p>
             </div>
           </div>
         )}
@@ -587,9 +712,9 @@ export function MessagesScreen({
                   <Clock3 aria-hidden />
                   <span>Gerada em {formatDateTime(message.created_at)}</span>
                 </div>
-                <button type="button" onClick={() => setSimulationMessage(message)}>
+                <button type="button" onClick={() => setSimulationMessage(message)} disabled={simulationBusy}>
                   <MessageSquareText aria-hidden />
-                  {message.generation_status === 'sent' ? 'Ver no chat' : 'Simular no chat'}
+                  {simulationBusy ? 'Abrindo simulação...' : message.generation_status === 'sent' ? 'Ver no chat' : 'Simular no chat'}
                 </button>
               </div>
             </article>
@@ -611,18 +736,6 @@ export function MessagesScreen({
         onConfirm={(message) => void simulateSend(message)}
       />
 
-      <button
-        type="button"
-        className="client-simulator-shortcut"
-        onClick={() => void openClientSimulator(activeSimulatorThread)}
-        disabled={!activeSimulatorThread || simulatorLinkBusy}
-        aria-label="Abrir simulador do cliente em nova janela"
-      >
-        <MessageCircleReply aria-hidden />
-        <span>
-          Abra o simulador para agir como cliente e testar a próxima resposta da IA em outra janela.
-        </span>
-      </button>
     </section>
   );
 }

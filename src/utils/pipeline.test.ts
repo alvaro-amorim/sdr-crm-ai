@@ -16,6 +16,7 @@ const lead: Lead = {
   workspace_id: 'workspace-1',
   current_stage_id: 'stage-0',
   assigned_user_id: null,
+  technical_owner_name: null,
   name: 'Lead Exemplo',
   email: null,
   phone: '11999999999',
@@ -104,6 +105,29 @@ describe('pipeline rules', () => {
         customValues: [],
       }),
     ).toEqual([]);
+  });
+
+  it('rotula corretamente o responsável do workspace quando ele é obrigatório', () => {
+    const requiredFields: StageRequiredField[] = [
+      {
+        id: 'rule-2',
+        workspace_id: 'workspace-1',
+        stage_id: stage.id,
+        field_key: 'assigned_user_id',
+        custom_field_id: null,
+        created_at: new Date().toISOString(),
+      },
+    ];
+
+    expect(
+      findMissingRequiredFields({
+        lead,
+        targetStage: stage,
+        requiredFields,
+        customFields: [],
+        customValues: [],
+      }),
+    ).toEqual(['Responsável do workspace']);
   });
 
   it('gera field_key estável e seguro', () => {

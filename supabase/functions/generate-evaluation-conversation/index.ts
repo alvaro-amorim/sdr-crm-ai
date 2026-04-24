@@ -88,7 +88,7 @@ function parseConversation(
 
   scenarioProfile.sequence.forEach((step, index) => {
     if (normalized[index]?.direction !== step.direction) {
-      throw new Error('A IA retornou uma sequência inválida para o cenário do smoke.');
+      throw new Error('A IA retornou uma sequência inválida para o cenário de avaliação.');
     }
   });
 
@@ -196,7 +196,7 @@ serve(async (request) => {
   const openAiKey = Deno.env.get('OPENAI_API_KEY');
 
   if (!supabaseUrl || !publishableKey || !openAiKey) {
-    return json(500, { success: false, error: 'Serviço de smoke não configurado.' });
+    return json(500, { success: false, error: 'Serviço do cenário de avaliação não configurado.' });
   }
 
   const authorization = request.headers.get('Authorization') ?? (request.headers.get('x-sdr-auth-token') ? `Bearer ${request.headers.get('x-sdr-auth-token')}` : null);
@@ -238,6 +238,6 @@ serve(async (request) => {
 
     return json(200, { success: true, data: generated });
   } catch (_error) {
-    return json(502, { success: false, error: 'Falha segura ao gerar conversa do smoke.' });
+    return json(502, { success: false, error: 'Falha segura ao gerar conversa do cenário de avaliação.' });
   }
 });

@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Elevar a percepção do produto antes da migração visual para o Lovable, preservando a base funcional já validada:
+Elevar a percepção do produto com refinamento visual incremental apoiado por stack de vibe coding, preservando a base funcional já validada:
 
 - autenticação
 - workspace
@@ -78,7 +78,7 @@ Elevar a percepção do produto antes da migração visual para o Lovable, prese
 - revisar telas internas em mobile
 - garantir que modais, cards, selects e barras não quebrem
 
-### Etapa 8 — Polimento final antes do Lovable
+### Etapa 8 — Polimento final com apoio de vibe coding
 
 - revisar microcopy
 - revisar estados vazios

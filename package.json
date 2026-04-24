@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:smoke:crm": "node scripts/smoke-crm-flow.mjs"
+    "test:smoke:crm": "node scripts/smoke-crm.mjs",
+    "scenario:evaluation:crm": "node scripts/evaluation-scenario-crm.mjs"
   },
   "keywords": [],
   "author": "",

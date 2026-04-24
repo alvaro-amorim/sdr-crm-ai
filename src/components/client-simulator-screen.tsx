@@ -1,8 +1,11 @@
 import { ArrowLeft, Bot, RefreshCcw, Send, UserRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import type { ConversationMessage, ConversationThread, Campaign, Lead } from '../types/domain';
+import { supabaseEnv } from '../lib/supabase';
+import type { Campaign, ConversationMessage, ConversationThread, Lead } from '../types/domain';
+import { sortConversationMessages } from '../utils/conversation';
 import { formatDateTime } from '../utils/crm-ui';
+import { getErrorMessage } from '../utils/error-messages';
+import { buildLeadStageDecisionNotice, type LeadStageDecision } from '../utils/lead-stage-action';
 
 type SimulatorThread = ConversationThread & {
   leads?: Lead;
@@ -13,6 +16,14 @@ type SimulatorPayload = {
   thread: SimulatorThread;
   messages: ConversationMessage[];
   generated_model?: string;
+  used_fallback?: boolean;
+  stage_decision?: LeadStageDecision | null;
+  pending_message?: {
+    id: string;
+    scheduled_for: string;
+    status: 'pending' | 'sent' | 'canceled';
+  } | null;
+  processed_scheduled_messages?: number;
 };
 
 function getTokenFromUrl() {
@@ -30,46 +41,151 @@ function getChannelLabel(channel: string | null | undefined) {
   }
 }
 
+function getFriendlySimulatorError(error: unknown) {
+  return getErrorMessage(error, 'simulator');
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function randomBetween(min: number, max: number) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function notifyAuthenticatedApp(data: SimulatorPayload) {
+  try {
+    window.localStorage.setItem(
+      'sdr-simulator-conversation-updated',
+      JSON.stringify({
+        workspaceId: data.thread.workspace_id,
+        leadId: data.thread.lead_id,
+        threadId: data.thread.id,
+        updatedAt: new Date().toISOString(),
+        stageDecision: data.stage_decision ?? null,
+      }),
+    );
+  } catch {
+    // The simulator still works if browser storage is blocked.
+  }
+}
+
+async function invokePublicSimulator(body: { token: string; message?: string }) {
+  if (!supabaseEnv) {
+    throw new Error('Supabase nao configurado.');
+  }
+
+  const response = await fetch(`${supabaseEnv.VITE_SUPABASE_URL.replace(/\/$/, '')}/functions/v1/simulate-client-chat`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${supabaseEnv.VITE_SUPABASE_ANON_KEY}`,
+      apikey: supabaseEnv.VITE_SUPABASE_ANON_KEY,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(payload?.error ?? payload?.message ?? `Falha HTTP ${response.status}.`);
+  }
+
+  return payload as { success?: boolean; error?: string; data?: SimulatorPayload };
+}
+
 export function ClientSimulatorScreen() {
   const token = useMemo(getTokenFromUrl, []);
   const [payload, setPayload] = useState<SimulatorPayload | null>(null);
   const [reply, setReply] = useState('');
   const [busy, setBusy] = useState(false);
+  const [typing, setTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stageNotice, setStageNotice] = useState<string | null>(null);
 
-  async function loadThread() {
-    if (!supabase || !token) return;
-    setBusy(true);
+  async function applyPayload(data: SimulatorPayload, humanized = false) {
+    if (humanized) {
+      await wait(randomBetween(20_000, 45_000));
+      setTyping(true);
+      await wait(randomBetween(3_000, 6_000));
+      setTyping(false);
+    }
+
+    setPayload({
+      ...data,
+      messages: sortConversationMessages(data.messages),
+    });
+    setStageNotice(buildLeadStageDecisionNotice(data.stage_decision));
+  }
+
+  async function loadThread(options: { silent?: boolean } = {}) {
+    if (!token) return;
+    if (!options.silent) setBusy(true);
     setError(null);
     try {
-      const { data, error: functionError } = await supabase.functions.invoke('simulate-client-chat', {
-        body: { token },
-      });
-      if (functionError) throw functionError;
-      if (!data?.success) throw new Error(data?.error ?? 'Falha ao carregar conversa.');
-      setPayload(data.data);
+      const data = await invokePublicSimulator({ token });
+      if (!data?.success || !data.data) throw new Error(data?.error ?? 'Falha ao carregar conversa.');
+      const processedScheduledMessages = Number(data.data?.processed_scheduled_messages ?? 0);
+      await applyPayload(data.data, options.silent && processedScheduledMessages > 0);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Falha ao carregar simulador.');
+      if (!options.silent) setError(getFriendlySimulatorError(loadError));
     } finally {
-      setBusy(false);
+      if (!options.silent) setBusy(false);
     }
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!supabase || !reply.trim()) return;
+    if (!reply.trim()) return;
+
+    const trimmedReply = reply.trim();
+    const optimisticMessage: ConversationMessage | null = payload
+      ? {
+          id: `optimistic-${Date.now()}`,
+          workspace_id: payload.thread.workspace_id,
+          thread_id: payload.thread.id,
+          lead_id: payload.thread.lead_id,
+          campaign_id: payload.thread.campaign_id,
+          direction: 'inbound',
+          sender_type: 'client',
+          sender_name: payload.thread.leads?.name ?? 'Cliente',
+          message_text: trimmedReply,
+          model_name: null,
+          prompt_purpose: null,
+          sentiment_tag: null,
+          intent_tag: null,
+          generated_by: 'user',
+          token_usage: null,
+          created_at: new Date().toISOString(),
+        }
+      : null;
+
+    if (optimisticMessage) {
+      setPayload((current) => (current ? { ...current, messages: [...current.messages, optimisticMessage] } : current));
+    }
+
+    setReply('');
     setBusy(true);
     setError(null);
+
     try {
-      const { data, error: functionError } = await supabase.functions.invoke('simulate-client-chat', {
-        body: { token, message: reply.trim() },
-      });
-      if (functionError) throw functionError;
-      if (!data?.success) throw new Error(data?.error ?? 'Falha ao gerar resposta.');
-      setPayload(data.data);
-      setReply('');
+      const data = await invokePublicSimulator({ token, message: trimmedReply });
+      if (!data?.success || !data.data) throw new Error(data?.error ?? 'Falha ao gerar resposta.');
+      await applyPayload(data.data, true);
+      notifyAuthenticatedApp(data.data);
     } catch (replyError) {
-      setError(replyError instanceof Error ? replyError.message : 'Falha ao responder como cliente.');
+      setTyping(false);
+      setError(getFriendlySimulatorError(replyError));
+      if (optimisticMessage) {
+        setPayload((current) =>
+          current
+            ? {
+                ...current,
+                messages: current.messages.filter((message) => message.id !== optimisticMessage.id),
+              }
+            : current,
+        );
+      }
+      setReply(trimmedReply);
     } finally {
       setBusy(false);
     }
@@ -78,6 +194,15 @@ export function ClientSimulatorScreen() {
   useEffect(() => {
     void loadThread();
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    const intervalId = window.setInterval(() => {
+      if (!busy) void loadThread({ silent: true });
+    }, 30_000);
+
+    return () => window.clearInterval(intervalId);
+  }, [busy, token]);
 
   if (!token) {
     return (
@@ -115,10 +240,24 @@ export function ClientSimulatorScreen() {
         {error && (
           <div className="status error-box">
             <strong>{error}</strong>
-            <button type="button" className="ghost compact" onClick={() => void loadThread()}>
-              <RefreshCcw aria-hidden />
-              Tentar novamente
+            <button type="button" className="ghost compact" onClick={() => void loadThread()} disabled={busy}>
+              <RefreshCcw className={busy ? 'spin' : undefined} aria-hidden />
+              {busy ? 'Carregando...' : 'Tentar novamente'}
             </button>
+          </div>
+        )}
+
+        {payload?.pending_message?.status === 'pending' && (
+          <div className="status">
+            <strong>Resposta pronta para envio</strong>
+            <span>Será disparada automaticamente em {formatDateTime(payload.pending_message.scheduled_for)} no horário de São Paulo.</span>
+          </div>
+        )}
+
+        {stageNotice && (
+          <div className="status">
+            <strong>Atualização automática do lead</strong>
+            <span>{stageNotice}</span>
           </div>
         )}
 
@@ -160,6 +299,16 @@ export function ClientSimulatorScreen() {
               );
             })
           )}
+          {typing && (
+            <article className="client-chat-message">
+              <div className="client-chat-avatar">
+                <Bot aria-hidden />
+              </div>
+              <div className="client-chat-bubble client-chat-typing">
+                <strong>SDR Expert está digitando...</strong>
+              </div>
+            </article>
+          )}
         </section>
 
         <form className="client-reply-form" onSubmit={submit}>
@@ -170,7 +319,7 @@ export function ClientSimulatorScreen() {
               name="clientReply"
               value={reply}
               onChange={(event) => setReply(event.target.value)}
-              placeholder="Exemplo: Tenho interesse, mas preciso entender prazo de implantação e esforço do meu time."
+              placeholder="Exemplo: Tenho interesse, mas preciso entender prazo de implantação."
               maxLength={1200}
               disabled={busy}
               required
@@ -178,7 +327,7 @@ export function ClientSimulatorScreen() {
           </label>
           <button type="submit" disabled={busy || reply.trim().length === 0}>
             <Send aria-hidden />
-            {busy ? 'Gerando resposta...' : 'Enviar resposta'}
+            {busy ? 'Aguardando IA...' : 'Enviar resposta'}
           </button>
         </form>
       </section>
