@@ -1,62 +1,72 @@
+<div align="center">
+
 # SDR Expert CRM
 
-Mini CRM para operação de SDR com Supabase Auth, isolamento por workspace, pipeline comercial, campanhas com apoio de IA e simulador público de conversa.
+### Mini CRM multi-tenant para operação comercial com automações e inteligência artificial
 
-## Entrega final
+[![Demo](https://img.shields.io/badge/Demo-Acessar-111827?style=for-the-badge&logo=vercel&logoColor=white)](https://sdr-crm-ai-wine.vercel.app/)
+[![Video](https://img.shields.io/badge/Vídeo-Apresentação-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/tDCifuSgRc0)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=111827)](https://react.dev/)
+[![Supabase](https://img.shields.io/badge/Supabase-Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
 
-- Aplicação publicada: [https://sdr-crm-ai-wine.vercel.app/](https://sdr-crm-ai-wine.vercel.app/)
-- Repositório GitHub: [https://github.com/alvaro-amorim/sdr-crm-ai](https://github.com/alvaro-amorim/sdr-crm-ai)
-- Vídeo de apresentação: [https://youtu.be/tDCifuSgRc0](https://youtu.be/tDCifuSgRc0)
-- Branch de entrega: `main`
+</div>
+
+---
+
+## Sobre o projeto
+
+O **SDR Expert CRM** é um produto web para organização da rotina de Sales Development Representatives. A aplicação reúne pipeline comercial, leads, campanhas, mensagens assistidas por IA, histórico de conversas e um simulador público de atendimento.
+
+O projeto foi construído como um MVP funcional, com isolamento por workspace, autenticação real, políticas de acesso no banco e funções server-side para operações sensíveis.
+
+## O que este projeto demonstra
+
+- Aplicação React com TypeScript estruturada para produção.
+- Autenticação por e-mail, senha e Google OAuth.
+- Arquitetura multi-tenant baseada em workspaces.
+- PostgreSQL com Row Level Security.
+- Edge Functions para IA e operações privilegiadas.
+- Pipeline em kanban e dashboard operacional.
+- Testes automatizados e ambiente de avaliação reproduzível.
+
+## Funcionalidades principais
+
+- Cadastro, login, logout e recuperação de senha.
+- Criação automática do primeiro workspace.
+- CRUD de leads com campos padrão e personalizados.
+- Pipeline comercial em kanban.
+- Validação de campos obrigatórios por etapa.
+- Campanhas com planejamento assistido por IA.
+- Geração de mensagens personalizadas por lead.
+- Envio simulado com persistência da conversa.
+- Simulador público acessado por token.
+- Dashboard com métricas e atalhos operacionais.
 
 ## Stack
 
-- React 19 + TypeScript + Vite
-- Supabase Auth, Postgres, RLS e Edge Functions
-- OpenAI para planejamento e geração de mensagens
-- Zod para validação
-- Vitest para testes automatizados
-- Vercel para deploy do frontend
+<div align="center">
 
-## Fluxo principal entregue
+<img src="https://skillicons.dev/icons?i=react,typescript,vite,supabase,postgres,nodejs,vercel,git,github" alt="Stack do SDR Expert CRM" />
 
-- cadastro, login, logout e recuperação de senha com Supabase Auth;
-- login com Google via Supabase OAuth;
-- criação do primeiro workspace com funil padrão;
-- CRUD de leads com campos padrão e personalizados;
-- validação de campos obrigatórios por etapa;
-- leitura do pipeline em kanban;
-- criação de campanhas com planejamento assistido por IA;
-- geração de mensagens por lead;
-- envio simulado com persistência de thread;
-- simulador público por token;
-- dashboard operacional com métricas e atalhos.
+</div>
+
+| Camada | Tecnologias |
+|---|---|
+| **Front-end** | React 19, TypeScript e Vite |
+| **Backend e dados** | Supabase Auth, PostgreSQL, RLS e Edge Functions |
+| **IA** | OpenAI para estratégia e geração de mensagens |
+| **Validação e testes** | Zod e Vitest |
+| **Deploy** | Vercel e Supabase |
 
 ## Decisões técnicas
 
-- Supabase centraliza Auth, Postgres, RLS e Edge Functions para reduzir superfície operacional no MVP.
-- O isolamento multi-tenant usa `workspace_id`, `workspace_members` e políticas RLS nas tabelas principais.
-- As chamadas com privilégio e IA ficam em Edge Functions, mantendo `SUPABASE_SERVICE_ROLE_KEY` e `OPENAI_API_KEY` fora do frontend.
-- O frontend usa React, TypeScript e validações locais com Zod para reduzir estados inválidos antes de persistir dados.
-- O painel auxiliar de avaliação fica separado em `/__evaluation` para não misturar dados de demo com o fluxo normal do produto.
+- O Supabase centraliza autenticação, PostgreSQL, RLS e funções server-side para reduzir a superfície operacional do MVP.
+- O isolamento por cliente utiliza `workspace_id`, associação de membros e políticas RLS nas tabelas principais.
+- Chaves privilegiadas e chamadas de IA permanecem nas Edge Functions, nunca no frontend publicado.
+- O frontend valida os principais payloads com Zod antes da persistência.
+- O painel de avaliação fica isolado em `/__evaluation`, sem interferir no fluxo normal do produto.
 
-## Diferenciais implementados
-
-- Workspace inicial com funil padrão pronto para uso.
-- Campo textual `technical_owner_name` para responsável técnico quando não existe usuário interno atribuído.
-- Campo `assigned_user_id` preservado para atribuição real a membros do workspace.
-- Geração de campanhas e mensagens com IA via Edge Functions.
-- Envio simulado com persistência de conversa e simulador público por token.
-- Painel técnico de avaliação e smoke leve para preparar rapidamente um ambiente testável.
-
-## Limites honestos do MVP
-
-- O envio de mensagens é simulado; não há integração real com WhatsApp, e-mail ou CRM externo.
-- O painel auxiliar existe para avaliação técnica e deve ficar restrito por configuração em ambientes públicos.
-- O cenário pesado de avaliação pode gerar custo de IA e depende de `OPENAI_API_KEY` configurada no ambiente correto.
-- Permissões avançadas por perfil ainda estão reduzidas ao modelo de workspace e membership.
-
-## Edge Functions ativas
+## Edge Functions
 
 - `generate-lead-messages`
 - `plan-campaign-strategy`
@@ -64,19 +74,33 @@ Mini CRM para operação de SDR com Supabase Auth, isolamento por workspace, pip
 - `simulate-client-chat`
 - `generate-evaluation-conversation`
 
-## Setup local
+## Segurança e multi-tenancy
 
-### 1. Instalar dependências
+- O frontend não utiliza `SUPABASE_SERVICE_ROLE_KEY`.
+- Todas as entidades de negócio pertencem a um `workspace_id`.
+- O banco valida membership por meio de RLS.
+- As Edge Functions verificam autenticação e workspace antes de operar.
+- O simulador público limita o acesso a uma thread específica por token.
+
+## Limites honestos do MVP
+
+- O envio de mensagens é simulado e não possui integração real com WhatsApp ou e-mail.
+- As permissões avançadas ainda estão limitadas ao modelo de workspace e membership.
+- O cenário completo de avaliação pode gerar custo de IA quando utiliza uma chave OpenAI real.
+
+## Executando localmente
+
+### 1. Instale as dependências
 
 ```bash
 npm install
 ```
 
-### 2. Configurar `.env.local`
+### 2. Configure o ambiente
 
 Use `.env.example` como base:
 
-```bash
+```env
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 VITE_ENABLE_EVALUATION_PANEL=false
@@ -84,11 +108,9 @@ TEST_USER_EMAIL=avaliador@example.com
 TEST_USER_PASSWORD=sua-senha
 ```
 
-`OPENAI_API_KEY` local é opcional e só deve ser usada no cenário pesado de avaliação. Ela nunca deve ficar no frontend publicado.
+`OPENAI_API_KEY` e `SUPABASE_SERVICE_ROLE_KEY` devem permanecer somente no ambiente server-side do Supabase.
 
-`VITE_ENABLE_EVALUATION_PANEL` é opcional. Use `true` apenas quando for necessário expor o painel auxiliar de avaliação em ambiente remoto de review.
-
-### 3. Linkar e aplicar o projeto Supabase
+### 3. Aplique o projeto Supabase
 
 ```bash
 npx supabase login
@@ -96,7 +118,7 @@ npx supabase link --project-ref your-project-ref
 npx supabase db push
 ```
 
-### 4. Publicar as Edge Functions
+### 4. Publique as funções
 
 ```bash
 npx supabase functions deploy generate-lead-messages
@@ -106,107 +128,13 @@ npx supabase functions deploy simulate-client-chat
 npx supabase functions deploy generate-evaluation-conversation
 ```
 
-### 5. Rodar o frontend local
+### 5. Rode o frontend
 
 ```bash
 npm run dev
 ```
 
-## Seeds técnicos
-
-O repositório agora separa claramente dois fluxos:
-
-### Painel auxiliar de avaliação técnica
-
-Rota:
-
-```bash
-/__evaluation
-```
-
-Objetivo:
-
-- acelerar a validação funcional pelo avaliador;
-- não misturar seeds de apoio com o fluxo normal do produto;
-- popular dados determinísticos no workspace atual da sessão do avaliador.
-
-Comportamento:
-
-- usa o workspace logado do avaliador, inclusive quando aberto por `?workspace=`;
-- funciona automaticamente em `localhost`;
-- em ambiente remoto exige `VITE_ENABLE_EVALUATION_PANEL=true`;
-- oferece 4 ações determinísticas:
-  - gerar leads de exemplo
-  - criar campanha de exemplo
-  - popular cenário básico de avaliação
-  - resetar dados de avaliação
-- expõe atalhos diretos para:
-  - Dashboard
-  - Leads
-  - Campanhas
-  - Mensagens IA
-  - chat como cliente quando a conversa seeded existir
-
-Mais detalhes:
-
-- `docs/evaluation-panel.md`
-
-### Smoke test real
-
-Comando:
-
-```bash
-npm run test:smoke:crm
-```
-
-Objetivo:
-
-- preparar um ambiente mínimo e rápido;
-- não usar IA;
-- criar apenas:
-  - 3 leads fixos
-  - 1 campanha fixa
-  - 1 conversa seeded
-  - 1 token de simulador
-
-Uso recomendado:
-
-- deixar o sistema minimamente pronto para avaliação;
-- validar o fluxo principal sem volume alto;
-- testar rapidamente em um perfil vazio.
-
-Variáveis opcionais:
-
-- `SMOKE_WORKSPACE_NAME`
-- `SMOKE_PUBLIC_BASE_URL`
-
-### Cenário pesado de avaliação
-
-Comando:
-
-```bash
-npm run scenario:evaluation:crm
-```
-
-Objetivo:
-
-- preparar um workspace cheio e crível para demo;
-- criar 100 leads e 4 campanhas;
-- gerar até 75 conversas com IA real;
-- povoar dashboard, mensagens e simulador com volume alto.
-
-Esse fluxo não é mais tratado como smoke test.
-
-Variáveis opcionais:
-
-- `OPENAI_API_KEY`
-- `EVALUATION_WORKSPACE_NAME`
-- `EVALUATION_PUBLIC_BASE_URL`
-- `EVALUATION_WAVE`
-- `EVALUATION_THREAD_LIMIT`
-- `EVALUATION_AI_DELAY_MS`
-
-## Testes e validações
+## Testes e avaliação
 
 ```bash
 npm run test
@@ -214,54 +142,44 @@ npm run lint
 npm run build
 ```
 
-Smoke leve:
+Para preparar um cenário mínimo sem uso de IA:
 
 ```bash
 npm run test:smoke:crm
 ```
 
-Cenário pesado:
+Para popular um ambiente completo de demonstração:
 
 ```bash
 npm run scenario:evaluation:crm
 ```
 
-Painel auxiliar:
+O painel auxiliar de avaliação está disponível em:
 
-- abrir `http://localhost:5173/__evaluation`
-- preparar o cenário com um clique
-- navegar pelos atalhos do app principal no workspace atual da sessão
+```text
+/__evaluation
+```
 
-## Guia rápido para o avaliador
+## Meu papel
 
-1. Acesse a aplicação publicada ou rode o projeto localmente.
-2. Crie uma conta ou entre com o usuário de teste fornecido fora do repositório.
-3. Confirme a criação do workspace inicial.
-4. Abra `/__evaluation` e prepare o cenário básico.
-5. Navegue por Dashboard, Leads, Campanhas, Mensagens IA e Simulador.
-6. Opcionalmente rode `npm run test:smoke:crm` para validar o fluxo mínimo automatizado.
+Desenvolvimento full stack do projeto, incluindo:
 
-Vídeo de apresentação:
+- arquitetura multi-tenant e modelagem de dados;
+- interface, dashboard, pipeline e campanhas;
+- autenticação, RLS e Edge Functions;
+- integração com IA e simulador público;
+- testes, seeds técnicos, documentação e deploy.
 
-- [https://youtu.be/tDCifuSgRc0](https://youtu.be/tDCifuSgRc0)
+## Links
 
-## Deploy
+- **Aplicação:** https://sdr-crm-ai-wine.vercel.app/
+- **Vídeo:** https://youtu.be/tDCifuSgRc0
+- **Repositório:** https://github.com/alvaro-amorim/sdr-crm-ai
 
-- frontend publicado na Vercel;
-- variáveis públicas na Vercel:
-  - `VITE_SUPABASE_URL`
-  - `VITE_SUPABASE_ANON_KEY`
-  - `VITE_ENABLE_EVALUATION_PANEL=true` para expor o painel remoto do avaliador
-- `OPENAI_API_KEY` e `SUPABASE_SERVICE_ROLE_KEY` ficam apenas no Supabase.
+---
 
-Deploy de referência:
+<div align="center">
 
-- [https://sdr-crm-ai-wine.vercel.app/](https://sdr-crm-ai-wine.vercel.app/)
+Desenvolvido por [Álvaro Amorim](https://github.com/alvaro-amorim)
 
-## Segurança e multi-tenancy
-
-- o frontend não usa `SUPABASE_SERVICE_ROLE_KEY`;
-- toda entidade de negócio é ligada a `workspace_id`;
-- o banco aplica membership e RLS nas tabelas principais;
-- as Edge Functions validam autenticação e workspace antes de operar;
-- o simulador público acessa apenas uma thread específica por token.
+</div>
